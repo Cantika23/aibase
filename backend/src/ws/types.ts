@@ -1,0 +1,130 @@
+/**
+ * Core WebSocket message types for bidirectional LLM communication
+ */
+
+export interface WSMessage {
+  type: MessageType;
+  id: string;
+  data?: any;
+  metadata?: MessageMetadata;
+}
+
+export interface MessageMetadata {
+  timestamp: number;
+  sequence?: number;
+  total?: number;
+  clientId?: string;
+  sessionId?: string;
+}
+
+export type MessageType =
+  // Client to Server
+  | 'user_message'
+  | 'control'
+  | 'ping'
+
+  // Server to Client
+  | 'llm_chunk'
+  | 'llm_complete'
+  | 'tool_call'
+  | 'tool_result'
+  | 'error'
+  | 'control_response'
+  | 'pong'
+  | 'status';
+
+// Control message types
+export interface ControlMessage {
+  type: 'abort' | 'pause' | 'resume' | 'clear_history' | 'get_history' | 'get_status';
+  targetId?: string;
+  data?: any;
+}
+
+// LLM related messages
+export interface UserMessageData {
+  text: string;
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    tools?: string[];
+  };
+}
+
+export interface LLMChunkData {
+  chunk: string;
+  isComplete: boolean;
+}
+
+export interface ToolCallData {
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  status: 'start' | 'progress' | 'complete' | 'error';
+  result?: any;
+  error?: string;
+}
+
+// Status and error messages
+export interface StatusData {
+  status: 'connecting' | 'connected' | 'processing' | 'idle' | 'error' | 'disconnected';
+  message?: string;
+  details?: any;
+}
+
+export interface ErrorData {
+  code: string;
+  message: string;
+  details?: any;
+  recoverable: boolean;
+}
+
+// Configuration options
+export interface WSClientOptions {
+  url: string;
+  reconnectAttempts?: number;
+  reconnectDelay?: number;
+  heartbeatInterval?: number;
+  timeout?: number;
+  protocols?: string[];
+}
+
+export interface WSServerOptions {
+  port?: number;
+  hostname?: string;
+  maxConnections?: number;
+  heartbeatInterval?: number;
+  enableCompression?: boolean;
+  conversationOptions?: any;
+}
+
+// Event handler types
+export type EventHandler<T = any> = (data: T) => void | Promise<void>;
+export type ErrorEventHandler = (error: Error) => void | Promise<void>;
+
+// Connection state
+export type ConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'disconnecting'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'error';
+
+// Conversation session info
+export interface SessionInfo {
+  id: string;
+  clientId: string;
+  createdAt: number;
+  lastActivity: number;
+  messageCount: number;
+}
+
+// Statistics and monitoring
+export interface ConnectionStats {
+  connectedAt?: number;
+  messagesSent: number;
+  messagesReceived: number;
+  lastMessageAt?: number;
+  reconnectCount: number;
+  averageLatency?: number;
+}
