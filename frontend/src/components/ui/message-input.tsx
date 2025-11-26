@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowUp, Info, Loader2, Mic, Paperclip, Square, X } from "lucide-react"
+import { ArrowUp, Info, Loader2, Mic, Paperclip, Square } from "lucide-react"
 import { omit } from "remeda"
 
 import { cn } from "@/lib/utils"
@@ -48,6 +48,7 @@ export function MessageInput({
   transcribeAudio,
   ...props
 }: MessageInputProps) {
+  const pasteTimestampRef = useRef<number>(0);
   const [isDragging, setIsDragging] = useState(false)
   const [showInterruptPrompt, setShowInterruptPrompt] = useState(false)
 
@@ -118,9 +119,10 @@ export function MessageInput({
     if (text && text.length > 500 && props.allowAttachments) {
       event.preventDefault()
       const blob = new Blob([text], { type: "text/plain" })
+      pasteTimestampRef.current = Date.now()
       const file = new File([blob], "Pasted text", {
         type: "text/plain",
-        lastModified: Date.now(),
+        lastModified: pasteTimestampRef.current,
       })
       addFiles([file])
       return
@@ -159,7 +161,7 @@ export function MessageInput({
     onKeyDownProp?.(event)
   }
 
-  const textAreaRef = useRef<HTMLTextAreaElement>(null)
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null)
   const [textAreaHeight, setTextAreaHeight] = useState<number>(0)
 
   useEffect(() => {
@@ -172,7 +174,7 @@ export function MessageInput({
     props.allowAttachments && props.files && props.files.length > 0
 
   useAutosizeTextArea({
-    ref: textAreaRef,
+    ref: textAreaRef as React.RefObject<HTMLTextAreaElement>,
     maxHeight: 240,
     borderWidth: 1,
     dependencies: [props.value, showFileList],
@@ -216,7 +218,7 @@ export function MessageInput({
           />
 
           {props.allowAttachments && (
-            <div className="absolute inset-x-3 bottom-0 z-20 overflow-x-scroll py-3">
+            <div className="absolute inset-x-3 bottom-0 z-20 py-3">
               <div className="flex space-x-3">
                 <AnimatePresence mode="popLayout">
                   {props.files?.map((file) => {

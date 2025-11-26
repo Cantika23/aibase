@@ -97,14 +97,19 @@ export class WebSocketServer {
       hostname: this.options.hostname,
       development: this.options.development,
       fetch: (req, server) => {
-        // Handle WebSocket upgrade requests through WSServer
-        const wsResponse = this.wsServer.handleHttpUpgrade(req, server);
-        if (wsResponse === undefined) {
-          return undefined; // WebSocket connection established
-        }
-
-        // Handle HTTP routes
         const url = new URL(req.url);
+        
+        // Handle WebSocket upgrade requests
+        console.log("Incoming request:", req.method, req.url);
+        if (url.pathname.startsWith("/api/ws")) {
+          console.log("WebSocket upgrade request for:", req.url);
+          const upgraded = server.upgrade(req);
+          console.log("WebSocket upgrade result:", upgraded);
+          if (upgraded) {
+            return undefined; // WebSocket connection established
+          }
+          return new Response("WebSocket upgrade failed", { status: 400 });
+        }
 
         // Default routes
         if (url.pathname === "/") {
@@ -148,7 +153,7 @@ export class WebSocketServer {
 
         return new Response("Not Found", { status: 404 });
       },
-      websocket: wsHandlers,
+      websocket: this.wsServer.getWebSocketHandlers(),
     });
 
     console.log(
@@ -212,6 +217,5 @@ export async function createAndStartServer(
  */
 export const VERSION = "1.0.0";
 
-if (require.main === module) {
-  createAndStartServer();
-}
+// Always start server when this file is run
+createAndStartServer();

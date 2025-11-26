@@ -273,7 +273,7 @@ export class WSClient extends WSEventEmitter {
         }
       };
 
-      this.ws!.onerror = (error) => {
+      this.ws!.onerror = () => {
         this.setState("error");
         this.emit("error", new Error("WebSocket connection error"));
       };
@@ -380,7 +380,7 @@ export class WSClient extends WSEventEmitter {
 
   private async sendMessageAndWaitForResponse(
     message: WSMessage,
-    responseType: MessageType
+    _responseType: MessageType
   ): Promise<any> {
     return new Promise((resolve, reject) => {
       // Add timeout to prevent hanging
@@ -430,7 +430,7 @@ export class WSClient extends WSEventEmitter {
   }
 
   private clearPendingMessages(): void {
-    for (const [messageId, pending] of this.pendingMessages.entries()) {
+    for (const [, pending] of this.pendingMessages.entries()) {
       if (pending.timeout) {
         clearTimeout(pending.timeout);
       }

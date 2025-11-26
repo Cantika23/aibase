@@ -201,18 +201,21 @@ export function Chat({
         />
       ) : null}
 
-      {messages.length > 0 ? (
-        <ChatMessages messages={messages}>
-          <MessageList
-            messages={messages}
-            isTyping={isTyping}
-            messageOptions={messageOptions}
-          />
-        </ChatMessages>
-      ) : null}
+      <div className="max-w-[650px] w-full">
 
+        {messages.length > 0 ? (
+          <ChatMessages messages={messages}>
+            <MessageList
+              messages={messages}
+              isTyping={isTyping}
+              messageOptions={messageOptions}
+            />
+          </ChatMessages>
+        ) : null}
+      </div>
+      
       <ChatForm
-        className="mt-auto"
+        className="mt-auto mx-auto w-full md:max-w-[650px]"
         isPending={isGenerating || isTyping}
         handleSubmit={handleSubmit}
       >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, ChangeEvent } from "react";
+import { useState, useCallback, useRef, useEffect, type ChangeEvent } from "react";
 import { Chat } from "@/components/ui/chat";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,6 @@ import type { Message } from "@/components/ui/chat-message";
 import {
   Square,
   Trash2,
-  Wifi,
-  WifiOff,
   AlertCircle,
 } from "lucide-react";
 
@@ -120,7 +118,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       setMessages(prev => [...prev, errorMessage]);
     };
 
-    const handleStatus = (data: any) => {
+    const handleStatus = (data: { status?: string }) => {
       if (data.status) {
         setConnectionStatus(data.status);
       }
@@ -145,7 +143,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     };
   }, [wsUrl]);
 
-  const handleSubmit = useCallback(async (e?: { preventDefault?: () => void }, options?: { experimental_attachments?: FileList }) => {
+  const handleSubmit = useCallback(async (e?: { preventDefault?: () => void }) => {
     e?.preventDefault?.();
 
     if (!input.trim() || !wsClientRef.current?.isConnected()) {
@@ -242,27 +240,20 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     }
   };
 
-  const isConnected = wsClientRef.current?.isConnected() ?? false;
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Update connection status based on wsClient
+  useEffect(() => {
+    const checkConnection = () => {
+      setIsConnected(wsClientRef.current?.isConnected() ?? false);
+    };
+
+    const interval = setInterval(checkConnection, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className={`flex flex-col h-screen ${className}`}>
-      {/* Header */}
-      <div className="m-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold">AI Assistant</h1>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="flex items-center gap-1">
-              {isConnected ? (
-                <Wifi className="w-3 h-3" />
-              ) : (
-                <WifiOff className="w-3 h-3" />
-              )}
-              {getStatusText(connectionStatus)}
-            </Badge>
-            <div className={`w-2 h-2 rounded-full ${getStatusColor(connectionStatus)}`} />
-          </div>
-        </div>
-      </div>
 
       {/* Error Alert */}
       {error && (
@@ -272,55 +263,71 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         </Alert>
       )}
 
-      {/* shadcn-chatbot-kit Chat Component */}
-      <div className="flex-1 px-4 pb-4 min-h-0">
-        <div className="h-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm flex flex-col">
-          <div className="flex-1">
-            <Chat
-              messages={messages}
-              input={input}
-              handleInputChange={handleInputChange}
-              handleSubmit={handleSubmit}
-              isGenerating={isLoading}
-              stop={abort}
-              setMessages={setMessages}
-              append={append}
-              suggestions={messages.length === 0 ? suggestions : []}
-              className="h-full"
-            />
+      <Chat
+        messages={messages}
+        input={input}
+        handleInputChange={handleInputChange}
+        handleSubmit={handleSubmit}
+        isGenerating={isLoading}
+        stop={abort}
+        setMessages={setMessages}
+        append={append}
+        suggestions={messages.length === 0 ? suggestions : []}
+        className="h-full"
+      />
+
+      {/* <div className="flex-1 px-4 pb-4 min-h-0">
+        <div className="flex flex-rpw">
+
+          <div className="p-4 border-t bg-background">
+            <div className="flex gap-2 justify-end">
+
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  {isConnected ? (
+                    <Wifi className="w-3 h-3" />
+                  ) : (
+                    <WifiOff className="w-3 h-3" />
+                  )}
+                  {getStatusText(connectionStatus)}
+                </Badge>
+                <div className={`w-2 h-2 rounded-full ${getStatusColor(connectionStatus)}`} />
+              </div>
+
+              {isLoading ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={abort}
+                  disabled={!isConnected}
+                  title="Stop generation"
+                >
+                  <Square className="h-4 w-4 mr-2" />
+                  Stop
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearHistory}
+                disabled={messages.length === 0 || !isConnected}
+                title="Clear conversation"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="p-4 border-t bg-background">
-        <div className="flex gap-2 justify-end">
-          {isLoading ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={abort}
-              disabled={!isConnected}
-              title="Stop generation"
-            >
-              <Square className="h-4 w-4 mr-2" />
-              Stop
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={clearHistory}
-            disabled={messages.length === 0 || !isConnected}
-            title="Clear conversation"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear
-          </Button>
+        <div className="h-full bg-white flex flex-col">
+          <div className="flex-1">
+          </div>
         </div>
-      </div>
+      </div> */}
+
+
     </div>
   );
 }
