@@ -10,6 +10,8 @@ import type {
   UserMessageData,
 } from "./types";
 import { Conversation, Tool } from "../llm/conversation";
+import { getBuiltinTools } from "../tools/builtin-tools";
+import { getAllAvailableTools } from "../tools/conversation-tools";
 import { WSEventEmitter } from "./events";
 
 // Use Bun's built-in WebSocket type for compatibility
@@ -136,7 +138,7 @@ export class WSServer extends WSEventEmitter {
     return sent;
   }
 
-  private handleConnectionOpen(ws: ServerWebSocket): void {
+  private async handleConnectionOpen(ws: ServerWebSocket): Promise<void> {
     const clientId = this.generateClientId();
     const sessionId = this.generateSessionId();
 
@@ -162,7 +164,7 @@ export class WSServer extends WSEventEmitter {
     this.sessions.set(sessionId, sessionInfo);
 
     // Create conversation for this session
-    const conversation = this.createConversation();
+    const conversation = await this.createConversation();
     connectionInfo.conversation = conversation;
 
     // Start heartbeat for this connection
@@ -439,12 +441,13 @@ export class WSServer extends WSEventEmitter {
     }
   }
 
-  private createConversation(): Conversation {
+  private async createConversation(): Promise<Conversation> {
+    const tools = await this.getDefaultTools();
     return new Conversation({
       systemPrompt: `You are a helpful AI assistant connected via WebSocket.
 You have access to tools that can help you provide better responses.
 Always be helpful and conversational.`,
-      tools: this.getDefaultTools(),
+      tools,
       hooks: {
         message: {
           chunk: (_chunk: string) => {
@@ -464,45 +467,22 @@ Always be helpful and conversational.`,
     });
   }
 
-  private getDefaultTools(): Tool[] {
-    return [
-      new (class extends Tool {
-        name = "get_current_time";
-        description = "Get the current date and time";
-        parameters = { type: "object", properties: {} };
+  private async getDefaultTools(): Promise<Tool[]> {
+    try {
+      // Try to get advanced tools first
+      const advancedTools = await getAllAvailableTools();
+      if (advancedTools.length > getBuiltinTools().length) {
+        console.log(`Using advanced tool system with ${advancedTools.length} tools`);
+        return advancedTools;
+      }
+    } catch (error) {
+      console.warn('Failed to load advanced tools, falling back to basic tools:', error);
+    }
 
-        async execute(): Promise<string> {
-          return new Date().toISOString();
-        }
-      })(),
-
-      new (class extends Tool {
-        name = "calculate";
-        description = "Perform basic arithmetic operations";
-        parameters = {
-          type: "object",
-          properties: {
-            expression: {
-              type: "string",
-              description:
-                'Mathematical expression to evaluate (e.g., "2 + 3 * 4")',
-            },
-          },
-          required: ["expression"],
-        };
-
-        async execute(args: { expression: string }): Promise<string> {
-          try {
-            const result = Function(
-              '"use strict"; return (' + args.expression + ")"
-            )();
-            return `Result: ${result}`;
-          } catch (error) {
-            throw new Error(`Invalid expression: ${args.expression}`);
-          }
-        }
-      })(),
-    ];
+    // Fallback to basic tools
+    const basicTools = getBuiltinTools();
+    console.log(`Using basic tool system with ${basicTools.length} tools`);
+    return basicTools;
   }
 
   private sendToWebSocket(ws: ServerWebSocket, message: WSMessage): boolean {
