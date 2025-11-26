@@ -137,11 +137,6 @@ export interface ConversationHooks {
  */
 export interface ConversationOptions {
   /**
-   * Name of the AI config to use from ai.json (defaults to "default")
-   */
-  configName?: string;
-
-  /**
    * System prompt to set the assistant's behavior
    */
   systemPrompt?: string;
