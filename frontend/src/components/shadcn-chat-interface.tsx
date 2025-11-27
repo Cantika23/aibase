@@ -159,56 +159,104 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         isAccumulated: data.isAccumulated
       });
 
-      if (data.isAccumulated) {
-        // For accumulated completions, find any recent non-empty assistant message and update it
-        // or create a new one if none exists
-        const assistantMessages = messages.filter(msg => msg.role === 'assistant' && msg.content.length > 0);
+      // Always ensure we have a non-empty fullText
+      const fullText = data.fullText?.trim() || '';
+      if (!fullText) {
+        console.log("Skipping empty completion");
+        currentMessageRef.current = null;
+        currentMessageIdRef.current = null;
+        setIsLoading(false);
+        return;
+      }
 
-        if (assistantMessages.length > 0) {
-          // Update the most recent assistant message
-          const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
-          console.log("Updating last assistant message with accumulated completion");
-          setMessages(prev => prev.map(msg =>
-            msg.id === lastAssistantMessage.id
-              ? { ...msg, content: data.fullText }
-              : msg
-          ));
-        } else {
-          // Create a new message if no non-empty assistant message exists
+      // Use functional setState to avoid stale closure issues
+      setMessages(prev => {
+        console.log("handleLLMComplete: Current state has", prev.length, "messages");
+
+        if (data.isAccumulated) {
+          console.log("Handling accumulated completion with", fullText.length, "chars");
+
+          // Find all assistant messages in the current state
+          const assistantMessages = prev.filter(msg => msg.role === 'assistant');
+
+          // Strategy 1: Try to match by messageId if provided
+          if (data.messageId) {
+            const matchingMessage = assistantMessages.find(msg => msg.id === data.messageId);
+            if (matchingMessage) {
+              console.log("Updating message by ID:", data.messageId);
+              return prev.map(msg =>
+                msg.id === data.messageId
+                  ? { ...msg, content: fullText }
+                  : msg
+              );
+            }
+          }
+
+          // Strategy 2: If no ID match, update the most recent assistant message
+          if (assistantMessages.length > 0) {
+            const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+            console.log("Updating most recent assistant message:", {
+              messageId: lastAssistantMessage.id,
+              currentLength: lastAssistantMessage.content.length,
+              newLength: fullText.length
+            });
+
+            return prev.map(msg =>
+              msg.id === lastAssistantMessage.id
+                ? { ...msg, content: fullText }
+                : msg
+            );
+          }
+
+          // Strategy 3: If no assistant messages exist, create a new one
           console.log("Creating new message from accumulated completion");
           const newMessage: Message = {
             id: `accumulated_complete_${Date.now()}`,
             role: "assistant",
-            content: data.fullText,
+            content: fullText,
             createdAt: new Date(),
           };
-          setMessages(prev => [...prev, newMessage]);
-        }
-      } else {
-        // Normal completion - finalize the current message if it exists
-        if (currentMessageIdRef.current) {
-          console.log("Finalizing current message:", currentMessageIdRef.current);
-          setMessages(prev => prev.map(msg =>
-            msg.id === currentMessageIdRef.current
-              ? { ...msg, content: data.fullText }
-              : msg
-          ));
+          return [...prev, newMessage];
         } else {
-          // If we don't have a current message, create one from the completion
-          console.log("Creating new message from completion (no current message)");
+          // Normal completion handling
+          if (currentMessageIdRef.current) {
+            console.log("Finalizing current message:", currentMessageIdRef.current);
+            return prev.map(msg =>
+              msg.id === currentMessageIdRef.current
+                ? { ...msg, content: fullText }
+                : msg
+            );
+          } else if (data.messageId) {
+            // Try to find message by ID in current state
+            const messageToUpdate = prev.find(msg => msg.id === data.messageId);
+            if (messageToUpdate) {
+              console.log("Updating message by ID:", data.messageId);
+              return prev.map(msg =>
+                msg.id === data.messageId
+                  ? { ...msg, content: fullText }
+                  : msg
+              );
+            }
+          }
+
+          // If still no update, create a new message
+          console.log("Creating new message from completion");
           const newMessage: Message = {
             id: `msg_${Date.now()}_assistant`,
             role: "assistant",
-            content: data.fullText,
+            content: fullText,
             createdAt: new Date(),
           };
-          setMessages(prev => [...prev, newMessage]);
+          return [...prev, newMessage];
         }
-      }
+      });
 
+      // Always reset refs and loading state
       currentMessageRef.current = null;
       currentMessageIdRef.current = null;
       setIsLoading(false);
+
+      console.log("Completion handling complete");
     };
 
     const handleCommunicationError = (data: { code: string; message: string }) => {
