@@ -76,23 +76,31 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
       // Don't process empty chunks
       if (!data.chunk || data.chunk.trim() === '') {
+        console.log("Skipping empty chunk");
+        return;
+      }
+
+      // For accumulated chunks, only process if they have substantial content
+      if (data.isAccumulated && data.chunk.length < 10) {
+        console.log("Skipping very short accumulated chunk:", data.chunk.length, "chars");
         return;
       }
 
       if (data.isAccumulated) {
         // For accumulated chunks from active streams, create a complete message immediately
+        const trimmedContent = data.chunk.trim();
         const messageId = `accumulated_${Date.now()}`;
         const newMessage: Message = {
           id: messageId,
           role: "assistant",
-          content: data.chunk,
+          content: trimmedContent,
           createdAt: new Date(),
         };
 
-        console.log("Creating complete message from accumulated content:", { id: messageId, contentLength: data.chunk.length });
+        console.log("Creating complete message from accumulated content:", { id: messageId, contentLength: trimmedContent.length });
         setMessages(prev => {
           // Check if we already have this exact message to avoid duplicates
-          const exists = prev.some(msg => msg.content === data.chunk);
+          const exists = prev.some(msg => msg.content === trimmedContent);
           return exists ? prev : [...prev, newMessage];
         });
         return;
@@ -110,6 +118,12 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
             : msg
         ));
       } else {
+        // Only start a new message if the chunk has substantial content
+        if (data.chunk.length < 3) {
+          console.log("Skipping very short initial chunk:", data.chunk.length, "chars");
+          return;
+        }
+
         // Start a new assistant message
         const messageId = `msg_${Date.now()}_assistant`;
         currentMessageIdRef.current = messageId;

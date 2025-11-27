@@ -311,8 +311,9 @@ export class WSServer extends WSEventEmitter {
             isAccumulated: true,
           },
         });
-      } else if (stream.fullResponse.length > 0) {
-        // For active streams with content, send the current accumulated response as a single chunk
+      } else if (stream.fullResponse.length > 10) {
+        // For active streams with substantial content, send the current accumulated response as a single chunk
+        // so the frontend can see what has been generated so far
         console.log(`Sending accumulated active stream: ${stream.messageId}, accumulated length: ${stream.fullResponse.length}`);
         this.sendToWebSocket(ws, {
           type: "llm_chunk",
