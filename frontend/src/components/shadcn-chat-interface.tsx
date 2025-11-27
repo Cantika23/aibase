@@ -71,11 +71,39 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       setIsLoading(false);
     };
 
-    const handleLLMChunk = (data: { chunk: string; sequence?: number }) => {
-      // If we have a current message being built, append to it
+    const handleLLMChunk = (data: { chunk: string; sequence?: number; isAccumulated?: boolean }) => {
+      console.log("ShadcnChatInterface: handleLLMChunk called with:", data);
+
+      // Don't process empty chunks
+      if (!data.chunk || data.chunk.trim() === '') {
+        return;
+      }
+
+      if (data.isAccumulated) {
+        // For accumulated chunks from active streams, create a complete message immediately
+        const messageId = `accumulated_${Date.now()}`;
+        const newMessage: Message = {
+          id: messageId,
+          role: "assistant",
+          content: data.chunk,
+          createdAt: new Date(),
+        };
+
+        console.log("Creating complete message from accumulated content:", { id: messageId, contentLength: data.chunk.length });
+        setMessages(prev => {
+          // Check if we already have this exact message to avoid duplicates
+          const exists = prev.some(msg => msg.content === data.chunk);
+          return exists ? prev : [...prev, newMessage];
+        });
+        return;
+      }
+
+      // Normal streaming - append to existing message or create new one
       if (currentMessageRef.current && currentMessageIdRef.current) {
+        // Append to existing message (real-time streaming)
         currentMessageRef.current += data.chunk;
 
+        console.log("Appending to existing message, new length:", currentMessageRef.current.length);
         setMessages(prev => prev.map(msg =>
           msg.id === currentMessageIdRef.current
             ? { ...msg, content: currentMessageRef.current! }
@@ -94,19 +122,57 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           createdAt: new Date(),
         };
 
+        console.log("Creating new assistant message:", { id: messageId, content: data.chunk.substring(0, 50) + '...' });
         setMessages(prev => [...prev, newMessage]);
       }
     };
 
-    const handleLLMComplete = (data: { fullText: string; messageId: string }) => {
-      console.log("ShadcnChatInterface: handleLLMComplete called with:", data);
-      // Finalize the current message
-      if (currentMessageIdRef.current) {
-        setMessages(prev => prev.map(msg =>
-          msg.id === currentMessageIdRef.current
-            ? { ...msg, content: data.fullText }
-            : msg
-        ));
+    const handleLLMComplete = (data: { fullText: string; messageId: string; isAccumulated?: boolean }) => {
+      console.log("ShadcnChatInterface: handleLLMComplete called with:", {
+        messageId: data.messageId,
+        contentLength: data.fullText.length,
+        isAccumulated: data.isAccumulated
+      });
+
+      if (data.isAccumulated) {
+        // For accumulated completions, create a complete message if it doesn't exist
+        const messageExists = messages.some(msg =>
+          msg.role === 'assistant' &&
+          msg.content === data.fullText
+        );
+
+        if (!messageExists) {
+          console.log("Creating complete message from accumulated completion");
+          const newMessage: Message = {
+            id: `accumulated_complete_${Date.now()}`,
+            role: "assistant",
+            content: data.fullText,
+            createdAt: new Date(),
+          };
+          setMessages(prev => [...prev, newMessage]);
+        } else {
+          console.log("Accumulated completion message already exists, skipping");
+        }
+      } else {
+        // Normal completion - finalize the current message if it exists
+        if (currentMessageIdRef.current) {
+          console.log("Finalizing current message:", currentMessageIdRef.current);
+          setMessages(prev => prev.map(msg =>
+            msg.id === currentMessageIdRef.current
+              ? { ...msg, content: data.fullText }
+              : msg
+          ));
+        } else {
+          // If we don't have a current message, create one from the completion
+          console.log("Creating new message from completion (no current message)");
+          const newMessage: Message = {
+            id: `msg_${Date.now()}_assistant`,
+            role: "assistant",
+            content: data.fullText,
+            createdAt: new Date(),
+          };
+          setMessages(prev => [...prev, newMessage]);
+        }
       }
 
       currentMessageRef.current = null;

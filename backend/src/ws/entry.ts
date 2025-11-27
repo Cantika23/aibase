@@ -98,6 +98,14 @@ class StreamingManager {
       }
     }
   }
+
+  // Get all streams for a conversation (including recently completed ones)
+  getRecentStreamsForConv(convId: string, withinLastMinutes: number = 2): StreamingState[] {
+    const cutoff = Date.now() - withinLastMinutes * 60 * 1000;
+    return Array.from(this.activeStreams.values()).filter(stream =>
+      stream.convId === convId && stream.lastChunkTime >= cutoff
+    );
+  }
 }
 
 export class WSServer extends WSEventEmitter {
@@ -285,31 +293,35 @@ export class WSServer extends WSEventEmitter {
    * Send accumulated chunks to a newly connected WebSocket
    */
   private sendAccumulatedChunks(ws: ServerWebSocket, convId: string): void {
-    const allStreams = this.streamingManager.getAllStreamsForConv(convId);
+    const allStreams = this.streamingManager.getRecentStreamsForConv(convId, 5); // Get streams from last 5 minutes
+
+    console.log(`sendAccumulatedChunks: Found ${allStreams.length} streams for convId: ${convId}`);
 
     for (const stream of allStreams) {
-      // Send all accumulated chunks for this stream
-      for (const chunk of stream.chunks) {
-        this.sendToWebSocket(ws, {
-          type: "llm_chunk",
-          id: stream.messageId,
-          data: { chunk, isComplete: false },
-          metadata: {
-            timestamp: stream.lastChunkTime,
-            convId: stream.convId,
-          },
-        });
-      }
-
-      // If stream is complete, send completion message
       if (stream.isComplete) {
+        // For completed streams, send the complete response as one message
+        console.log(`Sending accumulated completed stream: ${stream.messageId}, length: ${stream.fullResponse.length}`);
         this.sendToWebSocket(ws, {
           type: "llm_complete",
           id: stream.messageId,
-          data: { fullText: stream.fullResponse },
+          data: { fullText: stream.fullResponse, isAccumulated: true },
           metadata: {
             timestamp: stream.lastChunkTime,
             convId: stream.convId,
+            isAccumulated: true,
+          },
+        });
+      } else if (stream.fullResponse.length > 0) {
+        // For active streams with content, send the current accumulated response as a single chunk
+        console.log(`Sending accumulated active stream: ${stream.messageId}, accumulated length: ${stream.fullResponse.length}`);
+        this.sendToWebSocket(ws, {
+          type: "llm_chunk",
+          id: stream.messageId,
+          data: { chunk: stream.fullResponse, isComplete: false, isAccumulated: true },
+          metadata: {
+            timestamp: stream.lastChunkTime,
+            convId: stream.convId,
+            isAccumulated: true,
           },
         });
       }

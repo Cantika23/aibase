@@ -60,6 +60,7 @@ export interface UserMessageData {
 export interface LLMChunkData {
   chunk: string;
   isComplete?: boolean;
+  isAccumulated?: boolean; // Indicates if this chunk is from accumulated history
 }
 
 export interface StatusData {
