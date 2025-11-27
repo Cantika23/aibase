@@ -429,6 +429,7 @@ export class Conversation {
     let fullText = "";
     let currentToolCalls: any[] = [];
     let isToolCallResponse = false;
+    let assistantMessageIndex = -1; // Track the assistant message index for updates
 
     const stream = await this.client.chat.completions.create(
       {
@@ -454,6 +455,24 @@ export class Conversation {
 
         if (delta?.content) {
           fullText += delta.content;
+
+          // Add placeholder message on first content chunk
+          if (assistantMessageIndex === -1 && !isToolCallResponse) {
+            this.addMessage({
+              role: "assistant",
+              content: "", // Start with empty content
+            });
+            assistantMessageIndex = this._history.length - 1;
+          }
+
+          // Update the assistant message content as we stream
+          if (assistantMessageIndex >= 0 && !isToolCallResponse) {
+            this._history[assistantMessageIndex] = {
+              ...this._history[assistantMessageIndex],
+              content: fullText,
+            };
+          }
+
           await this.hooks.message?.chunk?.(delta.content, fullText);
           yield delta.content;
         }
@@ -481,7 +500,7 @@ export class Conversation {
         }
       }
     } catch (error: any) {
-      // If aborted, just stop - don't add partial response to history
+      // If aborted, keep the partial message in history (it's already been added)
       if (error?.name === "AbortError" || abortController.signal.aborted) {
         return;
       }
@@ -506,10 +525,19 @@ export class Conversation {
       // Recursively stream the next response after tool execution
       yield* this.streamContinuation(abortController);
     } else {
-      this.addMessage({
-        role: "assistant",
-        content: fullText,
-      });
+      // If we already added the message during streaming, just ensure it has the final content
+      if (assistantMessageIndex >= 0) {
+        this._history[assistantMessageIndex] = {
+          ...this._history[assistantMessageIndex],
+          content: fullText,
+        };
+      } else {
+        // Fallback: add the message (shouldn't happen in normal flow)
+        this.addMessage({
+          role: "assistant",
+          content: fullText,
+        });
+      }
     }
   }
 

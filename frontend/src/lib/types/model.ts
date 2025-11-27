@@ -5,7 +5,7 @@ export interface ChatMessage {
   timestamp: number;
   isComplete: boolean;
   metadata?: {
-    clientId?: string;
+    convId?: string;
     sessionId?: string;
     sequence?: number;
   };
@@ -22,7 +22,7 @@ export interface MessageMetadata {
   timestamp: number;
   sequence?: number;
   total?: number;
-  clientId?: string;
+  convId?: string;
   sessionId?: string;
 }
 
@@ -88,7 +88,7 @@ export interface ConnectionState {
     | "disconnected"
     | "reconnecting"
     | "error";
-  clientId?: string;
+  convId?: string;
   sessionId?: string;
   connectedAt?: number;
   messageCount: number;
@@ -147,7 +147,7 @@ export interface FileUploadResponseData {
 }
 
 export interface FileListData {
-  clientId?: string;
+  convId?: string;
 }
 
 export interface FileListResponseData {

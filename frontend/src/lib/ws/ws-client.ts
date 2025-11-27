@@ -16,7 +16,7 @@ import type {
 } from "../types/model";
 
 import { WSEventEmitter } from "./ws-emitter";
-import { ClientIdManager } from "../client-id";
+import { ConvIdManager } from "../conv-id";
 
 export class WSClient extends WSEventEmitter {
   private ws: WebSocket | null = null;
@@ -68,10 +68,10 @@ export class WSClient extends WSEventEmitter {
 
     this.setState("connecting");
 
-    // Get or generate client ID and include it in the URL
-    const clientId = this.getClientId();
+    // Get or generate conversation ID and include it in the URL
+    const convId = this.getConvId();
     const url = new URL(this.options.url);
-    url.searchParams.set("clientId", clientId);
+    url.searchParams.set("convId", convId);
     const finalUrl = url.toString();
 
     return new Promise((resolve, reject) => {
@@ -147,7 +147,7 @@ export class WSClient extends WSEventEmitter {
       data: { text, ...options },
       metadata: {
         timestamp: Date.now(),
-        clientId: this.getClientId(),
+        convId: this.getConvId(),
       },
     };
 
@@ -164,7 +164,7 @@ export class WSClient extends WSEventEmitter {
       data: control,
       metadata: {
         timestamp: Date.now(),
-        clientId: this.getClientId(),
+        convId: this.getConvId(),
       },
     };
 
@@ -282,14 +282,27 @@ export class WSClient extends WSEventEmitter {
   }
 
   private async handleMessage(message: WSMessage): Promise<void> {
-    // Handle pending message responses only for completion messages
-    if (message.type && this.pendingMessages.has(message.id) &&
-        (message.type === "llm_complete" || message.type === "control_response" || message.type === "error")) {
+    // Check if this is a pending message that needs resolution
+    const isPendingMessage = message.type && this.pendingMessages.has(message.id) &&
+        (message.type === "control_response" || message.type === "error");
+
+    // Resolve pending messages first (but not llm_complete - we want it to emit)
+    if (isPendingMessage) {
       const pending = this.pendingMessages.get(message.id)!;
       if (pending.timeout) clearTimeout(pending.timeout);
       this.pendingMessages.delete(message.id);
       pending.resolve(message.data);
-      return;
+      return; // Only return for non-llm_complete pending messages
+    }
+
+    // Handle llm_complete pending messages specially - resolve AND emit
+    let shouldResolvePending = false;
+    if (message.type === "llm_complete" && this.pendingMessages.has(message.id)) {
+      const pending = this.pendingMessages.get(message.id)!;
+      if (pending.timeout) clearTimeout(pending.timeout);
+      this.pendingMessages.delete(message.id);
+      pending.resolve(message.data);
+      shouldResolvePending = true;
     }
 
     // Emit specific message events
@@ -303,10 +316,16 @@ export class WSClient extends WSEventEmitter {
         break;
 
       case "llm_complete":
+        // Always emit llm_complete for the UI
+        console.log("WSClient: Emitting llm_complete:", message.data?.fullText);
         this.emit("llm_complete", {
           fullText: message.data?.fullText || "",
           messageId: message.id,
         });
+        // Return after handling if we already resolved pending message
+        if (shouldResolvePending) {
+          return;
+        }
         break;
 
       case "tool_call":
@@ -342,13 +361,13 @@ export class WSClient extends WSEventEmitter {
           this.state.sessionId = message.data.sessionId;
         }
 
-        // Only accept server client ID if we don't already have one
+        // Only accept server conversation ID if we don't already have one
         // This preserves the client-side generated ID across refreshes
-        if (message.data?.clientId && !ClientIdManager.hasClientId()) {
-          this.setClientId(message.data.clientId);
-          console.log("WSClient: Accepted server client ID (no existing ID):", message.data.clientId);
-        } else if (message.data?.clientId) {
-          console.log("WSClient: Ignoring server client ID, keeping existing:", message.data.clientId);
+        if (message.data?.convId && !ConvIdManager.hasConvId()) {
+          this.setConvId(message.data.convId);
+          console.log("WSClient: Accepted server conversation ID (no existing ID):", message.data.convId);
+        } else if (message.data?.convId) {
+          console.log("WSClient: Ignoring server conversation ID, keeping existing:", message.data.convId);
         }
 
         this.emit("status", message.data);
@@ -484,15 +503,15 @@ export class WSClient extends WSEventEmitter {
     return `msg_${Date.now()}_${++this.messageId}`;
   }
 
-  private getClientId(): string {
-    // Use the shared ClientIdManager for consistency
-    return ClientIdManager.getClientId();
+  private getConvId(): string {
+    // Use the shared ConvIdManager for consistency
+    return ConvIdManager.getConvId();
   }
 
-  private setClientId(clientId: string): void {
-    // Use the shared ClientIdManager for consistency
-    ClientIdManager.setClientId(clientId);
+  private setConvId(convId: string): void {
+    // Use the shared ConvIdManager for consistency
+    ConvIdManager.setConvId(convId);
     // Update the connection state
-    this.state.clientId = clientId;
+    this.state.convId = convId;
   }
 }

@@ -113,8 +113,8 @@ interface WSServerOptions {
 #### Methods
 - `start(): Promise<void>` - Start server
 - `stop(): Promise<void>` - Stop server
-- `sendToClient(clientId: string, message: WSMessage): boolean` - Send to specific client
-- `broadcast(message: WSMessage, excludeClientId?: string): number` - Broadcast to all
+- `sendToClient(convId: string, message: WSMessage): boolean` - Send to specific conversation
+- `broadcast(message: WSMessage, excludeConvId?: string): number` - Broadcast to all
 - `getActiveSessions(): SessionInfo[]` - Get active sessions
 - `getConnectionCount(): number` - Get connection count
 

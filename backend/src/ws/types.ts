@@ -13,7 +13,7 @@ export interface MessageMetadata {
   timestamp: number;
   sequence?: number;
   total?: number;
-  clientId?: string;
+  convId?: string;
   sessionId?: string;
 }
 
@@ -113,7 +113,7 @@ export type ConnectionState =
 // Conversation session info
 export interface SessionInfo {
   id: string;
-  clientId: string;
+  convId: string;
   createdAt: number;
   lastActivity: number;
   messageCount: number;

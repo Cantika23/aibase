@@ -2,55 +2,55 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ClientIdManager } from "@/lib/client-id";
-import { useClientId } from "@/lib/client-id";
+import { ConvIdManager } from "@/lib/conv-id";
+import { useConvId } from "@/lib/conv-id";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 
 /**
- * Example component demonstrating client ID usage patterns
+ * Example component demonstrating conversation ID usage patterns
  */
-export function ClientIdExample() {
+export function ConvIdExample() {
   const [serverResponse, setServerResponse] = useState<string>("");
 
   // Using the React hook (recommended for components)
   const {
-    clientId: hookClientId,
-    setClientId,
-    generateNewClientId,
-    hasClientId,
+    convId: hookConvId,
+    setConvId,
+    generateNewConvId,
+    hasConvId,
     metadata
-  } = useClientId();
+  } = useConvId();
 
   // Using the static class directly (useful for utility functions)
-  const directClientId = ClientIdManager.getClientId();
+  const directConvId = ConvIdManager.getConvId();
 
   const simulateApiCall = async () => {
     try {
-      // Example of including client ID in API request
+      // Example of including conversation ID in API request
       const response = await fetch('/api/endpoint', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Client-ID': hookClientId, // Include client ID in headers
+          'X-Client-ID': hookConvId, // Include conversation ID in headers
         },
         body: JSON.stringify({
           message: "Hello from client",
-          clientId: hookClientId, // Include in request body
+          convId: hookConvId, // Include in request body
         }),
       });
 
       const data = await response.json();
-      setServerResponse(`Server acknowledged client ID: ${data.clientId}`);
+      setServerResponse(`Server acknowledged conversation ID: ${data.convId}`);
     } catch (error) {
       setServerResponse(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  const updateClientId = () => {
+  const updateConvId = () => {
     const newId = `custom_${Date.now()}`;
-    setClientId(newId);
-    setServerResponse(`Updated client ID to: ${newId}`);
+    setConvId(newId);
+    setServerResponse(`Updated conversation ID to: ${newId}`);
   };
 
   return (
@@ -62,31 +62,31 @@ export function ClientIdExample() {
             <Badge variant="outline">React Hook</Badge>
           </CardTitle>
           <CardDescription>
-            Demonstrating different ways to use client ID in components
+            Demonstrating different ways to use conversation ID in components
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Hook-based usage */}
           <div className="p-4 bg-blue-50 rounded-lg">
             <h4 className="font-semibold mb-2">Using React Hook:</h4>
-            <p className="font-mono text-sm mb-2">Hook Client ID: {hookClientId}</p>
-            <p className="font-mono text-sm mb-2">Has Stored ID: {hasClientId ? "Yes" : "No"}</p>
+            <p className="font-mono text-sm mb-2">Hook Conversation ID: {hookConvId}</p>
+            <p className="font-mono text-sm mb-2">Has Stored ID: {hasConvId ? "Yes" : "No"}</p>
             <p className="font-mono text-sm">Browser Environment: {metadata.isBrowserEnvironment ? "Yes" : "No"}</p>
           </div>
 
           {/* Direct class usage */}
           <div className="p-4 bg-green-50 rounded-lg">
             <h4 className="font-semibold mb-2">Using Static Class:</h4>
-            <p className="font-mono text-sm mb-2">Direct Client ID: {directClientId}</p>
-            <p className="font-mono text-sm">Has ID: {ClientIdManager.hasClientId() ? "Yes" : "No"}</p>
+            <p className="font-mono text-sm mb-2">Direct Conversation ID: {directConvId}</p>
+            <p className="font-mono text-sm">Has ID: {ConvIdManager.hasConvId() ? "Yes" : "No"}</p>
           </div>
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={generateNewClientId} variant="outline">
+            <Button onClick={generateNewConvId} variant="outline">
               Generate New ID
             </Button>
-            <Button onClick={updateClientId} variant="outline">
+            <Button onClick={updateConvId} variant="outline">
               Set Custom ID
             </Button>
             <Button onClick={simulateApiCall} variant="default">
@@ -108,19 +108,19 @@ export function ClientIdExample() {
         <CardHeader>
           <CardTitle>Integration Patterns</CardTitle>
           <CardDescription>
-            Common integration patterns for client ID usage
+            Common integration patterns for conversation ID usage
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 text-sm">
             <div className="p-3 bg-muted rounded-md">
-              <strong>API Requests:</strong> Include client ID in headers or request body
+              <strong>API Requests:</strong> Include conversation ID in headers or request body
             </div>
             <div className="p-3 bg-muted rounded-md">
               <strong>WebSocket Connections:</strong> Client ID automatically included in URL and metadata
             </div>
             <div className="p-3 bg-muted rounded-md">
-              <strong>Logging/Analytics:</strong> Use client ID to track user sessions
+              <strong>Logging/Analytics:</strong> Use conversation ID to track user sessions
             </div>
             <div className="p-3 bg-muted rounded-md">
               <strong>Local Storage:</strong> Client IDs persist across browser sessions
@@ -133,23 +133,23 @@ export function ClientIdExample() {
 }
 
 /**
- * Utility function example showing how to use client ID outside React components
+ * Utility function example showing how to use conversation ID outside React components
  */
 export function exampleUtilityFunction() {
   // This function can be called from anywhere (including non-React code)
-  const clientId = ClientIdManager.getClientId();
+  const convId = ConvIdManager.getConvId();
 
-  console.log(`Processing request for client: ${clientId}`);
+  console.log(`Processing request for client: ${convId}`);
 
-  // Example: Including client ID in error reporting
+  // Example: Including conversation ID in error reporting
   const errorInfo = {
     error: "Something went wrong",
-    clientId: clientId,
+    convId: convId,
     timestamp: Date.now(),
     userAgent: navigator.userAgent,
   };
 
-  // Send error report with client ID
+  // Send error report with conversation ID
   // reportError(errorInfo);
 
   return errorInfo;

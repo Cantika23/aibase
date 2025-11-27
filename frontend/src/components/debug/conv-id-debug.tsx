@@ -3,21 +3,21 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useClientId } from "@/lib/client-id";
+import { useConvId } from "@/lib/conv-id";
 import { MessagePersistence } from "@/lib/message-persistence";
 import { WSConnectionManager } from "@/lib/ws/ws-connection-manager";
 import { Copy, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useState, useEffect } from "react";
 
-export function ClientIdDebug() {
+export function ConvIdDebug() {
   const {
-    clientId,
-    setClientId,
-    generateNewClientId,
-    clearClientId,
-    hasClientId,
+    convId,
+    setConvId,
+    generateNewConvId,
+    clearConvId,
+    hasConvId,
     metadata
-  } = useClientId();
+  } = useConvId();
 
   const [messageInfo, setMessageInfo] = useState(() => MessagePersistence.getStoredMessagesInfo());
 
@@ -38,8 +38,8 @@ export function ClientIdDebug() {
   }, []);
 
   const copyToClipboard = useCallback(() => {
-    navigator.clipboard.writeText(clientId);
-  }, [clientId]);
+    navigator.clipboard.writeText(convId);
+  }, [convId]);
 
   const clearStoredMessages = useCallback(() => {
     MessagePersistence.clearMessages();
@@ -58,19 +58,19 @@ export function ClientIdDebug() {
     <Card className="w-full max-w-md">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          Client ID Debug
-          <Badge variant={hasClientId ? "default" : "secondary"}>
-            {hasClientId ? "Stored" : "Generated"}
+          Conversation ID Debug
+          <Badge variant={hasConvId ? "default" : "secondary"}>
+            {hasConvId ? "Stored" : "Generated"}
           </Badge>
         </CardTitle>
         <CardDescription>
-          Client identification information for debugging
+          Conversation identification information for debugging
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Current Client ID:</span>
+            <span className="text-sm font-medium">Current Conversation ID:</span>
             <Button
               size="sm"
               variant="ghost"
@@ -81,7 +81,7 @@ export function ClientIdDebug() {
             </Button>
           </div>
           <div className="p-2 bg-muted rounded-md font-mono text-xs break-all">
-            {clientId}
+            {convId}
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export function ClientIdDebug() {
           <Button
             size="sm"
             variant="outline"
-            onClick={generateNewClientId}
+            onClick={generateNewConvId}
             className="flex items-center gap-1"
           >
             <RefreshCw className="h-3 w-3" />
@@ -106,7 +106,7 @@ export function ClientIdDebug() {
           <Button
             size="sm"
             variant="outline"
-            onClick={clearClientId}
+            onClick={clearConvId}
             className="flex items-center gap-1"
           >
             <Trash2 className="h-3 w-3" />
@@ -115,7 +115,7 @@ export function ClientIdDebug() {
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Client IDs are automatically stored in localStorage and persist across browser sessions.
+          Conversation IDs are automatically stored in localStorage and persist across browser sessions.
         </div>
 
         {/* Message Persistence Section */}

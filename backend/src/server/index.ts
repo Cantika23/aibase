@@ -101,12 +101,12 @@ export class WebSocketServer {
         
         // Handle WebSocket upgrade requests
         if (url.pathname.startsWith("/api/ws")) {
-          // Extract client ID from URL before upgrading
-          const clientId = url.searchParams.get("clientId");
+          // Extract conversation ID from URL before upgrading
+          const convId = url.searchParams.get("convId");
 
-          // Pass client ID as data to WebSocket connection
+          // Pass conversation ID as data to WebSocket connection
           const upgraded = server.upgrade(req, {
-            data: { clientId }
+            data: { convId }
           });
           if (upgraded) {
             return undefined; // WebSocket connection established

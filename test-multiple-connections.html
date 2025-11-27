@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple WebSocket Connections Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .connection {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .connection.connected {
+            border-color: green;
+            background-color: #f0fff0;
+        }
+        .connection.disconnected {
+            border-color: red;
+            background-color: #fff0f0;
+        }
+        .messages {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+        .chunk {
+            color: blue;
+            font-size: 0.9em;
+        }
+        .complete {
+            color: green;
+            font-weight: bold;
+        }
+        .status {
+            color: gray;
+            font-style: italic;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        input {
+            width: 70%;
+            padding: 5px;
+        }
+        button {
+            padding: 5px 15px;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Multiple WebSocket Connections Test</h1>
+
+    <div>
+        <label for="convId">Conversation ID:</label>
+        <input type="text" id="convId" value="test-conv-123">
+        <button onclick="addConnection()">Add Connection</button>
+        <button onclick="sendMessage()">Send Message</button>
+        <button onclick="clearAll()">Clear All</button>
+    </div>
+
+    <div id="connections"></div>
+
+    <script>
+        let connectionCounter = 0;
+        const connections = new Map();
+
+        function addConnection() {
+            const convId = document.getElementById('convId').value;
+            const connectionId = ++connectionCounter;
+
+            const wsUrl = `ws://localhost:5040/api/ws?convId=${encodeURIComponent(convId)}`;
+            const ws = new WebSocket(wsUrl);
+
+            const connectionDiv = document.createElement('div');
+            connectionDiv.className = 'connection disconnected';
+            connectionDiv.id = `connection-${connectionId}`;
+            connectionDiv.innerHTML = `
+                <h3>Connection ${connectionId} (convId: ${convId})</h3>
+                <div class="messages" id="messages-${connectionId}"></div>
+            `;
+
+            document.getElementById('connections').appendChild(connectionDiv);
+
+            connections.set(connectionId, {
+                ws: ws,
+                div: connectionDiv,
+                convId: convId
+            });
+
+            ws.onopen = function() {
+                connectionDiv.className = 'connection connected';
+                addMessage(connectionId, 'Connected', 'status');
+            };
+
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+
+                switch(message.type) {
+                    case 'llm_chunk':
+                        addMessage(connectionId, `Chunk: ${message.data.chunk}`, 'chunk');
+                        break;
+                    case 'llm_complete':
+                        addMessage(connectionId, `Complete: ${message.data.fullText}`, 'complete');
+                        break;
+                    case 'status':
+                        addMessage(connectionId, `Status: ${message.data.status} - ${message.data.message || ''}`, 'status');
+                        break;
+                    case 'error':
+                        addMessage(connectionId, `Error: ${message.data.message}`, 'error');
+                        break;
+                    default:
+                        addMessage(connectionId, `Other: ${message.type}`, 'status');
+                }
+            };
+
+            ws.onclose = function() {
+                connectionDiv.className = 'connection disconnected';
+                addMessage(connectionId, 'Disconnected', 'status');
+            };
+
+            ws.onerror = function(error) {
+                addMessage(connectionId, `WebSocket error: ${error}`, 'error');
+            };
+        }
+
+        function addMessage(connectionId, text, className) {
+            const messagesDiv = document.getElementById(`messages-${connectionId}`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = className;
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendMessage() {
+            const convId = document.getElementById('convId').value;
+            const message = prompt('Enter message to send:');
+            if (!message) return;
+
+            // Send from the first connected WebSocket for this conversation
+            for (const [id, conn] of connections) {
+                if (conn.convId === convId && conn.ws.readyState === WebSocket.OPEN) {
+                    const wsMessage = {
+                        type: 'user_message',
+                        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        data: {
+                            text: message
+                        },
+                        metadata: {
+                            timestamp: Date.now()
+                        }
+                    };
+                    conn.ws.send(JSON.stringify(wsMessage));
+
+                    // Add the message to all connections for this conversation
+                    for (const [msgId, msgConn] of connections) {
+                        if (msgConn.convId === convId) {
+                            addMessage(msgId, `You: ${message}`, 'status');
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        function clearAll() {
+            connections.forEach((conn, id) => {
+                conn.ws.close();
+                conn.div.remove();
+            });
+            connections.clear();
+            connectionCounter = 0;
+        }
+
+        // Auto-add first connection on load
+        window.onload = function() {
+            setTimeout(addConnection, 100);
+        };
+    </script>
+</body>
+</html>

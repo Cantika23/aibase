@@ -27,12 +27,87 @@ const WebSocketReadyState = {
   CLOSED: 3,
 } as const;
 
+// Streaming chunk accumulator for broadcasting to new connections
+interface StreamingState {
+  convId: string;
+  messageId: string;
+  chunks: string[];
+  fullResponse: string;
+  isComplete: boolean;
+  startTime: number;
+  lastChunkTime: number;
+}
+
+class StreamingManager {
+  private activeStreams = new Map<string, StreamingState>(); // key: convId_messageId
+
+  startStream(convId: string, messageId: string): void {
+    const key = `${convId}_${messageId}`;
+    this.activeStreams.set(key, {
+      convId,
+      messageId,
+      chunks: [],
+      fullResponse: '',
+      isComplete: false,
+      startTime: Date.now(),
+      lastChunkTime: Date.now(),
+    });
+  }
+
+  addChunk(convId: string, messageId: string, chunk: string): void {
+    const key = `${convId}_${messageId}`;
+    const stream = this.activeStreams.get(key);
+    if (!stream) return;
+
+    stream.chunks.push(chunk);
+    stream.fullResponse += chunk;
+    stream.lastChunkTime = Date.now();
+  }
+
+  completeStream(convId: string, messageId: string): void {
+    const key = `${convId}_${messageId}`;
+    const stream = this.activeStreams.get(key);
+    if (stream) {
+      stream.isComplete = true;
+    }
+  }
+
+  getStream(convId: string, messageId: string): StreamingState | undefined {
+    const key = `${convId}_${messageId}`;
+    return this.activeStreams.get(key);
+  }
+
+  getActiveStreamsForConv(convId: string): StreamingState[] {
+    return Array.from(this.activeStreams.values()).filter(stream =>
+      stream.convId === convId && !stream.isComplete
+    );
+  }
+
+  getAllStreamsForConv(convId: string): StreamingState[] {
+    return Array.from(this.activeStreams.values()).filter(stream =>
+      stream.convId === convId
+    );
+  }
+
+  // Clean up old completed streams (older than 5 minutes)
+  cleanup(): void {
+    const cutoff = Date.now() - 5 * 60 * 1000; // 5 minutes
+    for (const [key, stream] of this.activeStreams) {
+      if (stream.isComplete && stream.lastChunkTime < cutoff) {
+        this.activeStreams.delete(key);
+      }
+    }
+  }
+}
+
 export class WSServer extends WSEventEmitter {
   private options: WSServerOptions;
   private connections = new Map<ServerWebSocket, ConnectionInfo>();
   private sessions = new Map<string, SessionInfo>();
   private heartbeats = new Map<ServerWebSocket, NodeJS.Timeout>();
   private messagePersistence: MessagePersistence;
+  private streamingManager: StreamingManager;
+  private cleanupInterval: NodeJS.Timeout;
 
   constructor(options: WSServerOptions = {}) {
     super();
@@ -44,6 +119,12 @@ export class WSServer extends WSEventEmitter {
       ...options,
     };
     this.messagePersistence = MessagePersistence.getInstance();
+    this.streamingManager = new StreamingManager();
+
+    // Start cleanup interval for old streams
+    this.cleanupInterval = setInterval(() => {
+      this.streamingManager.cleanup();
+    }, 60000); // Clean up every minute
   }
 
   /**
@@ -59,6 +140,8 @@ export class WSServer extends WSEventEmitter {
 
   /**
    * Handle HTTP upgrade requests for WebSocket
+   * Note: This method is kept for compatibility but the actual upgrade logic
+   * should be handled in the main server where URL parameters are extracted
    */
   handleHttpUpgrade(req: Request, server: any): Response | undefined {
     const url = new URL(req.url);
@@ -73,8 +156,9 @@ export class WSServer extends WSEventEmitter {
         return new Response("Server at capacity", { status: 503 });
       }
 
-      // Upgrade to WebSocket
-      const upgraded = server.upgrade(req);
+      // For direct usage without the main server, extract convId here
+      const convId = url.searchParams.get("convId");
+      const upgraded = server.upgrade(req, { data: { convId } });
       if (upgraded) {
         return undefined; // WebSocket connection established
       }
@@ -92,6 +176,11 @@ export class WSServer extends WSEventEmitter {
       clearInterval(timer);
     }
     this.heartbeats.clear();
+
+    // Clear cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
 
     // Clear all connections
     this.connections.clear();
@@ -115,11 +204,49 @@ export class WSServer extends WSEventEmitter {
   }
 
   /**
+   * Get connection count for a specific conversation
+   */
+  getConnectionCountForConv(convId: string): number {
+    return this.getConnectionsForConv(convId).length;
+  }
+
+  /**
+   * Get all conversation IDs with active connections
+   */
+  getActiveConvIds(): string[] {
+    const convIds = new Set<string>();
+    for (const connInfo of this.connections.values()) {
+      convIds.add(connInfo.convId);
+    }
+    return Array.from(convIds);
+  }
+
+  /**
+   * Get connection information for debugging
+   */
+  getConnectionInfo(): { [convId: string]: { connectionCount: number; sessionIds: string[] } } {
+    const info: { [convId: string]: { connectionCount: number; sessionIds: string[] } } = {};
+
+    for (const connInfo of this.connections.values()) {
+      if (!info[connInfo.convId]) {
+        info[connInfo.convId] = {
+          connectionCount: 0,
+          sessionIds: []
+        };
+      }
+      info[connInfo.convId].connectionCount++;
+      info[connInfo.convId].sessionIds.push(connInfo.sessionId);
+    }
+
+    return info;
+  }
+
+  /**
    * Send message to specific client
    */
-  sendToClient(clientId: string, message: WSMessage): boolean {
+  sendToClient(convId: string, message: WSMessage): boolean {
     for (const [ws, connInfo] of this.connections) {
-      if (connInfo.clientId === clientId) {
+      if (connInfo.convId === convId) {
         return this.sendToWebSocket(ws, message);
       }
     }
@@ -132,7 +259,7 @@ export class WSServer extends WSEventEmitter {
   broadcast(message: WSMessage, excludeClientId?: string): number {
     let sent = 0;
     for (const [ws, connInfo] of this.connections) {
-      if (connInfo.clientId !== excludeClientId) {
+      if (connInfo.convId !== excludeClientId) {
         if (this.sendToWebSocket(ws, message)) {
           sent++;
         }
@@ -141,23 +268,71 @@ export class WSServer extends WSEventEmitter {
     return sent;
   }
 
+  /**
+   * Get all WebSocket connections for a specific conversation ID
+   */
+  getConnectionsForConv(convId: string): ServerWebSocket[] {
+    const connections: ServerWebSocket[] = [];
+    for (const [ws, connInfo] of this.connections) {
+      if (connInfo.convId === convId) {
+        connections.push(ws);
+      }
+    }
+    return connections;
+  }
+
+  /**
+   * Send accumulated chunks to a newly connected WebSocket
+   */
+  private sendAccumulatedChunks(ws: ServerWebSocket, convId: string): void {
+    const allStreams = this.streamingManager.getAllStreamsForConv(convId);
+
+    for (const stream of allStreams) {
+      // Send all accumulated chunks for this stream
+      for (const chunk of stream.chunks) {
+        this.sendToWebSocket(ws, {
+          type: "llm_chunk",
+          id: stream.messageId,
+          data: { chunk, isComplete: false },
+          metadata: {
+            timestamp: stream.lastChunkTime,
+            convId: stream.convId,
+          },
+        });
+      }
+
+      // If stream is complete, send completion message
+      if (stream.isComplete) {
+        this.sendToWebSocket(ws, {
+          type: "llm_complete",
+          id: stream.messageId,
+          data: { fullText: stream.fullResponse },
+          metadata: {
+            timestamp: stream.lastChunkTime,
+            convId: stream.convId,
+          },
+        });
+      }
+    }
+  }
+
   private async handleConnectionOpen(ws: ServerWebSocket): Promise<void> {
     // Extract client ID from URL parameters if provided
     let urlClientId: string | null = null;
 
     try {
       // Extract client ID from the data passed during upgrade
-      urlClientId = ws.data?.clientId || null;
+      urlClientId = ws.data?.convId || null;
     } catch (error) {
       console.warn("Failed to extract client ID from WebSocket data:", error);
     }
 
     // Use provided client ID or generate a new one
-    const clientId = urlClientId || this.generateClientId();
+    const convId = urlClientId || this.generateClientId();
     const sessionId = this.generateSessionId();
 
     const connectionInfo: ConnectionInfo = {
-      clientId,
+      convId,
       sessionId,
       connectedAt: Date.now(),
       lastActivity: Date.now(),
@@ -170,7 +345,7 @@ export class WSServer extends WSEventEmitter {
     // Create session
     const sessionInfo: SessionInfo = {
       id: sessionId,
-      clientId,
+      convId,
       createdAt: Date.now(),
       lastActivity: Date.now(),
       messageCount: 0,
@@ -178,12 +353,24 @@ export class WSServer extends WSEventEmitter {
     this.sessions.set(sessionId, sessionInfo);
 
     // Create conversation for this session with existing history
-    const existingHistory = this.messagePersistence.getClientHistory(clientId);
+    const existingHistory = this.messagePersistence.getClientHistory(convId);
     const conversation = await this.createConversation(existingHistory);
     connectionInfo.conversation = conversation;
 
+    // Hook into conversation to persist changes to MessagePersistence
+    const originalAddMessage = conversation.addMessage.bind(conversation);
+    conversation.addMessage = (message: any) => {
+      originalAddMessage(message);
+      // Immediately persist the updated conversation history
+      const history = (conversation as any)._history || [];
+      this.messagePersistence.setClientHistory(convId, history);
+    };
+
     // Start heartbeat for this connection
     this.startHeartbeat(ws);
+
+    // Send accumulated chunks from active streams for this conversation
+    this.sendAccumulatedChunks(ws, convId);
 
     // Send welcome message
     this.sendToWebSocket(ws, {
@@ -192,17 +379,17 @@ export class WSServer extends WSEventEmitter {
       data: {
         status: "connected",
         message: "Connected to chat server",
-        clientId,
+        convId,
         sessionId,
       },
       metadata: {
         timestamp: Date.now(),
-        clientId,
+        convId,
         sessionId,
       },
     });
 
-    this.emit("client_connected", { clientId, sessionId, ws });
+    this.emit("client_connected", { convId, sessionId, ws });
   }
 
   private async handleMessage(
@@ -294,13 +481,17 @@ export class WSServer extends WSEventEmitter {
     if (!conversation) return;
 
     try {
-      // Send processing status
-      this.sendToWebSocket(ws, {
-        type: "status",
+      // Start tracking this stream in the streaming manager
+      this.streamingManager.startStream(connectionInfo.convId, originalMessage.id);
+
+      // Send processing status to all connections for this conversation
+      const statusMessage = {
+        type: "status" as const,
         id: this.generateMessageId(),
         data: { status: "processing", message: "Processing your message..." },
         metadata: { timestamp: Date.now() },
-      });
+      };
+      this.broadcastToConv(connectionInfo.convId, statusMessage);
 
       let fullResponse = "";
 
@@ -308,58 +499,82 @@ export class WSServer extends WSEventEmitter {
       for await (const chunk of conversation.sendMessage(userData.text)) {
         fullResponse += chunk;
 
-        // Send chunk to client immediately
-        this.sendToWebSocket(ws, {
-          type: "llm_chunk",
+        // Add chunk to streaming manager
+        this.streamingManager.addChunk(connectionInfo.convId, originalMessage.id, chunk);
+
+        // Create chunk message
+        const chunkMessage = {
+          type: "llm_chunk" as const,
           id: originalMessage.id,
           data: { chunk, isComplete: false },
           metadata: {
             timestamp: Date.now(),
-            clientId: connectionInfo.clientId,
-            sessionId: connectionInfo.sessionId,
+            convId: connectionInfo.convId,
           },
-        });
+        };
+
+        // Broadcast chunk to ALL connections for this conversation
+        this.broadcastToConv(connectionInfo.convId, chunkMessage);
       }
 
-      // Send completion message
-      this.sendToWebSocket(ws, {
-        type: "llm_complete",
+      // Mark stream as complete in streaming manager
+      this.streamingManager.completeStream(connectionInfo.convId, originalMessage.id);
+
+      // Send completion message to all connections for this conversation
+      const completionMessage = {
+        type: "llm_complete" as const,
         id: originalMessage.id,
         data: { fullText: fullResponse },
         metadata: {
           timestamp: Date.now(),
-          clientId: connectionInfo.clientId,
-          sessionId: connectionInfo.sessionId,
+          convId: connectionInfo.convId,
         },
-      });
+      };
+      this.broadcastToConv(connectionInfo.convId, completionMessage);
 
       // Save updated conversation history to persistent storage
       const currentHistory = conversation.history;
-      this.messagePersistence.setClientHistory(connectionInfo.clientId, currentHistory);
+      this.messagePersistence.setClientHistory(connectionInfo.convId, currentHistory);
     } catch (error: any) {
       console.error("LLM Processing Error:", error);
-      // Send error response but don't disconnect
-      this.sendToWebSocket(ws, {
-        type: "llm_chunk",
-        id: originalMessage.id,
-        data: {
-          chunk:
-            "I apologize, but I encountered an error processing your request. Please try again.",
-          isComplete: false,
-        },
-        metadata: { timestamp: Date.now() },
-      });
 
-      this.sendToWebSocket(ws, {
-        type: "llm_complete",
+      // Mark stream as complete even on error
+      this.streamingManager.completeStream(connectionInfo.convId, originalMessage.id);
+
+      const errorMessage = "I apologize, but I encountered an error processing your request. Please try again.";
+
+      // Send error response to all connections
+      const errorChunkMessage = {
+        type: "llm_chunk" as const,
         id: originalMessage.id,
-        data: {
-          fullText:
-            "I apologize, but I encountered an error processing your request. Please try again.",
-        },
+        data: { chunk: errorMessage, isComplete: false },
         metadata: { timestamp: Date.now() },
-      });
+      };
+      this.broadcastToConv(connectionInfo.convId, errorChunkMessage);
+
+      const errorCompletionMessage = {
+        type: "llm_complete" as const,
+        id: originalMessage.id,
+        data: { fullText: errorMessage },
+        metadata: { timestamp: Date.now() },
+      };
+      this.broadcastToConv(connectionInfo.convId, errorCompletionMessage);
     }
+  }
+
+  /**
+   * Broadcast message to all connections for a specific conversation
+   */
+  private broadcastToConv(convId: string, message: WSMessage): number {
+    let sent = 0;
+    for (const [ws, connInfo] of this.connections) {
+      if (connInfo.convId === convId) {
+        if (this.sendToWebSocket(ws, message)) {
+          sent++;
+        }
+      }
+    }
+    return sent;
   }
 
   private async handleControlMessage(
@@ -388,7 +603,7 @@ export class WSServer extends WSEventEmitter {
           if (conversation) {
             conversation.clearHistory();
             // Also clear from persistent storage
-            this.messagePersistence.clearClientHistory(connectionInfo.clientId);
+            this.messagePersistence.clearClientHistory(connectionInfo.convId);
             this.sendToWebSocket(ws, {
               type: "control_response",
               id: message.id,
@@ -400,13 +615,32 @@ export class WSServer extends WSEventEmitter {
 
         case "get_history":
           // Get history from persistent storage (which should match conversation history)
-          const history = this.messagePersistence.getClientHistory(connectionInfo.clientId);
+          console.log(`Backend: Getting history for convId: ${connectionInfo.convId}`);
+          const history = this.messagePersistence.getClientHistory(connectionInfo.convId);
+          console.log(`Backend: Retrieved history:`, {
+            hasHistory: !!history,
+            messageCount: history?.messageCount || 0,
+            messages: history?.messages?.length || 0,
+            messagesContent: history?.messages || 'No messages'
+          });
+
+          // Also check conversation object directly
+          if (connectionInfo.conversation) {
+            // Access the private _history array through any available method or property
+            const convHistory = (connectionInfo.conversation as any)._history || [];
+            console.log(`Backend: Conversation history:`, {
+              messageCount: convHistory.length,
+              messages: convHistory
+            });
+          }
+
           this.sendToWebSocket(ws, {
             type: "control_response",
             id: message.id,
             data: { status: "history", history, type: control.type },
             metadata: { timestamp: Date.now() },
           });
+          console.log(`Backend: Sent history response`);
           break;
 
         case "get_status":
@@ -453,7 +687,7 @@ export class WSServer extends WSEventEmitter {
       this.connections.delete(ws);
 
       this.emit("client_disconnected", {
-        clientId: connectionInfo.clientId,
+        convId: connectionInfo.convId,
         sessionId: connectionInfo.sessionId,
         code,
         reason,
@@ -558,7 +792,7 @@ Always be helpful and conversational.`,
 }
 
 interface ConnectionInfo {
-  clientId: string;
+  convId: string;
   sessionId: string;
   connectedAt: number;
   lastActivity: number;

@@ -1,12 +1,12 @@
 /**
  * Simple in-memory message persistence service
- * Stores conversation history per client ID using a Record structure
+ * Stores conversation history per conversation ID using a Record structure
  */
 
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-export interface ClientMessageHistory {
-  clientId: string;
+export interface ConvMessageHistory {
+  convId: string;
   messages: ChatCompletionMessageParam[];
   lastUpdated: number;
   messageCount: number;
@@ -14,7 +14,7 @@ export interface ClientMessageHistory {
 
 export class MessagePersistence {
   private static instance: MessagePersistence;
-  private clientHistories: Record<string, ClientMessageHistory> = {};
+  private convHistories: Record<string, ConvMessageHistory> = {};
 
   private constructor() {}
 
@@ -29,10 +29,10 @@ export class MessagePersistence {
   }
 
   /**
-   * Get message history for a client
+   * Get message history for a conversation
    */
-  getClientHistory(clientId: string): ChatCompletionMessageParam[] {
-    const history = this.clientHistories[clientId];
+  getClientHistory(convId: string): ChatCompletionMessageParam[] {
+    const history = this.convHistories[convId];
     if (!history) {
       return [];
     }
@@ -40,11 +40,11 @@ export class MessagePersistence {
   }
 
   /**
-   * Set message history for a client
+   * Set message history for a conversation
    */
-  setClientHistory(clientId: string, messages: ChatCompletionMessageParam[]): void {
-    this.clientHistories[clientId] = {
-      clientId,
+  setClientHistory(convId: string, messages: ChatCompletionMessageParam[]): void {
+    this.convHistories[convId] = {
+      convId,
       messages: [...messages], // Store a copy
       lastUpdated: Date.now(),
       messageCount: messages.length,
@@ -52,56 +52,56 @@ export class MessagePersistence {
   }
 
   /**
-   * Add a message to client history
+   * Add a message to conversation history
    */
-  addClientMessage(clientId: string, message: ChatCompletionMessageParam): void {
-    if (!this.clientHistories[clientId]) {
-      this.clientHistories[clientId] = {
-        clientId,
+  addClientMessage(convId: string, message: ChatCompletionMessageParam): void {
+    if (!this.convHistories[convId]) {
+      this.convHistories[convId] = {
+        convId,
         messages: [],
         lastUpdated: Date.now(),
         messageCount: 0,
       };
     }
 
-    this.clientHistories[clientId].messages.push(message);
-    this.clientHistories[clientId].lastUpdated = Date.now();
-    this.clientHistories[clientId].messageCount++;
+    this.convHistories[convId].messages.push(message);
+    this.convHistories[convId].lastUpdated = Date.now();
+    this.convHistories[convId].messageCount++;
   }
 
   /**
-   * Clear message history for a client
+   * Clear message history for a conversation
    */
-  clearClientHistory(clientId: string, keepSystemPrompt: boolean = true): void {
-    const history = this.clientHistories[clientId];
+  clearClientHistory(convId: string, keepSystemPrompt: boolean = true): void {
+    const history = this.convHistories[convId];
     if (!history) return;
 
     if (keepSystemPrompt && history.messages[0]?.role === "system") {
-      this.clientHistories[clientId].messages = [history.messages[0]];
-      this.clientHistories[clientId].messageCount = 1;
+      this.convHistories[convId].messages = [history.messages[0]];
+      this.convHistories[convId].messageCount = 1;
     } else {
-      this.clientHistories[clientId].messages = [];
-      this.clientHistories[clientId].messageCount = 0;
+      this.convHistories[convId].messages = [];
+      this.convHistories[convId].messageCount = 0;
     }
-    this.clientHistories[clientId].lastUpdated = Date.now();
+    this.convHistories[convId].lastUpdated = Date.now();
   }
 
   /**
-   * Delete client history completely
+   * Delete conversation history completely
    */
-  deleteClientHistory(clientId: string): boolean {
-    if (this.clientHistories[clientId]) {
-      delete this.clientHistories[clientId];
+  deleteClientHistory(convId: string): boolean {
+    if (this.convHistories[convId]) {
+      delete this.convHistories[convId];
       return true;
     }
     return false;
   }
 
   /**
-   * Get all client histories metadata
+   * Get all conversation histories metadata
    */
-  getAllClientHistories(): Omit<ClientMessageHistory, "messages">[] {
-    return Object.values(this.clientHistories).map(({ messages, ...metadata }) => metadata);
+  getAllClientHistories(): Omit<ConvMessageHistory, "messages">[] {
+    return Object.values(this.convHistories).map(({ messages, ...metadata }) => metadata);
   }
 
   /**
@@ -113,7 +113,7 @@ export class MessagePersistence {
     oldestHistory?: number;
     newestHistory?: number;
   } {
-    const histories = Object.values(this.clientHistories);
+    const histories = Object.values(this.convHistories);
     const totalMessages = histories.reduce((sum, h) => sum + h.messageCount, 0);
     const timestamps = histories.map(h => h.lastUpdated);
 
@@ -132,9 +132,9 @@ export class MessagePersistence {
     const cutoff = Date.now() - maxAge;
     let cleaned = 0;
 
-    for (const clientId in this.clientHistories) {
-      if (this.clientHistories[clientId].lastUpdated < cutoff) {
-        delete this.clientHistories[clientId];
+    for (const convId in this.convHistories) {
+      if (this.convHistories[convId].lastUpdated < cutoff) {
+        delete this.convHistories[convId];
         cleaned++;
       }
     }
@@ -143,16 +143,16 @@ export class MessagePersistence {
   }
 
   /**
-   * Check if client has history
+   * Check if conversation has history
    */
-  hasClientHistory(clientId: string): boolean {
-    return !!this.clientHistories[clientId] && this.clientHistories[clientId].messages.length > 0;
+  hasClientHistory(convId: string): boolean {
+    return !!this.convHistories[convId] && this.convHistories[convId].messages.length > 0;
   }
 
   /**
-   * Get message count for a client
+   * Get message count for a conversation
    */
-  getClientMessageCount(clientId: string): number {
-    return this.clientHistories[clientId]?.messageCount || 0;
+  getClientMessageCount(convId: string): number {
+    return this.convHistories[convId]?.messageCount || 0;
   }
 }

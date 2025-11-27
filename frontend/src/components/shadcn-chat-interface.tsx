@@ -3,7 +3,7 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Chat } from "@/components/ui/chat";
 import type { Message } from "@/components/ui/chat-message";
-import { useClientId } from "@/lib/client-id";
+import { useConvId } from "@/lib/conv-id";
 import { useWSConnection } from "@/lib/ws/ws-connection-manager";
 import {
   AlertCircle
@@ -11,8 +11,8 @@ import {
 import { lazy, useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 // Lazy load debug component only in development
-const ClientIdDebug = process.env.NODE_ENV === "development"
-  ? lazy(() => import("@/components/debug/client-id-debug").then(mod => ({ default: mod.ClientIdDebug })))
+const ConvIdDebug = process.env.NODE_ENV === "development"
+  ? lazy(() => import("@/components/debug/conv-id-debug").then(mod => ({ default: mod.ConvIdDebug })))
   : null;
 
 interface ShadcnChatInterfaceProps {
@@ -28,7 +28,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   const [error, setError] = useState<string | null>(null);
 
   // Use the client ID management hook
-  const { clientId, metadata: clientMetadata } = useClientId();
+  const { convId, metadata: convMetadata } = useConvId();
 
   
   // Use WebSocket connection manager - this ensures only one connection even with Strict Mode
@@ -40,6 +40,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     timeout: 10000,
   });
 
+  
   const currentMessageRef = useRef<string | null>(null);
   const currentMessageIdRef = useRef<string | null>(null);
 
@@ -47,9 +48,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   useEffect(() => {
     if (!wsClient) return;
 
-    // Log client ID information for debugging
-    console.log("ShadcnChatInterface: Setting up event handlers with Client ID:", clientId);
-
+    
     // Set up event handlers
     const handleConnected = () => {
       setConnectionStatus("connected");
@@ -100,6 +99,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     };
 
     const handleLLMComplete = (data: { fullText: string; messageId: string }) => {
+      console.log("ShadcnChatInterface: handleLLMComplete called with:", data);
       // Finalize the current message
       if (currentMessageIdRef.current) {
         setMessages(prev => prev.map(msg =>
@@ -136,7 +136,9 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     };
 
     const handleHistoryResponse = (data: { messages?: any[] }) => {
+      console.log("handleHistoryResponse called with:", data);
       if (data.messages && Array.isArray(data.messages)) {
+        console.log("Converting messages:", data.messages);
         // Convert server messages to Message format
         const serverMessages: Message[] = data.messages.map((msg, index) => ({
           id: msg.id || `server_msg_${index}`,
@@ -144,15 +146,20 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           content: msg.content || msg.text || "",
           createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
         }));
-
-        console.log(`Loaded ${serverMessages.length} messages from server`);
+        console.log("Setting messages to:", serverMessages);
+        console.log("First message structure:", serverMessages[0]);
+        console.log("Messages state will be updated to:", serverMessages.length, "messages");
         setMessages(serverMessages);
+      } else {
+        console.log("No messages to process or messages is not an array");
       }
     };
 
     const handleControl = (data: any) => {
-      if (data.type === "history_response") {
-        handleHistoryResponse(data);
+      console.log("handleControl called with:", data);
+      if (data.status === "history" || data.type === "history_response") {
+        console.log("Processing history data:", data.history);
+        handleHistoryResponse({ messages: data.history || [] });
       }
     };
 
@@ -182,7 +189,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       wsClient.off("status", handleStatus);
       wsClient.off("control", handleControl);
     };
-  }, [wsClient, clientId]); // Include wsClient and clientId in dependencies
+  }, [wsClient, convId]); // Include wsClient and convId in dependencies
 
   const handleSubmit = useCallback(async (e?: { preventDefault?: () => void }) => {
     e?.preventDefault?.();
@@ -305,10 +312,10 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       )}
 
       {/* Development Debug Panel */}
-      {/* {ClientIdDebug && (
+      {/* {ConvIdDebug && (
         <div className="absolute top-4 right-4 z-50">
           <Suspense fallback={<div className="text-xs text-gray-500">Loading debug...</div>}>
-            <ClientIdDebug />
+            <ConvIdDebug />
           </Suspense>
         </div>
       )} */}
@@ -326,6 +333,21 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         className="h-full"
       />
 
+      {/* Debug: Log messages being passed to Chat component */}
+      <div style={{ position: 'fixed', bottom: 10, left: 10, background: 'rgba(0,255,0,0.2)', padding: '5px', fontSize: '10px' }}>
+        Chat messages: {messages.length} | System: {messages.filter(m => m.role === 'system').length} | User: {messages.filter(m => m.role === 'user').length} | Assistant: {messages.filter(m => m.role === 'assistant').length}
+      </div>
+
+      {/* Debug: Show message details */}
+      <div style={{ position: 'fixed', bottom: 30, left: 10, background: 'rgba(255,255,0,0.2)', padding: '5px', fontSize: '9px', maxWidth: '300px' }}>
+        {messages.map((msg, i) => (
+          <div key={i} style={{ borderBottom: '1px solid #333', paddingBottom: '2px' }}>
+            <strong>{msg.role}:</strong> "{msg.content}" (len: {msg.content.length})
+          </div>
+        ))}
+      </div>
+
+      
       {/* <div className="flex-1 px-4 pb-4 min-h-0">
         <div className="flex flex-rpw">
 

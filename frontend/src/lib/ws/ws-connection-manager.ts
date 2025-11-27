@@ -74,12 +74,20 @@ export class WSConnectionManager {
       connectionInfo.refCount--;
       console.log(`WSConnectionManager: Released connection ${connectionKey} (ref count: ${connectionInfo.refCount})`);
 
-      // Only disconnect if no more references
+      // Only disconnect if no more references, but delay to handle React Strict Mode
       if (connectionInfo.refCount <= 0) {
-        console.log(`WSConnectionManager: No more references for ${connectionKey}, disconnecting`);
-        connectionInfo.client.disconnect();
-        this.connections.delete(connectionKey);
-        console.log(`WSConnectionManager: Total connections now: ${this.connections.size}`);
+        console.log(`WSConnectionManager: No more references for ${connectionKey}, scheduling disconnect`);
+        setTimeout(() => {
+          const currentConnectionInfo = this.connections.get(connectionKey);
+          if (currentConnectionInfo && currentConnectionInfo.refCount <= 0) {
+            console.log(`WSConnectionManager: Confirmed disconnect for ${connectionKey}`);
+            currentConnectionInfo.client.disconnect();
+            this.connections.delete(connectionKey);
+            console.log(`WSConnectionManager: Total connections now: ${this.connections.size}`);
+          } else {
+            console.log(`WSConnectionManager: Disconnect cancelled for ${connectionKey}, still has references`);
+          }
+        }, 200); // 200ms delay to allow React Strict Mode remount
       }
     } else {
       console.log(`WSConnectionManager: Attempted to release unknown connection: ${connectionKey}`);
@@ -147,11 +155,12 @@ export class WSConnectionManager {
 /**
  * React hook for using WebSocket connection manager
  */
-import { useCallback, useEffect, useRef, useMemo } from "react";
+import { useCallback, useEffect, useRef, useMemo, useState } from "react";
 
 export function useWSConnection(options: WSClientOptions) {
   const clientRef = useRef<WSClient | null>(null);
   const managerRef = useRef<WSConnectionManager>(WSConnectionManager.getInstance());
+  const [, forceUpdate] = useState({});
 
   // Memoize options to prevent unnecessary recreations
   const memoizedOptions = useMemo(() => options, [
@@ -168,7 +177,12 @@ export function useWSConnection(options: WSClientOptions) {
     console.log("useWSConnection: useEffect triggered for:", memoizedOptions.url);
 
     // Get or create client
-    clientRef.current = managerRef.current.getClient(memoizedOptions);
+    const client = managerRef.current.getClient(memoizedOptions);
+    if (client !== clientRef.current) {
+      clientRef.current = client;
+      // Force re-render to update the returned client value
+      forceUpdate({});
+    }
 
     // Cleanup on unmount
     return () => {
