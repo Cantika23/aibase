@@ -9,13 +9,8 @@ import { activeTabManager } from "@/lib/ws/active-tab-manager";
 import {
   AlertCircle
 } from "lucide-react";
-import { lazy, useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { flushSync } from "react-dom";
-
-// Lazy load debug component only in development
-const ConvIdDebug = process.env.NODE_ENV === "development"
-  ? lazy(() => import("@/components/debug/conv-id-debug").then(mod => ({ default: mod.ConvIdDebug })))
-  : null;
 
 interface ShadcnChatInterfaceProps {
   wsUrl: string;
@@ -521,15 +516,6 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         </Alert>
       )}
 
-      {/* Development Debug Panel */}
-      {/* {ConvIdDebug && (
-        <div className="absolute top-4 right-4 z-50">
-          <Suspense fallback={<div className="text-xs text-gray-500">Loading debug...</div>}>
-            <ConvIdDebug />
-          </Suspense>
-        </div>
-      )} */}
-
       <Chat
         messages={messages}
         input={input}
@@ -543,21 +529,6 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         className="h-full"
       />
 
-      {/* Debug: Log messages being passed to Chat component */}
-      <div style={{ position: 'fixed', bottom: 10, left: 10, background: 'rgba(0,255,0,0.2)', padding: '5px', fontSize: '10px' }}>
-        Chat messages: {messages.length} | System: {messages.filter(m => m.role === 'system').length} | User: {messages.filter(m => m.role === 'user').length} | Assistant: {messages.filter(m => m.role === 'assistant').length}
-      </div>
-
-      {/* Debug: Show message details */}
-      <div style={{ position: 'fixed', bottom: 30, left: 10, background: 'rgba(255,255,0,0.2)', padding: '5px', fontSize: '9px', maxWidth: '300px' }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{ borderBottom: '1px solid #333', paddingBottom: '2px' }}>
-            <strong>{msg.role}:</strong> "{msg.content}" (len: {msg.content.length})
-          </div>
-        ))}
-      </div>
-
-      
       {/* <div className="flex-1 px-4 pb-4 min-h-0">
         <div className="flex flex-rpw">
 
