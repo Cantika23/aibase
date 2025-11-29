@@ -130,6 +130,14 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
       const messageId = data.messageId || `msg_${Date.now()}_assistant`;
 
+      // If we're receiving chunks but loadingStartTime isn't set (e.g., page refresh during streaming),
+      // set it now so we can track completion time
+      if (!loadingStartTime && !data.isAccumulated) {
+        console.log("[Chunk] Setting loadingStartTime for in-progress message");
+        setLoadingStartTime(Date.now());
+        setIsLoading(true);
+      }
+
       flushSync(() => {
         setMessages(prevMessages => {
           // Remove thinking indicator when first chunk arrives
@@ -484,6 +492,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
                 role: "assistant",
                 content: mergedContent,
                 createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+                ...(msg.completionTime !== undefined && { completionTime: msg.completionTime }),
               };
 
               if (toolInvocations.length > 0) {
