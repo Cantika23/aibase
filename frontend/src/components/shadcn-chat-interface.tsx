@@ -37,9 +37,12 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     timeout: 10000,
   });
 
-  
+
   const currentMessageRef = useRef<string | null>(null);
   const currentMessageIdRef = useRef<string | null>(null);
+
+  // Track tool invocations for the current assistant message
+  const currentToolInvocationsRef = useRef<Map<string, any>>(new Map());
 
   // Create a stable component reference for tab management
   const componentRef = useRef({});
@@ -123,9 +126,12 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           if (existingIndex !== -1) {
             // Update existing message with accumulated content and correct ID
             console.log(`[Chunk-Accumulated] Updating message at index ${existingIndex} with content length ${data.chunk.length}`);
+            const toolInvocations = currentToolInvocationsRef.current.size > 0
+              ? Array.from(currentToolInvocationsRef.current.values())
+              : undefined;
             const updatedMessages = prev.map((msg, idx) =>
               idx === existingIndex
-                ? { ...msg, id: messageId, content: data.chunk }
+                ? { ...msg, id: messageId, content: data.chunk, ...(toolInvocations && { toolInvocations }) }
                 : msg
             );
 
@@ -138,11 +144,15 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           } else {
             // Create new message with accumulated content
             console.log(`[Chunk-Accumulated] Creating new message ${messageId} with accumulated content (${data.chunk.length} chars)`);
+            const toolInvocations = currentToolInvocationsRef.current.size > 0
+              ? Array.from(currentToolInvocationsRef.current.values())
+              : undefined;
             const newMessage: Message = {
               id: messageId,
               role: "assistant",
               content: data.chunk,
               createdAt: new Date(),
+              ...(toolInvocations && { toolInvocations }),
             };
 
             // Store in refs for completion handler
@@ -161,11 +171,15 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           if (existingIndex === -1) {
             // Create new message
             console.log(`[Chunk] Creating new message: ${messageId} with chunk "${data.chunk.substring(0, 20)}..."`);
+            const toolInvocations = currentToolInvocationsRef.current.size > 0
+              ? Array.from(currentToolInvocationsRef.current.values())
+              : undefined;
             const newMessage: Message = {
               id: messageId,
               role: "assistant",
               content: data.chunk,
               createdAt: new Date(),
+              ...(toolInvocations && { toolInvocations }),
             };
 
             // Store in refs
@@ -187,9 +201,14 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
             console.log(`[Chunk] Appending "${data.chunk.substring(0, 20)}..." (chunk size: ${data.chunk.length}) -> total: ${newContent.length} chars`);
 
+            // Preserve existing toolInvocations or add new ones
+            const toolInvocations = currentToolInvocationsRef.current.size > 0
+              ? Array.from(currentToolInvocationsRef.current.values())
+              : existingMessage.toolInvocations;
+
             const updatedArray = prev.map((msg, idx) =>
               idx === existingIndex
-                ? { ...msg, content: newContent }
+                ? { ...msg, content: newContent, ...(toolInvocations && { toolInvocations }) }
                 : msg
             );
             console.log(`[Chunk] Returning updated array with ${updatedArray.length} messages`);
@@ -264,6 +283,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       // Clear refs after completion
       currentMessageRef.current = null;
       currentMessageIdRef.current = null;
+      currentToolInvocationsRef.current.clear(); // Clear tool invocations for next message
       setIsLoading(false);
 
       console.log("Completion handling complete");
@@ -363,6 +383,76 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       }
     };
 
+    const handleToolCall = (data: { toolCallId: string; toolName: string; args: any; status: string }) => {
+      // Only active tab processes tool calls
+      if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
+      console.log("[Tool Call] Received:", data);
+
+      // Store tool invocation in "call" state
+      currentToolInvocationsRef.current.set(data.toolCallId, {
+        state: "call",
+        toolCallId: data.toolCallId,
+        toolName: data.toolName,
+        args: data.args,
+      });
+
+      // Update or create assistant message to include tool invocations
+      setMessages(prev => {
+        const toolInvocations = Array.from(currentToolInvocationsRef.current.values());
+        const lastMsg = prev[prev.length - 1];
+
+        // If last message is assistant, update it
+        if (lastMsg && lastMsg.role === "assistant") {
+          return prev.map((msg, idx) =>
+            idx === prev.length - 1
+              ? { ...msg, toolInvocations }
+              : msg
+          );
+        }
+
+        // Otherwise, create a placeholder assistant message
+        const messageId = `msg_${Date.now()}_assistant`;
+        currentMessageIdRef.current = messageId;
+        return [...prev, {
+          id: messageId,
+          role: "assistant" as const,
+          content: "",
+          createdAt: new Date(),
+          toolInvocations,
+        }];
+      });
+    };
+
+    const handleToolResult = (data: { toolCallId: string; toolName: string; result: any }) => {
+      // Only active tab processes tool results
+      if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
+      console.log("[Tool Result] Received:", data);
+
+      // Update tool invocation to "result" state
+      const existingInvocation = currentToolInvocationsRef.current.get(data.toolCallId);
+      if (existingInvocation) {
+        currentToolInvocationsRef.current.set(data.toolCallId, {
+          ...existingInvocation,
+          state: "result",
+          result: data.result,
+        });
+
+        // Update the current assistant message
+        setMessages(prev => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg && lastMsg.role === "assistant") {
+            const toolInvocations = Array.from(currentToolInvocationsRef.current.values());
+            return prev.map((msg, idx) =>
+              idx === prev.length - 1
+                ? { ...msg, toolInvocations }
+                : msg
+            );
+          }
+          return prev;
+        });
+      }
+    };
+
     // Register event listeners
     wsClient.on("connected", handleConnected);
     wsClient.on("disconnected", handleDisconnected);
@@ -373,6 +463,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     wsClient.on("communication_error", handleCommunicationError);
     wsClient.on("status", handleStatus);
     wsClient.on("control", handleControl);
+    wsClient.on("tool_call", handleToolCall);
+    wsClient.on("tool_result", handleToolResult);
 
     // Connect to WebSocket (connection manager handles multiple calls gracefully)
     wsClient.connect().catch(handleError);
@@ -393,6 +485,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       wsClient.off("communication_error", handleCommunicationError);
       wsClient.off("status", handleStatus);
       wsClient.off("control", handleControl);
+      wsClient.off("tool_call", handleToolCall);
+      wsClient.off("tool_result", handleToolResult);
     };
   }, [wsClient, convId]); // Include wsClient and convId in dependencies
 

@@ -334,7 +334,7 @@ export class WSServer extends WSEventEmitter {
 
     // Create conversation for this session with existing history
     const existingHistory = this.messagePersistence.getClientHistory(convId);
-    const conversation = await this.createConversation(existingHistory);
+    const conversation = await this.createConversation(existingHistory, convId);
     connectionInfo.conversation = conversation;
 
     // Hook into conversation to persist changes to MessagePersistence
@@ -720,7 +720,7 @@ export class WSServer extends WSEventEmitter {
     }
   }
 
-  private async createConversation(initialHistory: any[] = []): Promise<Conversation> {
+  private async createConversation(initialHistory: any[] = [], convId: string): Promise<Conversation> {
     const tools = await this.getDefaultTools();
     const defaultSystemPrompt = `You are a helpful AI assistant connected via WebSocket.
 You have access to tools that can help you provide better responses.
@@ -733,7 +733,62 @@ Always be helpful and conversational.`;
       systemPrompt: hasSystemMessage ? undefined : defaultSystemPrompt,
       initialHistory,
       tools,
-      hooks: {},
+      hooks: {
+        tools: {
+          before: async (toolCallId: string, toolName: string, args: any) => {
+            console.log(`[Tool Hook] Before: ${toolName} (${toolCallId})`);
+            // Broadcast tool call start to all connections for this conversation
+            this.broadcastToConv(convId, {
+              type: "tool_call",
+              id: toolCallId,
+              data: {
+                toolCallId,
+                toolName,
+                args,
+                status: "calling"
+              },
+              metadata: {
+                timestamp: Date.now(),
+                convId
+              },
+            });
+          },
+          after: async (toolCallId: string, toolName: string, args: any, result: any) => {
+            console.log(`[Tool Hook] After: ${toolName} (${toolCallId})`);
+            // Broadcast tool result to all connections for this conversation
+            this.broadcastToConv(convId, {
+              type: "tool_result",
+              id: toolCallId,
+              data: {
+                toolCallId,
+                toolName,
+                result
+              },
+              metadata: {
+                timestamp: Date.now(),
+                convId
+              },
+            });
+          },
+          error: async (toolCallId: string, toolName: string, args: any, error: Error) => {
+            console.log(`[Tool Hook] Error: ${toolName} (${toolCallId}) - ${error.message}`);
+            // Broadcast tool error to all connections for this conversation
+            this.broadcastToConv(convId, {
+              type: "tool_result",
+              id: toolCallId,
+              data: {
+                toolCallId,
+                toolName,
+                result: { error: error.message }
+              },
+              metadata: {
+                timestamp: Date.now(),
+                convId
+              },
+            });
+          },
+        },
+      },
       ...this.options.conversationOptions,
     });
   }
