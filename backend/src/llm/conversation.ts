@@ -566,10 +566,29 @@ export class Conversation {
 
     // Add assistant's response to history
     if (isToolCallResponse && currentToolCalls.length > 0) {
-      this.addMessage({
-        role: "assistant",
-        tool_calls: currentToolCalls,
-      });
+      // Combine text content and tool_calls in one message
+      // This preserves the order: text appears before tool calls
+      if (assistantMessageIndex >= 0 && fullText) {
+        // Update existing message with both content and tool_calls
+        this._history[assistantMessageIndex] = {
+          ...(this._history[assistantMessageIndex] as ChatCompletionAssistantMessageParam),
+          content: fullText,
+          tool_calls: currentToolCalls,
+        };
+      } else if (fullText) {
+        // Add new message with both content and tool_calls
+        this.addMessage({
+          role: "assistant",
+          content: fullText,
+          tool_calls: currentToolCalls,
+        });
+      } else {
+        // No text content, just tool_calls
+        this.addMessage({
+          role: "assistant",
+          tool_calls: currentToolCalls,
+        });
+      }
 
       // Execute tool calls
       await this.executeToolCalls(currentToolCalls);

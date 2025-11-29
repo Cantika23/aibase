@@ -352,24 +352,32 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   let beforeToolContent = "";
   let afterToolContent = content;
 
-  if (shouldSplitContent && content.includes("\n")) {
-    // Trim leading whitespace to find the actual content start
-    const trimmedContent = content.trimStart();
-    const firstNewline = trimmedContent.indexOf("\n");
+  if (shouldSplitContent) {
+    // During streaming, content might not have newlines yet
+    // Always put initial content before tools to maintain order
+    if (content.includes("\n")) {
+      // Trim leading whitespace to find the actual content start
+      const trimmedContent = content.trimStart();
+      const firstNewline = trimmedContent.indexOf("\n");
 
-    if (firstNewline !== -1) {
-      // Find where the first paragraph ends (double newline or single newline followed by content)
-      const doubleNewline = trimmedContent.indexOf("\n\n");
+      if (firstNewline !== -1) {
+        // Find where the first paragraph ends (double newline or single newline followed by content)
+        const doubleNewline = trimmedContent.indexOf("\n\n");
 
-      if (doubleNewline !== -1 && doubleNewline < 200) {
-        // Split at paragraph break
-        beforeToolContent = trimmedContent.substring(0, doubleNewline).trim();
-        afterToolContent = trimmedContent.substring(doubleNewline).trim();
-      } else {
-        // Split at first newline
-        beforeToolContent = trimmedContent.substring(0, firstNewline).trim();
-        afterToolContent = trimmedContent.substring(firstNewline).trim();
+        if (doubleNewline !== -1 && doubleNewline < 200) {
+          // Split at paragraph break
+          beforeToolContent = trimmedContent.substring(0, doubleNewline).trim();
+          afterToolContent = trimmedContent.substring(doubleNewline).trim();
+        } else {
+          // Split at first newline
+          beforeToolContent = trimmedContent.substring(0, firstNewline).trim();
+          afterToolContent = trimmedContent.substring(firstNewline).trim();
+        }
       }
+    } else if (content.trim()) {
+      // No newline yet (streaming), put all content before tools
+      beforeToolContent = content.trim();
+      afterToolContent = "";
     }
   }
 
@@ -738,20 +746,6 @@ function ToolCall({
                     <Code2 className="h-3 w-3" />
                     {toolName}
                   </div>
-                  {invocation.result && (
-                    <div className="text-green-600 dark:text-green-500 ml-5 font-mono text-[11px]">
-                      {(() => {
-                        // Extract nested result for script tools
-                        const displayResult = invocation.result.result !== undefined
-                          ? invocation.result.result
-                          : invocation.result;
-                        const resultStr = typeof displayResult === "string"
-                          ? displayResult
-                          : JSON.stringify(displayResult);
-                        return resultStr.substring(0, 100) + (resultStr.length > 100 ? "..." : "");
-                      })()}
-                    </div>
-                  )}
                 </div>
               );
             case "error":

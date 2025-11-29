@@ -687,7 +687,28 @@ export function ShadcnChatInterface({
               i++; // Skip tool message
             }
 
-            // Look ahead - if next message is assistant with content, merge it
+            // Build parts array to preserve order of text and tool invocations
+            const parts: any[] = [];
+
+            // Add initial content as text part if present
+            if (mergedContent.trim()) {
+              parts.push({
+                type: "text",
+                text: mergedContent,
+              });
+            }
+
+            // Add tool invocations as parts
+            if (toolInvocations.length > 0) {
+              toolInvocations.forEach((inv) => {
+                parts.push({
+                  type: "tool-invocation",
+                  toolInvocation: inv,
+                });
+              });
+            }
+
+            // Look ahead - if next message is assistant with content, add as another text part
             let finalCompletionTime = msg.completionTime;
             if (i + 1 < data.messages.length) {
               const nextMsg = data.messages[i + 1];
@@ -696,22 +717,26 @@ export function ShadcnChatInterface({
                 nextMsg.content &&
                 !nextMsg.tool_calls
               ) {
-                console.log(`[History] Merging content from message ${i + 1}`);
-                mergedContent += nextMsg.content;
+                console.log(`[History] Adding content from message ${i + 1} as text part`);
+                parts.push({
+                  type: "text",
+                  text: nextMsg.content,
+                });
                 // Use completion time from the merged message if available
                 if (nextMsg.completionTime !== undefined) {
                   finalCompletionTime = nextMsg.completionTime;
                 }
-                i++; // Skip the next message since we merged it
+                i++; // Skip the next message since we included it
               }
             }
 
-            // Only add if there's content or tool invocations
-            if (mergedContent.trim().length > 0 || toolInvocations.length > 0) {
+            // Only add if there are parts
+            if (parts.length > 0) {
               const message: Message = {
                 id: messageId,
                 role: "assistant",
-                content: mergedContent,
+                content: mergedContent, // Keep for backwards compatibility
+                parts: parts, // Use parts for proper ordering
                 createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
                 ...(finalCompletionTime !== undefined && {
                   completionTime: finalCompletionTime,
@@ -719,14 +744,15 @@ export function ShadcnChatInterface({
                 ...(msg.aborted && { aborted: true }),
               };
 
+              // Also keep toolInvocations for backwards compatibility
               if (toolInvocations.length > 0) {
                 message.toolInvocations = toolInvocations;
                 console.log(
-                  `[History] Added assistant message with ${toolInvocations.length} tool invocations`
+                  `[History] Added assistant message with ${parts.length} parts (${toolInvocations.length} tool invocations)`
                 );
               } else {
                 console.log(
-                  `[History] Added assistant message with content only`
+                  `[History] Added assistant message with ${parts.length} parts (content only)`
                 );
               }
 

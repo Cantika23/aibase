@@ -89,7 +89,7 @@ DuckDB query examples (read CSV/Excel/Parquet files):
 
 PostgreSQL query examples (connection URL stored in memory):
   // First, store the connection URL in memory using the memory tool:
-  // await memory({ action: 'add', category: 'database', key: 'postgresql_url', value: 'postgresql://user:pass@host:5432/db' })
+  // await memory({ action: 'set', category: 'database', key: 'postgresql_url', value: 'postgresql://user:pass@host:5432/db' })
 
   // Query users from PostgreSQL
   const users = await postgresql({

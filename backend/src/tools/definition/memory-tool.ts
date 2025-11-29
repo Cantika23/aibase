@@ -4,7 +4,7 @@ import * as path from "path";
 
 /**
  * Memory Tool - Project-level persistent key-value storage
- * Actions: list, read, update, add, remove, categories, keys
+ * Actions: list, read, set, remove, categories, keys
  * Memory is stored per project in /data/{proj-id}/memory.json
  * Structure: { category: { key: value } }
  */
@@ -17,25 +17,25 @@ export interface MemoryStore {
 
 export class MemoryTool extends Tool {
   name = "memory";
-  description = "Manage project-level memory: store and retrieve knowledge that persists across all conversations. Two-level structure: category -> key -> value. Actions: list (all data), read (category or specific key), update (modify value), add (new key-value), remove (key or category), categories (list all), keys (list keys in category).";
+  description = "Manage project-level memory: store and retrieve knowledge that persists across all conversations. Two-level structure: category -> key -> value. Actions: list (all data), read (category or specific key), set (create or update key-value), remove (key or category), categories (list all), keys (list keys in category).";
   parameters = {
     type: "object",
     properties: {
       action: {
         type: "string",
-        enum: ["list", "read", "update", "add", "remove", "categories", "keys"],
+        enum: ["list", "read", "set", "remove", "categories", "keys"],
         description: "The action to perform",
       },
       category: {
         type: "string",
-        description: "Category name (required for read, update, add, remove, keys actions)",
+        description: "Category name (required for read, set, remove, keys actions)",
       },
       key: {
         type: "string",
-        description: "Key name (required for read with category, update, add, remove actions)",
+        description: "Key name (required for read with category, set, remove actions)",
       },
       value: {
-        description: "Value to store (required for update, add actions). Can be any JSON-serializable value.",
+        description: "Value to store (required for set action). Can be any JSON-serializable value.",
       },
     },
     required: ["action"],
@@ -97,7 +97,7 @@ export class MemoryTool extends Tool {
   }
 
   async execute(args: {
-    action: "list" | "read" | "update" | "add" | "remove" | "categories" | "keys";
+    action: "list" | "read" | "set" | "remove" | "categories" | "keys";
     category?: string;
     key?: string;
     value?: any;
@@ -159,16 +159,16 @@ export class MemoryTool extends Tool {
             }, null, 2);
           }
 
-        case "add":
-          // Add new key-value to category
+        case "set":
+          // Set key-value (create or update)
           if (!args.category) {
-            throw new Error("category is required for add action");
+            throw new Error("category is required for set action");
           }
           if (!args.key) {
-            throw new Error("key is required for add action");
+            throw new Error("key is required for set action");
           }
           if (args.value === undefined) {
-            throw new Error("value is required for add action");
+            throw new Error("value is required for set action");
           }
 
           // Create category if it doesn't exist
@@ -177,52 +177,22 @@ export class MemoryTool extends Tool {
           }
 
           // Get category data (TypeScript now knows it's defined)
-          const addCategoryData = memory[args.category]!;
+          const setCategoryData = memory[args.category]!;
 
-          // Check if key already exists
-          if (args.key in addCategoryData) {
-            throw new Error(`Key '${args.key}' already exists in category '${args.category}'. Use 'update' to modify existing values.`);
-          }
+          // Check if key already exists to determine if this is create or update
+          const isUpdate = args.key in setCategoryData;
+          const oldValue = isUpdate ? setCategoryData[args.key] : undefined;
 
-          addCategoryData[args.key] = args.value;
+          // Set the value
+          setCategoryData[args.key] = args.value;
           await this.saveMemory(memory);
 
           return JSON.stringify({
-            action: "added",
+            action: isUpdate ? "updated" : "created",
             category: args.category,
             key: args.key,
+            ...(isUpdate && { oldValue }),
             value: args.value,
-          }, null, 2);
-
-        case "update":
-          // Update existing key-value
-          if (!args.category) {
-            throw new Error("category is required for update action");
-          }
-          if (!args.key) {
-            throw new Error("key is required for update action");
-          }
-          if (args.value === undefined) {
-            throw new Error("value is required for update action");
-          }
-          const updateCategoryData = memory[args.category];
-          if (!updateCategoryData) {
-            throw new Error(`Category '${args.category}' not found`);
-          }
-          if (!(args.key in updateCategoryData)) {
-            throw new Error(`Key '${args.key}' not found in category '${args.category}'. Use 'add' to create new entries.`);
-          }
-
-          const oldValue = updateCategoryData[args.key];
-          updateCategoryData[args.key] = args.value;
-          await this.saveMemory(memory);
-
-          return JSON.stringify({
-            action: "updated",
-            category: args.category,
-            key: args.key,
-            oldValue,
-            newValue: args.value,
           }, null, 2);
 
         case "remove":

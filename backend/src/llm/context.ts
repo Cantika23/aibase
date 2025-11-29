@@ -202,7 +202,31 @@ EXAMPLES:
   "code": "progress('Reading Excel structure...'); const structure = await duckdb({ query: \"DESCRIBE SELECT * FROM read_xlsx('data.xlsx', header=false, all_varchar=true, range='A1:Z100')\" }); progress(\`Found \${structure.rowCount} columns\`); const preview = await duckdb({ query: \"SELECT * FROM read_xlsx('data.xlsx', header=false, all_varchar=true, range='A1:Z10')\" }); return { columns: structure.data.map(c => c.column_name), totalColumns: structure.rowCount, preview: preview.data };"
 }
 
-Available: fetch, webSearch({ query, region?, safesearch?, timelimit?, maxResults? }), duckdb({ query, database?, format?, readonly? }), progress(msg), file(...), todo(...), memory(...), convId, projectId, console
+11. POSTGRESQL QUERY (IMPORTANT - Use postgresql(), NOT DuckDB!):
+{
+  "purpose": "Query PostgreSQL database for active users",
+  "code": "progress('Querying PostgreSQL...'); const result = await postgresql({ query: 'SELECT * FROM users WHERE active = true LIMIT 10' }); progress(\`Found \${result.rowCount} users\`); return { count: result.rowCount, users: result.data };"
+}
+
+12. POSTGRESQL WITH AGGREGATION:
+{
+  "purpose": "Get order statistics from PostgreSQL",
+  "code": "progress('Analyzing orders...'); const stats = await postgresql({ query: 'SELECT status, COUNT(*) as count, SUM(total) as revenue FROM orders GROUP BY status ORDER BY revenue DESC' }); return { breakdown: stats.data, totalStatuses: stats.rowCount };"
+}
+
+13. POSTGRESQL WITH CUSTOM CONNECTION:
+{
+  "purpose": "Query specific PostgreSQL database",
+  "code": "progress('Connecting to database...'); const result = await postgresql({ query: 'SELECT * FROM products WHERE price > 100 ORDER BY price DESC', connectionUrl: 'postgresql://user:pass@localhost:5432/shop' }); return { products: result.rowCount, data: result.data };"
+}
+
+Available: fetch, webSearch({ query, region?, safesearch?, timelimit?, maxResults? }), duckdb({ query, database?, format?, readonly? }), postgresql({ query, connectionUrl?, format?, timeout? }), progress(msg), file(...), todo(...), memory(...), convId, projectId, console
+
+CRITICAL DATABASE USAGE:
+- DuckDB: Use ONLY for CSV, Excel, Parquet, JSON files (local data files)
+- PostgreSQL: Use postgresql() function for PostgreSQL databases
+- NEVER use DuckDB extensions or postgres_attach for PostgreSQL - ALWAYS use postgresql() function instead!
+
 Note: For Excel files use read_xlsx('file.xlsx', header=true, all_varchar=true, range='A1:Z1000') - IMPORTANT: range parameter is required for multi-column Excel files!
       Without range, only the first column is read. Use all_varchar=true to avoid type errors. Cast to numeric types when needed: CAST(column AS DOUBLE)
 Write as async function body - NO import/export, just await and return!`;

@@ -45,7 +45,7 @@ export interface PostgreSQLResult {
  *
  * // 1. First, store the PostgreSQL connection URL in memory:
  * await memory({
- *   action: 'add',
+ *   action: 'set',
  *   category: 'database',
  *   key: 'postgresql_url',
  *   value: 'postgresql://user:password@localhost:5432/mydb'
@@ -127,7 +127,7 @@ export function createPostgreSQLFunction(projectId?: string) {
         } catch (error: any) {
           throw new Error(
             `Failed to read PostgreSQL connection URL from memory (${memoryCategory}.${memoryKey}): ${error.message}. ` +
-            `Please store it using: memory({ action: 'add', category: '${memoryCategory}', key: '${memoryKey}', value: 'postgresql://...' })`
+            `Please store it using: memory({ action: 'set', category: '${memoryCategory}', key: '${memoryKey}', value: 'postgresql://...' })`
           );
         }
       }

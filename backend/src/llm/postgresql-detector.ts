@@ -38,38 +38,18 @@ export async function detectAndStorePostgreSQLUrl(
 
     console.log(`[PostgreSQL] Connection successful! Version: ${testResult.version}`);
 
-    // Store in memory (use update to overwrite if exists, or add if new)
+    // Store in memory (set will create or update as needed)
     const memoryTool = new MemoryTool();
     memoryTool.setProjectId(projectId);
 
-    try {
-      // Try to read existing value first
-      await memoryTool.execute({
-        action: "read",
-        category: "database",
-        key: "postgresql_url",
-      });
+    await memoryTool.execute({
+      action: "set",
+      category: "database",
+      key: "postgresql_url",
+      value: connectionUrl,
+    });
 
-      // If we got here, key exists - update it
-      await memoryTool.execute({
-        action: "update",
-        category: "database",
-        key: "postgresql_url",
-        value: connectionUrl,
-      });
-
-      console.log(`[PostgreSQL] Connection URL updated in memory at database.postgresql_url`);
-    } catch (error) {
-      // Key doesn't exist - add it
-      await memoryTool.execute({
-        action: "add",
-        category: "database",
-        key: "postgresql_url",
-        value: connectionUrl,
-      });
-
-      console.log(`[PostgreSQL] Connection URL stored in memory at database.postgresql_url`);
-    }
+    console.log(`[PostgreSQL] Connection URL stored in memory at database.postgresql_url`);
 
     return {
       detected: true,
