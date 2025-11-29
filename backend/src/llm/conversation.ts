@@ -302,6 +302,13 @@ export class Conversation {
   }
 
   /**
+   * Get the tools registry (for internal use by script tool)
+   */
+  getToolsRegistry(): Map<string, Tool> {
+    return this.tools;
+  }
+
+  /**
    * Add a message to history
    */
   addMessage(message: ChatCompletionMessageParam): void {
@@ -614,11 +621,47 @@ export class Conversation {
       try {
         const args = JSON.parse(toolCall.function.arguments);
 
-        await this.hooks.tools?.before?.(toolCall.id, toolName, args);
+        // Special handling for script tool - inject context before execution
+        if (toolName === "script" && "setToolsRegistry" in tool) {
+          (tool as any).setToolsRegistry(this.tools);
+          (tool as any).setToolCallId(toolCall.id);
+
+          // Inject broadcast function for progress and sub-tool updates
+          (tool as any).setBroadcast(
+            (type: "tool_call" | "tool_result", data: any) => {
+              // Call hook with full data including status
+              if (type === "tool_call") {
+                // For tool_call type, pass the data through the before hook
+                // The hook implementation in ws/entry.ts will broadcast with status
+                this.hooks.tools?.before?.(
+                  data.toolCallId,
+                  data.toolName,
+                  { ...data.args, __status: data.status, __result: data.result }
+                );
+              } else {
+                this.hooks.tools?.after?.(
+                  data.toolCallId,
+                  data.toolName,
+                  data.args,
+                  data.result
+                );
+              }
+            }
+          );
+        }
+
+        // Skip the main hook call for script tool - it handles its own broadcasting
+        // For all other tools, call the before hook
+        if (toolName !== "script") {
+          await this.hooks.tools?.before?.(toolCall.id, toolName, args);
+        }
 
         const result = await tool.execute(args);
 
-        await this.hooks.tools?.after?.(toolCall.id, toolName, args, result);
+        // Skip the main hook call for script tool - it handles its own broadcasting
+        if (toolName !== "script") {
+          await this.hooks.tools?.after?.(toolCall.id, toolName, args, result);
+        }
 
         // Add tool result to history
         this.addMessage({

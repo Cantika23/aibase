@@ -8,7 +8,7 @@ import * as path from "path";
  * Todos are stored per conversation in /data/{proj-id}/{conv-id}/todos.json
  */
 
-interface TodoItem {
+export interface TodoItem {
   id: string;
   text: string;
   checked: boolean;
@@ -16,7 +16,7 @@ interface TodoItem {
   updatedAt: string;
 }
 
-interface TodoList {
+export interface TodoList {
   items: TodoItem[];
   updatedAt: string;
 }
@@ -56,6 +56,7 @@ export class TodoTool extends Tool {
 
   private convId: string = "default";
   private projectId: string = "default";
+  private broadcastCallback?: (convId: string, todos: TodoList) => void;
 
   /**
    * Set the conversation ID for this tool instance
@@ -69,6 +70,13 @@ export class TodoTool extends Tool {
    */
   setProjectId(projectId: string): void {
     this.projectId = projectId;
+  }
+
+  /**
+   * Set the broadcast callback for sending todo updates
+   */
+  setBroadcastCallback(callback: (convId: string, todos: TodoList) => void): void {
+    this.broadcastCallback = callback;
   }
 
   /**
@@ -114,12 +122,17 @@ export class TodoTool extends Tool {
   }
 
   /**
-   * Save todos to file
+   * Save todos to file and broadcast updates
    */
   private async saveTodos(todoList: TodoList): Promise<void> {
     const todosPath = this.getTodosFilePath();
     todoList.updatedAt = new Date().toISOString();
     await fs.writeFile(todosPath, JSON.stringify(todoList, null, 2), "utf-8");
+
+    // Broadcast the updated todos to all connected clients
+    if (this.broadcastCallback) {
+      this.broadcastCallback(this.convId, todoList);
+    }
   }
 
   /**

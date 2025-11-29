@@ -13,6 +13,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@phukon/duckduckgo-search": "^1.1.0",
     "@types/multer": "^2.0.0",
     "multer": "^2.0.2",
     "openai": "^6.9.1"

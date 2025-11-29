@@ -1,11 +1,12 @@
 import { Tool } from "../llm/conversation";
 import { FileTool } from "./definition/file-tool";
 import { TodoTool } from "./definition/todo-tool";
+import { ScriptTool } from "./definition/script-tool";
 
 /**
  * Get all built-in tools for a specific conversation
  */
-export function getBuiltinTools(convId: string = "default", projectId: string = "default"): Tool[] {
+export function getBuiltinTools(convId: string = "default", projectId: string = "A1"): Tool[] {
   const fileTool = new FileTool();
   fileTool.setConvId(convId);
   fileTool.setProjectId(projectId);
@@ -14,8 +15,13 @@ export function getBuiltinTools(convId: string = "default", projectId: string = 
   todoTool.setConvId(convId);
   todoTool.setProjectId(projectId);
 
+  const scriptTool = new ScriptTool();
+  scriptTool.setConvId(convId);
+  scriptTool.setProjectId(projectId);
+
   return [
     fileTool,
     todoTool,
+    scriptTool,
   ];
 }

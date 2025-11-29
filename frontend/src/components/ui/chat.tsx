@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -7,16 +8,14 @@ import {
   useState,
   type ReactElement,
 } from "react";
-import { ArrowDown, ThumbsDown, ThumbsUp } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import { Button } from "@/components/ui/button";
 import { type Message } from "@/components/ui/chat-message";
 import { CopyButton } from "@/components/ui/copy-button";
 import { MessageInput } from "@/components/ui/message-input";
 import { MessageList } from "@/components/ui/message-list";
-import { PromptSuggestions } from "@/components/ui/prompt-suggestions";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import { cn } from "@/lib/utils";
 
 interface ChatPropsBase {
   handleSubmit: (
@@ -35,6 +34,7 @@ interface ChatPropsBase {
   ) => void;
   setMessages?: (messages: any[]) => void;
   transcribeAudio?: (blob: Blob) => Promise<string>;
+  uploadProgress?: number | null;
 }
 
 interface ChatPropsWithoutSuggestions extends ChatPropsBase {
@@ -62,6 +62,7 @@ export function Chat({
   onRateResponse,
   setMessages,
   transcribeAudio,
+  uploadProgress,
 }: ChatProps) {
   const lastMessage = messages.at(-1);
   const isEmpty = messages.length === 0;
@@ -194,11 +195,7 @@ export function Chat({
   return (
     <ChatContainer className={className}>
       {isEmpty && append && suggestions ? (
-        <PromptSuggestions
-          label="Try these prompts ✨"
-          append={append}
-          suggestions={suggestions}
-        />
+        <div className="flex flex-1 items-center justify-center">Welcome</div>
       ) : null}
 
       {messages.length > 0 ? (
@@ -215,6 +212,7 @@ export function Chat({
         className="mt-auto mx-auto w-full md:max-w-[650px]"
         isPending={isGenerating || isTyping}
         handleSubmit={handleSubmit}
+        uploadProgress={uploadProgress}
       >
         {({ files, setFiles }) => (
           <MessageInput
@@ -226,6 +224,7 @@ export function Chat({
             stop={handleStop}
             isGenerating={isGenerating}
             transcribeAudio={transcribeAudio}
+            uploadProgress={uploadProgress}
           />
         )}
       </ChatForm>
@@ -256,9 +255,7 @@ export function ChatMessages({
       onTouchStart={handleTouchStart}
     >
       <div className="grid grid-cols-1 max-w-[650px]  w-full mx-auto pt-10 pb-[200px]">
-        <div className="max-w-full col-[1/1] row-[1/1]">
-          {children}
-        </div>
+        <div className="max-w-full col-[1/1] row-[1/1]">{children}</div>
 
         {!shouldAutoScroll && (
           <div className="pointer-events-none flex flex-1 items-end justify-end cursor-pointer col-[1/1] row-[1/1]">
@@ -304,6 +301,7 @@ interface ChatFormProps {
     files: File[] | null;
     setFiles: React.Dispatch<React.SetStateAction<File[] | null>>;
   }) => ReactElement;
+  uploadProgress?: number | null;
 }
 
 export const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(

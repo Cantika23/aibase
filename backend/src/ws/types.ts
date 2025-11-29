@@ -29,6 +29,7 @@ export type MessageType =
   | 'llm_complete'
   | 'tool_call'
   | 'tool_result'
+  | 'todo_update'
   | 'error'
   | 'control_response'
   | 'pong'

@@ -31,7 +31,7 @@ export class FileTool extends Tool {
   };
 
   private convId: string = "default";
-  private projectId: string = "default";
+  private projectId: string = "A1";
 
   /**
    * Set the conversation ID for this tool instance

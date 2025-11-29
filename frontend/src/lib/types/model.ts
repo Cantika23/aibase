@@ -117,7 +117,9 @@ export interface ToolCallData {
   toolCallId: string;
   toolName: string;
   args: any;
-  status?: "started" | "completed" | "error";
+  status?: "start" | "progress" | "complete" | "error";
+  result?: any; // For progress updates
+  error?: string; // For error details
   assistantMessageId?: string; // ID of the assistant message this tool call belongs to
 }
 

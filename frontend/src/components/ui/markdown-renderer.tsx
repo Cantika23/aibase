@@ -47,7 +47,7 @@ const HighlightedPre = async ({
 
     return (
       <pre className={className}>
-        <code>
+        <code className="font-mono whitespace-pre-wrap">
           {tokens.map((line, lineIndex) => (
             <React.Fragment key={lineIndex}>
               <span>

@@ -26,7 +26,7 @@ export interface UploadOptions {
   projectId?: string;
 }
 
-const UPLOAD_ENDPOINT = "http://localhost:5040/api/upload";
+const UPLOAD_ENDPOINT = "/api/upload"; // Use relative URL to leverage Vite proxy
 const DEFAULT_PROJECT_ID = "A1"; // Hardcoded for now
 
 /**
@@ -154,5 +154,5 @@ export function uploadFilesWithProgress(
  */
 export function getFileUrl(convId: string, fileName: string, projectId?: string): string {
   const projId = projectId || DEFAULT_PROJECT_ID;
-  return `http://localhost:5040/api/files/${projId}/${convId}/${fileName}`;
+  return `/api/files/${projId}/${convId}/${fileName}`; // Use relative URL to leverage Vite proxy
 }

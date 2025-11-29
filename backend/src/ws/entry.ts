@@ -960,15 +960,25 @@ Always be helpful and conversational.`;
               ? (connectionInfo as any).assistantMsgId
               : undefined;
 
-            // Broadcast tool call start to all connections for this conversation
+            // Extract status and result if passed from script tool
+            const status = args.__status || "calling";
+            const result = args.__result;
+
+            // Clean args by removing internal fields
+            const cleanArgs = { ...args };
+            delete cleanArgs.__status;
+            delete cleanArgs.__result;
+
+            // Broadcast tool call to all connections for this conversation
             this.broadcastToConv(convId, {
               type: "tool_call",
               id: toolCallId,
               data: {
                 toolCallId,
                 toolName,
-                args,
-                status: "calling",
+                args: cleanArgs,
+                status,
+                result,
                 assistantMessageId: assistantMsgId, // Include assistant message ID
               },
               metadata: {
@@ -1030,11 +1040,38 @@ Always be helpful and conversational.`;
   }
 
   private async getDefaultTools(convId: string): Promise<Tool[]> {
-    const tools = getBuiltinTools(convId);
+    // Use "A1" as project ID to match frontend upload configuration
+    const projectId = "A1";
+    const tools = getBuiltinTools(convId, projectId);
+
+    // Set up broadcast callback for TodoTool
+    const todoTool = tools.find(t => t.name === "todo");
+    if (todoTool && "setBroadcastCallback" in todoTool) {
+      (todoTool as any).setBroadcastCallback((convId: string, todos: any) => {
+        this.broadcastTodoUpdate(convId, todos);
+      });
+    }
+
     console.log(
-      `Loaded ${tools.length} built-in tools for conversation ${convId}`
+      `Loaded ${tools.length} built-in tools for conversation ${convId} in project ${projectId}`
     );
     return tools;
+  }
+
+  /**
+   * Broadcast todo updates to all connections for a conversation
+   */
+  private broadcastTodoUpdate(convId: string, todos: any): void {
+    console.log(`[TodoUpdate] Broadcasting todo update for convId: ${convId}`);
+    this.broadcastToConv(convId, {
+      type: "todo_update",
+      id: this.generateMessageId(),
+      data: { todos },
+      metadata: {
+        timestamp: Date.now(),
+        convId,
+      },
+    });
   }
 
   private sendToWebSocket(ws: ServerWebSocket, message: WSMessage): boolean {
