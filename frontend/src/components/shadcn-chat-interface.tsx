@@ -52,6 +52,9 @@ export function ShadcnChatInterface({
   // Track tool invocations for the current assistant message
   const currentToolInvocationsRef = useRef<Map<string, any>>(new Map());
 
+  // Track parts in arrival order for streaming
+  const currentPartsRef = useRef<any[]>([]);
+
   // Create a stable component reference for tab management
   const componentRef = useRef({});
 
@@ -295,17 +298,36 @@ export function ShadcnChatInterface({
                   20
                 )}..."`
               );
+
+              // Add chunk to parts array in arrival order
+              const lastPart = currentPartsRef.current[currentPartsRef.current.length - 1];
+              if (lastPart && lastPart.type === "text") {
+                // Append to existing text part
+                lastPart.text += data.chunk;
+              } else {
+                // Create new text part
+                currentPartsRef.current.push({
+                  type: "text",
+                  text: data.chunk,
+                });
+              }
+
               const toolInvocations =
                 currentToolInvocationsRef.current.size > 0
                   ? Array.from(currentToolInvocationsRef.current.values())
                   : undefined;
-              // Don't build parts during streaming - rely on ChatMessage split logic
+
+              const parts = currentPartsRef.current.length > 0
+                ? [...currentPartsRef.current]
+                : undefined;
+
               const newMessage: Message = {
                 id: messageId,
                 role: "assistant",
                 content: data.chunk,
                 createdAt: new Date(),
                 ...(toolInvocations && { toolInvocations }),
+                ...(parts && { parts }),
               };
 
               // Store in refs
@@ -324,6 +346,19 @@ export function ShadcnChatInterface({
                 `[Chunk] Found existing message at index ${existingIndex}, current content length: ${existingMessage.content.length}`
               );
               const newContent = existingMessage.content + data.chunk;
+
+              // Add chunk to parts array in arrival order
+              const lastPart = currentPartsRef.current[currentPartsRef.current.length - 1];
+              if (lastPart && lastPart.type === "text") {
+                // Append to existing text part
+                lastPart.text += data.chunk;
+              } else {
+                // Create new text part
+                currentPartsRef.current.push({
+                  type: "text",
+                  text: data.chunk,
+                });
+              }
 
               // Update refs
               currentMessageIdRef.current = messageId;
@@ -356,7 +391,11 @@ export function ShadcnChatInterface({
                 toolInvocations
               );
 
-              // Don't build parts during streaming - ChatMessage will handle split logic
+              // Use parts array to preserve streaming arrival order
+              const parts = currentPartsRef.current.length > 0
+                ? [...currentPartsRef.current]
+                : existingMessage.parts;
+
               const updatedArray = prev.map((msg, idx) => {
                 if (idx === existingIndex) {
                   const updatedMsg = { ...msg, content: newContent };
@@ -364,9 +403,17 @@ export function ShadcnChatInterface({
                   if (toolInvocations && toolInvocations.length > 0) {
                     updatedMsg.toolInvocations = toolInvocations;
                   }
+                  // Add parts to preserve arrival order
+                  if (parts) {
+                    updatedMsg.parts = parts;
+                  }
                   console.log(
                     `[Chunk] Updated message has toolInvocations:`,
                     updatedMsg.toolInvocations?.length || 0
+                  );
+                  console.log(
+                    `[Chunk] Updated message has parts:`,
+                    updatedMsg.parts?.length || 0
                   );
                   console.log(`[Chunk] Updated message object:`, updatedMsg);
                   return updatedMsg;
@@ -497,6 +544,7 @@ export function ShadcnChatInterface({
       currentMessageRef.current = null;
       currentMessageIdRef.current = null;
       currentToolInvocationsRef.current.clear(); // Clear tool invocations for next message
+      currentPartsRef.current = []; // Clear parts for next message
       setIsLoading(false);
 
       console.log("Completion handling complete");
@@ -876,17 +924,39 @@ export function ShadcnChatInterface({
       // Store tool invocation with appropriate state
       // Merge with existing invocation to preserve args (like code) across state changes
       const existingInvocation = currentToolInvocationsRef.current.get(data.toolCallId);
-      currentToolInvocationsRef.current.set(data.toolCallId, {
+      const toolInvocation = {
         state,
         toolCallId: data.toolCallId,
         toolName: data.toolName,
         args: { ...existingInvocation?.args, ...data.args }, // Preserve existing args
         result: data.result,
         error: data.error,
-      });
+      };
+      currentToolInvocationsRef.current.set(data.toolCallId, toolInvocation);
       console.log(
         "[Tool Call] Current tool invocations size:",
         currentToolInvocationsRef.current.size
+      );
+
+      // Add tool to parts array in arrival order (or update existing)
+      const existingPartIndex = currentPartsRef.current.findIndex(
+        p => p.type === "tool-invocation" && p.toolInvocation?.toolCallId === data.toolCallId
+      );
+
+      if (existingPartIndex !== -1) {
+        // Update existing tool part
+        currentPartsRef.current[existingPartIndex].toolInvocation = toolInvocation;
+      } else if (data.status === "executing" || data.status === "call") {
+        // Add new tool part on first appearance
+        currentPartsRef.current.push({
+          type: "tool-invocation",
+          toolInvocation: toolInvocation,
+        });
+      }
+
+      console.log(
+        "[Tool Call] Current parts array:",
+        currentPartsRef.current.map(p => ({ type: p.type, ...(p.type === "text" ? { textLength: p.text.length } : { toolName: p.toolInvocation.toolName }) }))
       );
 
       // Update or create assistant message to include tool invocations
@@ -894,7 +964,12 @@ export function ShadcnChatInterface({
         const toolInvocations = Array.from(
           currentToolInvocationsRef.current.values()
         );
+        const parts = currentPartsRef.current.length > 0
+          ? [...currentPartsRef.current]
+          : undefined;
+
         console.log("[Tool Call] Tool invocations array:", toolInvocations);
+        console.log("[Tool Call] Parts array:", parts);
 
         // Separate thinking indicator from other messages
         const thinkingMsg = prev.find((m) => m.isThinking);
@@ -919,7 +994,9 @@ export function ShadcnChatInterface({
               existingIndex
             );
             const updated = otherMessages.map((msg, idx) =>
-              idx === existingIndex ? { ...msg, toolInvocations } : msg
+              idx === existingIndex
+                ? { ...msg, toolInvocations, ...(parts && { parts }) }
+                : msg
             );
             return thinkingMsg ? [...updated, thinkingMsg] : updated;
           }
@@ -935,7 +1012,9 @@ export function ShadcnChatInterface({
             currentMessageIdRef.current
           );
           const updated = otherMessages.map((msg, idx) =>
-            idx === currentMsgIndex ? { ...msg, toolInvocations } : msg
+            idx === currentMsgIndex
+              ? { ...msg, toolInvocations, ...(parts && { parts }) }
+              : msg
           );
           return thinkingMsg ? [...updated, thinkingMsg] : updated;
         }
@@ -948,7 +1027,9 @@ export function ShadcnChatInterface({
             lastMsg.id
           );
           const updated = otherMessages.map((msg, idx) =>
-            idx === otherMessages.length - 1 ? { ...msg, toolInvocations } : msg
+            idx === otherMessages.length - 1
+              ? { ...msg, toolInvocations, ...(parts && { parts }) }
+              : msg
           );
           return thinkingMsg ? [...updated, thinkingMsg] : updated;
         }
