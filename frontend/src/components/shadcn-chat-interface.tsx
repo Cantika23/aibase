@@ -109,23 +109,22 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
       flushSync(() => {
         setMessages(prevMessages => {
-          // Update thinking indicator with elapsed time if present
-          const thinkingIndex = prevMessages.findIndex(m => m.isThinking);
-          console.log(`[Chunk] Looking for thinking indicator, found at index: ${thinkingIndex}, elapsedTime: ${data.elapsedTime}`);
+          // Separate thinking indicator from other messages
+          const thinkingMsg = prevMessages.find(m => m.isThinking);
+          const otherMessages = prevMessages.filter(m => !m.isThinking);
 
-          if (thinkingIndex !== -1 && data.elapsedTime !== undefined && data.elapsedTime > 0) {
+          console.log(`[Chunk] Found thinking indicator: ${!!thinkingMsg}, elapsedTime: ${data.elapsedTime}`);
+
+          // Update thinking indicator with elapsed time if present
+          let updatedThinking = thinkingMsg;
+          if (thinkingMsg && data.elapsedTime !== undefined && data.elapsedTime > 0) {
             console.log(`[Chunk] Updating thinking indicator with ${data.elapsedTime}s`);
-            prevMessages = prevMessages.map((msg, idx) =>
-              idx === thinkingIndex
-                ? { ...msg, content: `Thinking... ${data.elapsedTime}s` }
-                : msg
-            );
+            updatedThinking = { ...thinkingMsg, content: `Thinking... ${data.elapsedTime}s` };
           }
 
-          // Don't remove thinking indicator - keep it throughout streaming
-          console.log(`[State] Current messages count: ${prevMessages.length}, isAccumulated: ${data.isAccumulated}`);
+          console.log(`[State] Other messages count: ${otherMessages.length}, isAccumulated: ${data.isAccumulated}`);
 
-        const prev = prevMessages;
+        const prev = otherMessages;
 
         if (data.isAccumulated) {
           // Accumulated chunks on reconnect
@@ -245,9 +244,13 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
               return msg;
             });
             console.log(`[Chunk] Returning updated array with ${updatedArray.length} messages`);
-            return updatedArray;
+            // Add thinking indicator back at the end if it exists
+            return updatedThinking ? [...updatedArray, updatedThinking] : updatedArray;
           }
         }
+
+        // Add thinking indicator back at the end if it exists
+        return updatedThinking ? [...prev, updatedThinking] : prev;
         });
       });
 
