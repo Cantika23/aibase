@@ -1,16 +1,16 @@
-import React, { useMemo, useState } from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { motion } from "framer-motion"
-import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react"
+import React, { useMemo, useState } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { motion } from "framer-motion";
+import { Ban, ChevronRight, Code2, Loader2, Terminal } from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { FilePreview } from "@/components/ui/file-preview"
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+} from "@/components/ui/collapsible";
+import { FilePreview } from "@/components/ui/file-preview";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -50,66 +50,69 @@ const chatBubbleVariants = cva(
       },
     ],
   }
-)
+);
 
-type Animation = VariantProps<typeof chatBubbleVariants>["animation"]
+type Animation = VariantProps<typeof chatBubbleVariants>["animation"];
 
 interface Attachment {
-  name?: string
-  contentType?: string
-  url: string
+  name?: string;
+  contentType?: string;
+  url: string;
 }
 
 interface PartialToolCall {
-  state: "partial-call"
-  toolName: string
+  state: "partial-call";
+  toolName: string;
+  args?: Record<string, any>;
 }
 
 interface ToolCall {
-  state: "call"
-  toolName: string
+  state: "call";
+  toolName: string;
+  args?: Record<string, any>;
 }
 
 interface ToolResult {
-  state: "result"
-  toolName: string
+  state: "result";
+  toolName: string;
   result: {
-    __cancelled?: boolean
-    [key: string]: any
-  }
+    __cancelled?: boolean;
+    [key: string]: any;
+  };
+  args?: Record<string, any>;
 }
 
-type ToolInvocation = PartialToolCall | ToolCall | ToolResult
+type ToolInvocation = PartialToolCall | ToolCall | ToolResult;
 
 interface ReasoningPart {
-  type: "reasoning"
-  reasoning: string
+  type: "reasoning";
+  reasoning: string;
 }
 
 interface ToolInvocationPart {
-  type: "tool-invocation"
-  toolInvocation: ToolInvocation
+  type: "tool-invocation";
+  toolInvocation: ToolInvocation;
 }
 
 interface TextPart {
-  type: "text"
-  text: string
+  type: "text";
+  text: string;
 }
 
 // For compatibility with AI SDK types, not used
 interface SourcePart {
-  type: "source"
-  source?: any
+  type: "source";
+  source?: any;
 }
 
 interface FilePart {
-  type: "file"
-  mimeType: string
-  data: string
+  type: "file";
+  mimeType: string;
+  data: string;
 }
 
 interface StepStartPart {
-  type: "step-start"
+  type: "step-start";
 }
 
 type MessagePart =
@@ -118,22 +121,24 @@ type MessagePart =
   | ToolInvocationPart
   | SourcePart
   | FilePart
-  | StepStartPart
+  | StepStartPart;
 
 export interface Message {
-  id: string
-  role: "user" | "assistant" | (string & {})
-  content: string
-  createdAt?: Date
-  experimental_attachments?: Attachment[]
-  toolInvocations?: ToolInvocation[]
-  parts?: MessagePart[]
+  id: string;
+  role: "user" | "assistant" | (string & {});
+  content: string;
+  createdAt?: Date;
+  experimental_attachments?: Attachment[];
+  toolInvocations?: ToolInvocation[];
+  parts?: MessagePart[];
+  completionTime?: number; // Time in seconds to complete the message
+  isThinking?: boolean; // Temporary thinking indicator
 }
 
 export interface ChatMessageProps extends Message {
-  showTimeStamp?: boolean
-  animation?: Animation
-  actions?: React.ReactNode
+  showTimeStamp?: boolean;
+  animation?: Animation;
+  actions?: React.ReactNode;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -146,23 +151,40 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   experimental_attachments,
   toolInvocations,
   parts,
+  ...props
 }) => {
+  const completionTime = (props as Message).completionTime;
+  const isThinking = (props as Message).isThinking;
   const files = useMemo(() => {
     return experimental_attachments?.map((attachment) => {
-      const dataArray = dataUrlToUint8Array(attachment.url)
+      const dataArray = dataUrlToUint8Array(attachment.url);
       const file = new File([dataArray], attachment.name ?? "Unknown", {
         type: attachment.contentType,
-      })
-      return file
-    })
-  }, [experimental_attachments])
+      });
+      return file;
+    });
+  }, [experimental_attachments]);
 
-  const isUser = role === "user"
+  const isUser = role === "user";
 
   const formattedTime = createdAt?.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
-  })
+  });
+
+  // If this is a thinking indicator, show animated thinking message
+  if (isThinking) {
+    return (
+      <div className="flex items-start gap-2">
+        <div className={cn(chatBubbleVariants({ isUser: false, animation }))}>
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-muted-foreground">{content}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isUser) {
     return (
@@ -172,7 +194,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         {files ? (
           <div className="mb-1 flex flex-wrap gap-2">
             {files.map((file, index) => {
-              return <FilePreview file={file} key={index} />
+              return <FilePreview file={file} key={index} />;
             })}
           </div>
         ) : null}
@@ -193,7 +215,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </time>
         ) : null}
       </div>
-    )
+    );
   }
 
   if (parts && parts.length > 0) {
@@ -228,35 +250,88 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               </time>
             ) : null}
           </div>
-        )
+        );
       } else if (part.type === "reasoning") {
-        return <ReasoningBlock key={`reasoning-${index}`} part={part} />
+        return <ReasoningBlock key={`reasoning-${index}`} part={part} />;
       } else if (part.type === "tool-invocation") {
         return (
           <ToolCall
             key={`tool-${index}`}
             toolInvocations={[part.toolInvocation]}
           />
-        )
+        );
       }
-      return null
-    })
+      return null;
+    });
   }
 
-  if (toolInvocations && toolInvocations.length > 0) {
-    return <ToolCall toolInvocations={toolInvocations} />
+  // Debug logging
+  if (!isUser) {
+    console.log("[ChatMessage Render] Assistant message:", {
+      hasContent: !!content,
+      contentLength: content?.length || 0,
+      hasToolInvocations: !!toolInvocations,
+      toolInvocationsLength: toolInvocations?.length || 0,
+      toolInvocations: toolInvocations,
+    });
+  }
+
+  // Split content at first meaningful newline (skip leading newlines) if we have tool invocations
+  const shouldSplitContent = !isUser && toolInvocations && toolInvocations.length > 0;
+  let beforeToolContent = '';
+  let afterToolContent = content;
+
+  if (shouldSplitContent && content.includes('\n')) {
+    // Trim leading whitespace to find the actual content start
+    const trimmedContent = content.trimStart();
+    const firstNewline = trimmedContent.indexOf('\n');
+
+    if (firstNewline !== -1) {
+      // Find where the first paragraph ends (double newline or single newline followed by content)
+      const doubleNewline = trimmedContent.indexOf('\n\n');
+
+      if (doubleNewline !== -1 && doubleNewline < 200) {
+        // Split at paragraph break
+        beforeToolContent = trimmedContent.substring(0, doubleNewline).trim();
+        afterToolContent = trimmedContent.substring(doubleNewline).trim();
+      } else {
+        // Split at first newline
+        beforeToolContent = trimmedContent.substring(0, firstNewline).trim();
+        afterToolContent = trimmedContent.substring(firstNewline).trim();
+      }
+    }
   }
 
   return (
-    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-      <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-        <MarkdownRenderer>{content}</MarkdownRenderer>
-        {actions ? (
-          <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-            {actions}
-          </div>
-        ) : null}
-      </div>
+    <div
+      className={cn(
+        "flex flex-col gap-2",
+        isUser ? "items-end" : "items-start"
+      )}
+    >
+      {/* Render content before tools */}
+      {shouldSplitContent && beforeToolContent && (
+        <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+          <MarkdownRenderer>{beforeToolContent}</MarkdownRenderer>
+        </div>
+      )}
+
+      {/* Render tool invocations */}
+      {toolInvocations && toolInvocations.length > 0 && (
+        <ToolCall toolInvocations={toolInvocations} />
+      )}
+
+      {/* Render content after tools (or all content if not split) */}
+      {((shouldSplitContent && afterToolContent) || (!shouldSplitContent && content && content.trim())) && (
+        <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+          <MarkdownRenderer>{shouldSplitContent ? afterToolContent : content}</MarkdownRenderer>
+          {actions ? (
+            <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+              {actions}
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {showTimeStamp && createdAt ? (
         <time
@@ -269,18 +344,28 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           {formattedTime}
         </time>
       ) : null}
+
+      {/* Show completion time for assistant messages */}
+      {!isUser && completionTime !== undefined && completionTime > 0 ? (
+        <div className={cn(
+          "mt-1 block px-1 text-xs text-muted-foreground opacity-70",
+          animation !== "none" && "duration-500 animate-in fade-in-0"
+        )}>
+          Completed in {completionTime}s
+        </div>
+      ) : null}
     </div>
-  )
-}
+  );
+};
 
 function dataUrlToUint8Array(data: string) {
-  const base64 = data.split(",")[1]
-  const buf = Buffer.from(base64, "base64")
-  return new Uint8Array(buf)
+  const base64 = data.split(",")[1];
+  const buf = Buffer.from(base64, "base64");
+  return new Uint8Array(buf);
 }
 
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="mb-2 flex flex-col items-start sm:max-w-[70%]">
@@ -317,38 +402,35 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
         </CollapsibleContent>
       </Collapsible>
     </div>
-  )
-}
+  );
+};
 
 function ToolCall({
   toolInvocations,
 }: Pick<ChatMessageProps, "toolInvocations">) {
-  if (!toolInvocations?.length) return null
+  if (!toolInvocations?.length) return null;
 
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-col gap-1.5">
       {toolInvocations.map((invocation, index) => {
+        // Check for cancelled state - handle both formats
         const isCancelled =
           invocation.state === "result" &&
-          invocation.result.__cancelled === true
+          invocation.result?.__cancelled === true;
 
         if (isCancelled) {
           return (
             <div
               key={index}
-              className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+              className="flex items-center gap-2 rounded border border-muted-foreground/20 bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground"
             >
-              <Ban className="h-4 w-4" />
+              <Ban className="h-3 w-3" />
               <span>
                 Cancelled{" "}
-                <span className="font-mono">
-                  {"`"}
-                  {invocation.toolName}
-                  {"`"}
-                </span>
+                <code className="font-mono">{invocation.toolName}</code>
               </span>
             </div>
-          )
+          );
         }
 
         switch (invocation.state) {
@@ -357,47 +439,36 @@ function ToolCall({
             return (
               <div
                 key={index}
-                className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+                className="flex items-center gap-2 rounded border border-blue-200 bg-blue-50/50 px-2.5 py-1.5 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400"
               >
-                <Terminal className="h-4 w-4" />
-                <span>
-                  Calling{" "}
-                  <span className="font-mono">
-                    {"`"}
-                    {invocation.toolName}
-                    {"`"}
-                  </span>
-                  ...
-                </span>
                 <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="font-mono text-xs">
+                  <span className="capitalize">{invocation.toolName}</span>{" "}
+                  <span className="capitalize">
+                    {invocation.args?.action || "tool"}
+                  </span>
+                </span>
               </div>
-            )
+            );
           case "result":
             return (
               <div
                 key={index}
-                className="flex flex-col gap-1.5 rounded-lg border bg-muted/50 px-3 py-2 text-sm"
+                className="flex items-center gap-2 rounded border border-green-200 bg-green-50/50 px-2.5 py-1.5 text-xs text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
               >
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Code2 className="h-4 w-4" />
-                  <span>
-                    Result from{" "}
-                    <span className="font-mono">
-                      {"`"}
-                      {invocation.toolName}
-                      {"`"}
-                    </span>
+                <Code2 className="h-3 w-3" />
+                <span className="font-mono text-xs">
+                  <span className="capitalize">{invocation.toolName}</span>{" "}
+                  <span className="capitalize">
+                    {invocation.args?.action || "tool"}
                   </span>
-                </div>
-                <pre className="overflow-x-auto whitespace-pre-wrap text-foreground">
-                  {JSON.stringify(invocation.result, null, 2)}
-                </pre>
+                </span>
               </div>
-            )
+            );
           default:
-            return null
+            return null;
         }
       })}
     </div>
-  )
+  );
 }

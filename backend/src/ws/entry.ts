@@ -461,9 +461,12 @@ export class WSServer extends WSEventEmitter {
 
     // Generate IDs for user and assistant messages
     const userMsgId = `user_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-    const assistantMsgId = originalMessage.id; // Use the streaming message ID
+    const assistantMsgId = `assistant_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`; // Generate unique ID for assistant
 
     try {
+      // Store assistant message ID in connection info for tool hooks to access
+      (connectionInfo as any).assistantMsgId = assistantMsgId;
+
       // Start tracking this stream in the streaming manager
       this.streamingManager.startStream(connectionInfo.convId, assistantMsgId);
 
@@ -551,8 +554,14 @@ export class WSServer extends WSEventEmitter {
       // Verify it was saved
       const savedHistory = this.messagePersistence.getClientHistory(connectionInfo.convId);
       console.log(`[Backend Complete] Verification: Saved history has ${savedHistory.length} messages`);
+
+      // Clean up assistant message ID from connection info
+      delete (connectionInfo as any).assistantMsgId;
     } catch (error: any) {
       console.error("LLM Processing Error:", error);
+
+      // Clean up assistant message ID from connection info even on error
+      delete (connectionInfo as any).assistantMsgId;
 
       // Mark stream as complete even on error
       this.streamingManager.completeStream(connectionInfo.convId, assistantMsgId);
@@ -735,6 +744,10 @@ Always be helpful and conversational.`;
         tools: {
           before: async (toolCallId: string, toolName: string, args: any) => {
             console.log(`[Tool Hook] Before: ${toolName} (${toolCallId})`);
+            // Get the assistant message ID from the connection info
+            const connectionInfo = Array.from(this.connections.values()).find(c => c.convId === convId);
+            const assistantMsgId = connectionInfo ? (connectionInfo as any).assistantMsgId : undefined;
+
             // Broadcast tool call start to all connections for this conversation
             this.broadcastToConv(convId, {
               type: "tool_call",
@@ -743,7 +756,8 @@ Always be helpful and conversational.`;
                 toolCallId,
                 toolName,
                 args,
-                status: "calling"
+                status: "calling",
+                assistantMessageId: assistantMsgId, // Include assistant message ID
               },
               metadata: {
                 timestamp: Date.now(),

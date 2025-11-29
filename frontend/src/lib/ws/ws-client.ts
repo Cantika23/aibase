@@ -42,6 +42,11 @@ export class WSClient extends WSEventEmitter {
       timeout: ReturnType<typeof setTimeout> | null;
     }
   >();
+  private pendingUserMessage: {
+    resolve: (value: any) => void;
+    reject: (reason: any) => void;
+    timeout: ReturnType<typeof setTimeout> | null;
+  } | null = null;
 
   constructor(options: WSClientOptions) {
     super();
@@ -151,7 +156,29 @@ export class WSClient extends WSEventEmitter {
       },
     };
 
-    return this.sendMessageAndWaitForResponse(message, "llm_complete");
+    return new Promise((resolve, reject) => {
+      // Clear any existing pending user message
+      if (this.pendingUserMessage) {
+        if (this.pendingUserMessage.timeout) {
+          clearTimeout(this.pendingUserMessage.timeout);
+        }
+        this.pendingUserMessage.reject(new Error("New message sent"));
+      }
+
+      // Add timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        this.pendingUserMessage = null;
+        reject(new Error("Message response timeout"));
+      }, 60000); // 60 second timeout
+
+      this.pendingUserMessage = {
+        resolve,
+        reject,
+        timeout,
+      };
+
+      this.send(message);
+    });
   }
 
   /**
@@ -297,12 +324,15 @@ export class WSClient extends WSEventEmitter {
 
     // Handle llm_complete pending messages specially - resolve AND emit
     let shouldResolvePending = false;
-    if (message.type === "llm_complete" && this.pendingMessages.has(message.id)) {
-      const pending = this.pendingMessages.get(message.id)!;
-      if (pending.timeout) clearTimeout(pending.timeout);
-      this.pendingMessages.delete(message.id);
-      pending.resolve(message.data);
-      shouldResolvePending = true;
+    if (message.type === "llm_complete") {
+      // Resolve pending user message if exists
+      if (this.pendingUserMessage) {
+        const pending = this.pendingUserMessage;
+        if (pending.timeout) clearTimeout(pending.timeout);
+        this.pendingUserMessage = null;
+        pending.resolve(message.data);
+        shouldResolvePending = true;
+      }
     }
 
     // Emit specific message events
@@ -337,6 +367,7 @@ export class WSClient extends WSEventEmitter {
           toolName: message.data?.toolName,
           args: message.data?.args,
           status: message.data?.status,
+          assistantMessageId: message.data?.assistantMessageId,
         } as ToolCallData);
         break;
 
@@ -468,6 +499,15 @@ export class WSClient extends WSEventEmitter {
       pending.reject(new Error("Connection closed"));
     }
     this.pendingMessages.clear();
+
+    // Also clear pending user message
+    if (this.pendingUserMessage) {
+      if (this.pendingUserMessage.timeout) {
+        clearTimeout(this.pendingUserMessage.timeout);
+      }
+      this.pendingUserMessage.reject(new Error("Connection closed"));
+      this.pendingUserMessage = null;
+    }
   }
 
   private attemptReconnect(): void {

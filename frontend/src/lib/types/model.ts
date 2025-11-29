@@ -117,6 +117,7 @@ export interface ToolCallData {
   toolName: string;
   args: any;
   status?: "started" | "completed" | "error";
+  assistantMessageId?: string; // ID of the assistant message this tool call belongs to
 }
 
 export interface ToolResultData {

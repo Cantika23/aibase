@@ -7,7 +7,8 @@ import { useConvId } from "@/lib/conv-id";
 import { useWSConnection } from "@/lib/ws/ws-connection-manager";
 import { activeTabManager } from "@/lib/ws/active-tab-manager";
 import {
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { flushSync } from "react-dom";
@@ -23,6 +24,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [error, setError] = useState<string | null>(null);
+  const [loadingStartTime, setLoadingStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Use the client ID management hook
   const { convId, metadata: convMetadata } = useConvId();
@@ -43,6 +46,32 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
   // Track tool invocations for the current assistant message
   const currentToolInvocationsRef = useRef<Map<string, any>>(new Map());
+
+  // Update elapsed time when loading and update thinking message
+  useEffect(() => {
+    if (!isLoading || loadingStartTime === null) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - loadingStartTime) / 1000);
+      setElapsedSeconds(elapsed);
+
+      // Update thinking message with elapsed time
+      setMessages(prev => {
+        const thinkingIndex = prev.findIndex(m => m.isThinking);
+        if (thinkingIndex === -1) return prev;
+
+        return prev.map((msg, idx) =>
+          idx === thinkingIndex
+            ? { ...msg, content: `Thinking${elapsed > 0 ? `... ${elapsed}s` : '...'}` }
+            : msg
+        );
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isLoading, loadingStartTime]);
 
   // Create a stable component reference for tab management
   const componentRef = useRef({});
@@ -102,7 +131,9 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       const messageId = data.messageId || `msg_${Date.now()}_assistant`;
 
       flushSync(() => {
-        setMessages(prev => {
+        setMessages(prevMessages => {
+          // Remove thinking indicator when first chunk arrives
+          const prev = prevMessages.filter(m => !m.isThinking);
           console.log(`[State] Current messages count: ${prev.length}, isAccumulated: ${data.isAccumulated}`);
 
         if (data.isAccumulated) {
@@ -206,11 +237,23 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
               ? Array.from(currentToolInvocationsRef.current.values())
               : existingMessage.toolInvocations;
 
-            const updatedArray = prev.map((msg, idx) =>
-              idx === existingIndex
-                ? { ...msg, content: newContent, ...(toolInvocations && { toolInvocations }) }
-                : msg
-            );
+            console.log(`[Chunk] currentToolInvocationsRef size: ${currentToolInvocationsRef.current.size}`);
+            console.log(`[Chunk] existingMessage.toolInvocations:`, existingMessage.toolInvocations);
+            console.log(`[Chunk] Final toolInvocations to use:`, toolInvocations);
+
+            const updatedArray = prev.map((msg, idx) => {
+              if (idx === existingIndex) {
+                const updatedMsg = { ...msg, content: newContent };
+                // Always preserve toolInvocations if they exist
+                if (toolInvocations && toolInvocations.length > 0) {
+                  updatedMsg.toolInvocations = toolInvocations;
+                }
+                console.log(`[Chunk] Updated message has toolInvocations:`, updatedMsg.toolInvocations?.length || 0);
+                console.log(`[Chunk] Updated message object:`, updatedMsg);
+                return updatedMsg;
+              }
+              return msg;
+            });
             console.log(`[Chunk] Returning updated array with ${updatedArray.length} messages`);
             return updatedArray;
           }
@@ -231,6 +274,9 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         isAccumulated: data.isAccumulated
       });
 
+      // Calculate completion time
+      const completionTimeSeconds = loadingStartTime ? Math.floor((Date.now() - loadingStartTime) / 1000) : 0;
+
       // Don't process empty completions
       const fullText = data.fullText || '';
       if (!fullText) {
@@ -238,10 +284,14 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         currentMessageRef.current = null;
         currentMessageIdRef.current = null;
         setIsLoading(false);
+        setLoadingStartTime(null);
+        setElapsedSeconds(0);
         return;
       }
 
-      setMessages(prev => {
+      setMessages(prevMessages => {
+        // Remove thinking indicator when completion arrives
+        const prev = prevMessages.filter(m => !m.isThinking);
         console.log(`[Complete] Processing completion for message ${data.messageId} (${fullText.length} chars, accumulated: ${data.isAccumulated})`);
 
         // Try to update message by ID
@@ -257,14 +307,19 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           // Only use fullText if the message was created without chunks (e.g., on reconnect)
           if (existingMessage.content.length > 0 && !data.isAccumulated) {
             console.log(`[Complete] Keeping streamed content (${existingMessage.content.length} chars), ignoring fullText`);
-            return prev; // No change needed, we already have the complete content from streaming
+            // Still add completion time metadata
+            return prev.map((msg, idx) =>
+              idx === messageIndex
+                ? { ...msg, completionTime: completionTimeSeconds }
+                : msg
+            );
           }
 
           // Use fullText only for accumulated messages on reconnect
           console.log(`[Complete] Using fullText for ${data.isAccumulated ? 'accumulated' : 'empty'} message`);
           return prev.map((msg, idx) =>
             idx === messageIndex
-              ? { ...msg, content: fullText }
+              ? { ...msg, content: fullText, completionTime: completionTimeSeconds }
               : msg
           );
         }
@@ -276,6 +331,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           role: "assistant",
           content: fullText,
           createdAt: new Date(),
+          completionTime: completionTimeSeconds,
         };
         return [...prev, newMessage];
       });
@@ -285,6 +341,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       currentMessageIdRef.current = null;
       currentToolInvocationsRef.current.clear(); // Clear tool invocations for next message
       setIsLoading(false);
+      setLoadingStartTime(null);
+      setElapsedSeconds(0);
 
       console.log("Completion handling complete");
     };
@@ -292,6 +350,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     const handleCommunicationError = (data: { code: string; message: string }) => {
       setError(`Communication error: ${data.message}`);
       setIsLoading(false);
+      setLoadingStartTime(null);
+      setElapsedSeconds(0);
 
       // Add error message to chat
       const errorMessage: Message = {
@@ -301,7 +361,11 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         createdAt: new Date(),
       };
 
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => {
+        // Remove thinking indicator and add error message
+        const withoutThinking = prev.filter(m => !m.isThinking);
+        return [...withoutThinking, errorMessage];
+      });
     };
 
     const handleStatus = (data: { status?: string }) => {
@@ -314,21 +378,127 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       console.log("handleHistoryResponse called with:", data);
       if (data.messages && Array.isArray(data.messages)) {
         console.log("Converting messages:", data.messages);
-        // Convert server messages to Message format and filter out empty messages
-        const serverMessages: Message[] = data.messages
-          .map((msg, index) => {
-            // Prefer server-provided ID, fall back to generated ID
-            const messageId = msg.id || `history_${Date.now()}_${index}`;
-            console.log(`[History] Message ${index}: role=${msg.role}, id=${messageId}, content length=${(msg.content || '').length}`);
 
-            return {
+        // Convert and merge messages
+        const serverMessages: Message[] = [];
+        let i = 0;
+
+        while (i < data.messages.length) {
+          const msg = data.messages[i];
+
+          // Skip tool messages (they're internal)
+          if (msg.role === 'tool') {
+            console.log(`[History] Skipping tool message at index ${i}`);
+            i++;
+            continue;
+          }
+
+          // For user messages, just add them
+          if (msg.role === 'user') {
+            const messageId = msg.id || `history_${Date.now()}_${i}`;
+            serverMessages.push({
               id: messageId,
-              role: msg.role || "assistant",
-              content: msg.content || msg.text || "",
+              role: "user",
+              content: msg.content || "",
               createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
-            };
-          })
-          .filter(msg => msg.content.trim().length > 0); // Filter out empty messages
+            });
+            console.log(`[History] Added user message at index ${i}`);
+            i++;
+            continue;
+          }
+
+          // For assistant messages, look ahead to merge content and tool_calls
+          if (msg.role === 'assistant') {
+            let mergedContent = msg.content || "";
+            let toolInvocations: any[] = [];
+            const messageId = msg.id || `history_${Date.now()}_${i}`;
+
+            // Check if this message has tool_calls
+            if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+              console.log(`[History] Message ${i} has tool_calls:`, msg.tool_calls);
+              toolInvocations = msg.tool_calls.map((tc: any) => {
+                let args = {};
+                try {
+                  const argStr = tc.function?.arguments || tc.arguments;
+                  args = typeof argStr === 'string' ? JSON.parse(argStr) : (argStr || {});
+                } catch (e) {
+                  console.warn('[History] Failed to parse tool arguments:', e);
+                }
+                return {
+                  state: "result",
+                  toolCallId: tc.id,
+                  toolName: tc.function?.name || tc.name,
+                  args,
+                };
+              });
+            }
+
+            // Look ahead - if next message is assistant with tool_calls, merge it
+            if (i + 1 < data.messages.length) {
+              const nextMsg = data.messages[i + 1];
+              if (nextMsg.role === 'assistant' && nextMsg.tool_calls && (!nextMsg.content || nextMsg.content.trim() === '')) {
+                console.log(`[History] Merging tool_calls from message ${i + 1}`);
+                const nextToolInvocations = nextMsg.tool_calls.map((tc: any) => {
+                  let args = {};
+                  try {
+                    const argStr = tc.function?.arguments || tc.arguments;
+                    args = typeof argStr === 'string' ? JSON.parse(argStr) : (argStr || {});
+                  } catch (e) {
+                    console.warn('[History] Failed to parse tool arguments:', e);
+                  }
+                  return {
+                    state: "result",
+                    toolCallId: tc.id,
+                    toolName: tc.function?.name || tc.name,
+                    args,
+                  };
+                });
+                toolInvocations = [...toolInvocations, ...nextToolInvocations];
+                i++; // Skip the next message since we merged it
+              }
+            }
+
+            // Skip tool result message if it follows
+            if (i + 1 < data.messages.length && data.messages[i + 1].role === 'tool') {
+              i++; // Skip tool message
+            }
+
+            // Look ahead - if next message is assistant with content, merge it
+            if (i + 1 < data.messages.length) {
+              const nextMsg = data.messages[i + 1];
+              if (nextMsg.role === 'assistant' && nextMsg.content && !nextMsg.tool_calls) {
+                console.log(`[History] Merging content from message ${i + 1}`);
+                mergedContent += nextMsg.content;
+                i++; // Skip the next message since we merged it
+              }
+            }
+
+            // Only add if there's content or tool invocations
+            if (mergedContent.trim().length > 0 || toolInvocations.length > 0) {
+              const message: Message = {
+                id: messageId,
+                role: "assistant",
+                content: mergedContent,
+                createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+              };
+
+              if (toolInvocations.length > 0) {
+                message.toolInvocations = toolInvocations;
+                console.log(`[History] Added assistant message with ${toolInvocations.length} tool invocations`);
+              } else {
+                console.log(`[History] Added assistant message with content only`);
+              }
+
+              serverMessages.push(message);
+            }
+
+            i++;
+            continue;
+          }
+
+          // Default: skip unknown message types
+          i++;
+        }
 
         console.log("Setting messages to:", serverMessages);
         console.log("First message structure:", serverMessages[0]);
@@ -383,10 +553,11 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       }
     };
 
-    const handleToolCall = (data: { toolCallId: string; toolName: string; args: any; status: string }) => {
+    const handleToolCall = (data: { toolCallId: string; toolName: string; args: any; status: string; assistantMessageId?: string }) => {
       // Only active tab processes tool calls
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
       console.log("[Tool Call] Received:", data);
+      console.log("[Tool Call] Assistant message ID from backend:", data.assistantMessageId);
 
       // Store tool invocation in "call" state
       currentToolInvocationsRef.current.set(data.toolCallId, {
@@ -395,14 +566,33 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         toolName: data.toolName,
         args: data.args,
       });
+      console.log("[Tool Call] Current tool invocations size:", currentToolInvocationsRef.current.size);
 
       // Update or create assistant message to include tool invocations
       setMessages(prev => {
         const toolInvocations = Array.from(currentToolInvocationsRef.current.values());
-        const lastMsg = prev[prev.length - 1];
+        console.log("[Tool Call] Tool invocations array:", toolInvocations);
 
-        // If last message is assistant, update it
+        // Look for message with matching ID if provided
+        if (data.assistantMessageId) {
+          const existingIndex = prev.findIndex(m => m.id === data.assistantMessageId);
+          console.log("[Tool Call] Looking for message with ID:", data.assistantMessageId, "found at index:", existingIndex);
+
+          if (existingIndex !== -1) {
+            // Update existing message
+            console.log("[Tool Call] Updating existing message at index:", existingIndex);
+            return prev.map((msg, idx) =>
+              idx === existingIndex
+                ? { ...msg, toolInvocations }
+                : msg
+            );
+          }
+        }
+
+        // Check if last message is assistant
+        const lastMsg = prev[prev.length - 1];
         if (lastMsg && lastMsg.role === "assistant") {
+          console.log("[Tool Call] Updating last assistant message:", lastMsg.id);
           return prev.map((msg, idx) =>
             idx === prev.length - 1
               ? { ...msg, toolInvocations }
@@ -410,9 +600,10 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           );
         }
 
-        // Otherwise, create a placeholder assistant message
-        const messageId = `msg_${Date.now()}_assistant`;
+        // Otherwise, create a placeholder assistant message using the ID from backend
+        const messageId = data.assistantMessageId || currentMessageIdRef.current || `msg_${Date.now()}_assistant`;
         currentMessageIdRef.current = messageId;
+        console.log("[Tool Call] Creating new message with ID:", messageId);
         return [...prev, {
           id: messageId,
           role: "assistant" as const,
@@ -504,20 +695,32 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       createdAt: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const thinkingMessage: Message = {
+      id: `thinking_${Date.now()}`,
+      role: "assistant",
+      content: "Thinking...",
+      createdAt: new Date(),
+      isThinking: true,
+    };
+
+    setMessages(prev => [...prev, userMessage, thinkingMessage]);
     const messageText = input.trim();
     setInput("");
     setIsLoading(true);
+    setLoadingStartTime(Date.now());
+    setElapsedSeconds(0);
     setError(null);
 
     try {
       await wsClient.sendMessage(messageText);
     } catch (error) {
       setIsLoading(false);
+      setLoadingStartTime(null);
+      setElapsedSeconds(0);
       setError(error instanceof Error ? error.message : "Failed to send message");
 
-      // Remove the user message if send failed
-      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+      // Remove both the user message and thinking indicator if send failed
+      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id && msg.id !== thinkingMessage.id));
     }
   }, [input, wsClient]);
 
@@ -533,8 +736,12 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
   const abort = useCallback(() => {
     setIsLoading(false);
+    setLoadingStartTime(null);
+    setElapsedSeconds(0);
     currentMessageRef.current = null;
     currentMessageIdRef.current = null;
+    // Remove thinking indicator
+    setMessages(prev => prev.filter(m => !m.isThinking));
     wsClient?.abort();
   }, [wsClient]);
 
