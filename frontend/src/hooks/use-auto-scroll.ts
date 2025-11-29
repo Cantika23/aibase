@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 const ACTIVATION_THRESHOLD_PERCENT = 0.3
 // Minimum pixels of scroll-up movement required to disable auto-scroll
 const MIN_SCROLL_UP_THRESHOLD = 10
+// Pixels from bottom to consider "at bottom" for hiding the scroll button
+const AT_BOTTOM_THRESHOLD = 5
 
 export function useAutoScroll(dependencies: React.DependencyList) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -22,9 +24,16 @@ export function useAutoScroll(dependencies: React.DependencyList) {
     if (containerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = containerRef.current
 
-      const distanceFromBottom = Math.abs(
-        scrollHeight - scrollTop - clientHeight
-      )
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+
+      // If we're at the bottom (within 5px), always keep auto-scroll enabled
+      const isAtBottom = distanceFromBottom <= AT_BOTTOM_THRESHOLD
+
+      if (isAtBottom) {
+        setShouldAutoScroll(true)
+        previousScrollTop.current = scrollTop
+        return
+      }
 
       const isScrollingUp = previousScrollTop.current
         ? scrollTop < previousScrollTop.current

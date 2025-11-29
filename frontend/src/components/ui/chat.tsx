@@ -256,12 +256,12 @@ export function ChatMessages({
       onTouchStart={handleTouchStart}
     >
       <div className="grid grid-cols-1 max-w-[650px]  w-full mx-auto pt-10 pb-[200px]">
-        <div className="max-w-full [grid-column:1/1] [grid-row:1/1]">
+        <div className="max-w-full col-[1/1] row-[1/1]">
           {children}
         </div>
 
         {!shouldAutoScroll && (
-          <div className="pointer-events-none flex flex-1 items-end justify-end cursor-pointer [grid-column:1/1] [grid-row:1/1]">
+          <div className="pointer-events-none flex flex-1 items-end justify-end cursor-pointer col-[1/1] row-[1/1]">
             <div className="sticky bottom-0 left-0 flex w-full justify-end">
               <Button
                 onClick={scrollToBottom}
