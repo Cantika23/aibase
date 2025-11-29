@@ -47,6 +47,9 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   // Track tool invocations for the current assistant message
   const currentToolInvocationsRef = useRef<Map<string, any>>(new Map());
 
+  // Track loading start time in ref to avoid closure issues
+  const loadingStartTimeRef = useRef<number | null>(null);
+
   // Update elapsed time when loading and update thinking message
   useEffect(() => {
     if (!isLoading || loadingStartTime === null) {
@@ -132,9 +135,11 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
       // If we're receiving chunks but loadingStartTime isn't set (e.g., page refresh during streaming),
       // set it now so we can track completion time
-      if (!loadingStartTime && !data.isAccumulated) {
+      if (!loadingStartTimeRef.current && !data.isAccumulated) {
         console.log("[Chunk] Setting loadingStartTime for in-progress message");
-        setLoadingStartTime(Date.now());
+        const startTime = Date.now();
+        loadingStartTimeRef.current = startTime;
+        setLoadingStartTime(startTime);
         setIsLoading(true);
       }
 
@@ -283,8 +288,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       });
 
       // Calculate completion time
-      const completionTimeSeconds = loadingStartTime ? Math.floor((Date.now() - loadingStartTime) / 1000) : 0;
-      console.log(`[Complete] Calculated completion time: ${completionTimeSeconds}s (loadingStartTime: ${loadingStartTime})`);
+      const completionTimeSeconds = loadingStartTimeRef.current ? Math.floor((Date.now() - loadingStartTimeRef.current) / 1000) : 0;
+      console.log(`[Complete] Calculated completion time: ${completionTimeSeconds}s (loadingStartTime: ${loadingStartTimeRef.current})`);
 
       // Don't process empty completions
       const fullText = data.fullText || '';
@@ -292,6 +297,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         console.log("Skipping empty completion");
         currentMessageRef.current = null;
         currentMessageIdRef.current = null;
+        loadingStartTimeRef.current = null;
         setIsLoading(false);
         setLoadingStartTime(null);
         setElapsedSeconds(0);
@@ -352,6 +358,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       currentMessageRef.current = null;
       currentMessageIdRef.current = null;
       currentToolInvocationsRef.current.clear(); // Clear tool invocations for next message
+      loadingStartTimeRef.current = null;
       setIsLoading(false);
       setLoadingStartTime(null);
       setElapsedSeconds(0);
@@ -361,6 +368,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
     const handleCommunicationError = (data: { code: string; message: string }) => {
       setError(`Communication error: ${data.message}`);
+      loadingStartTimeRef.current = null;
       setIsLoading(false);
       setLoadingStartTime(null);
       setElapsedSeconds(0);
@@ -719,14 +727,17 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     setMessages(prev => [...prev, userMessage, thinkingMessage]);
     const messageText = input.trim();
     setInput("");
+    const startTime = Date.now();
+    loadingStartTimeRef.current = startTime;
     setIsLoading(true);
-    setLoadingStartTime(Date.now());
+    setLoadingStartTime(startTime);
     setElapsedSeconds(0);
     setError(null);
 
     try {
       await wsClient.sendMessage(messageText);
     } catch (error) {
+      loadingStartTimeRef.current = null;
       setIsLoading(false);
       setLoadingStartTime(null);
       setElapsedSeconds(0);
@@ -748,6 +759,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   }, [wsClient]);
 
   const abort = useCallback(() => {
+    loadingStartTimeRef.current = null;
     setIsLoading(false);
     setLoadingStartTime(null);
     setElapsedSeconds(0);
