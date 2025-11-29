@@ -48,11 +48,49 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   // Create a stable component reference for tab management
   const componentRef = useRef({});
 
+  // Track thinking indicator start time
+  const thinkingStartTimeRef = useRef<number | null>(null);
+
+  // Update thinking indicator seconds every second
+  useEffect(() => {
+    // Only set interval if thinking indicator exists
+    const hasThinking = messages.some(m => m.isThinking);
+
+    if (!hasThinking || thinkingStartTimeRef.current === null) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - thinkingStartTimeRef.current!) / 1000);
+
+      setMessages(prev => {
+        const thinkingIndex = prev.findIndex(m => m.isThinking);
+        if (thinkingIndex === -1) return prev;
+
+        const updated = [...prev];
+        updated[thinkingIndex] = {
+          ...updated[thinkingIndex],
+          content: `Thinking... ${elapsedSeconds}s`
+        };
+        return updated;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [messages.some(m => m.isThinking), thinkingStartTimeRef.current]);
+
   // Debug: Track messages state changes
   useEffect(() => {
     console.log(`[State-Effect] Messages state changed:`, {
       count: messages.length,
-      messages: messages.map(m => ({ id: m.id, role: m.role, contentLength: m.content.length, contentPreview: m.content.substring(0, 50) }))
+      messages: messages.map(m => ({
+        id: m.id,
+        role: m.role,
+        contentLength: m.content.length,
+        contentPreview: m.content.substring(0, 50),
+        completionTime: m.completionTime,
+        isThinking: m.isThinking
+      }))
     });
   }, [messages]);
 
@@ -113,15 +151,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           const thinkingMsg = prevMessages.find(m => m.isThinking);
           const otherMessages = prevMessages.filter(m => !m.isThinking);
 
-          console.log(`[Chunk] Found thinking indicator: ${!!thinkingMsg}, elapsedTime: ${data.elapsedTime}`);
-
-          // Update thinking indicator with elapsed time if present
-          let updatedThinking = thinkingMsg;
-          if (thinkingMsg && data.elapsedTime !== undefined && data.elapsedTime > 0) {
-            console.log(`[Chunk] Updating thinking indicator with ${data.elapsedTime}s`);
-            updatedThinking = { ...thinkingMsg, content: `Thinking... ${data.elapsedTime}s` };
-          }
-
+          console.log(`[Chunk] Found thinking indicator: ${!!thinkingMsg}`);
           console.log(`[State] Other messages count: ${otherMessages.length}, isAccumulated: ${data.isAccumulated}`);
 
         const prev = otherMessages;
@@ -181,7 +211,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
             currentMessageRef.current = data.chunk;
 
             console.log(`[Chunk-Accumulated] Returning ${prev.length + 1} messages (added new)`);
-            return [...prev, newMessage];
+            const resultArray = [...prev, newMessage];
+            return thinkingMsg ? [...resultArray, thinkingMsg] : resultArray;
           }
         } else {
           // Real-time chunk - check if message already exists in array
@@ -208,7 +239,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
             const newArray = [...prev, newMessage];
             console.log(`[Chunk] Returning new array with ${newArray.length} messages`);
-            return newArray;
+            return thinkingMsg ? [...newArray, thinkingMsg] : newArray;
           } else {
             // Append to existing message
             const existingMessage = prev[existingIndex];
@@ -245,12 +276,9 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
             });
             console.log(`[Chunk] Returning updated array with ${updatedArray.length} messages`);
             // Add thinking indicator back at the end if it exists
-            return updatedThinking ? [...updatedArray, updatedThinking] : updatedArray;
+            return thinkingMsg ? [...updatedArray, thinkingMsg] : updatedArray;
           }
         }
-
-        // Add thinking indicator back at the end if it exists
-        return updatedThinking ? [...prev, updatedThinking] : prev;
         });
       });
 
@@ -267,6 +295,9 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         isAccumulated: data.isAccumulated,
         completionTime: data.completionTime
       });
+
+      // Clear thinking start time to stop interval
+      thinkingStartTimeRef.current = null;
 
       // Use completion time from backend
       const completionTimeSeconds = data.completionTime ?? 0;
@@ -308,6 +339,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
                 : msg
             );
             console.log(`[Complete] Updated message:`, updated[messageIndex]);
+            console.log(`[Complete] Updated message completionTime:`, updated[messageIndex].completionTime);
             return updated;
           }
 
@@ -456,11 +488,16 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
             }
 
             // Look ahead - if next message is assistant with content, merge it
+            let finalCompletionTime = msg.completionTime;
             if (i + 1 < data.messages.length) {
               const nextMsg = data.messages[i + 1];
               if (nextMsg.role === 'assistant' && nextMsg.content && !nextMsg.tool_calls) {
                 console.log(`[History] Merging content from message ${i + 1}`);
                 mergedContent += nextMsg.content;
+                // Use completion time from the merged message if available
+                if (nextMsg.completionTime !== undefined) {
+                  finalCompletionTime = nextMsg.completionTime;
+                }
                 i++; // Skip the next message since we merged it
               }
             }
@@ -472,7 +509,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
                 role: "assistant",
                 content: mergedContent,
                 createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
-                ...(msg.completionTime !== undefined && { completionTime: msg.completionTime }),
+                ...(finalCompletionTime !== undefined && { completionTime: finalCompletionTime }),
               };
 
               if (toolInvocations.length > 0) {
@@ -703,6 +740,9 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       createdAt: new Date(),
       isThinking: true,
     };
+
+    // Set thinking start time for interval updates
+    thinkingStartTimeRef.current = Date.now();
 
     setMessages(prev => [...prev, userMessage, thinkingMessage]);
     const messageText = input.trim();

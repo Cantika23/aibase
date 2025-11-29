@@ -12,7 +12,7 @@ import type {
 import { Conversation, Tool } from "../llm/conversation";
 import { getBuiltinTools } from "../tools";
 import { WSEventEmitter } from "./events";
-import { MessagePersistence } from "./message-persistence";
+import { MessagePersistence } from "./msg-persistance";
 
 // Use Bun's built-in WebSocket type for compatibility
 // This matches Bun's ServerWebSocket interface
@@ -46,11 +46,13 @@ class StreamingManager {
       convId,
       messageId,
       chunks: [],
-      fullResponse: '',
+      fullResponse: "",
       startTime: Date.now(),
       lastChunkTime: Date.now(),
     });
-    console.log(`[StreamingManager] Total active streams: ${this.activeStreams.size}`);
+    console.log(
+      `[StreamingManager] Total active streams: ${this.activeStreams.size}`
+    );
   }
 
   addChunk(convId: string, messageId: string, chunk: string): void {
@@ -67,11 +69,15 @@ class StreamingManager {
     const key = `${convId}_${messageId}`;
     const stream = this.activeStreams.get(key);
     if (stream) {
-      console.log(`[StreamingManager] Completing stream: ${key} (had ${stream.fullResponse.length} chars)`);
+      console.log(
+        `[StreamingManager] Completing stream: ${key} (had ${stream.fullResponse.length} chars)`
+      );
     }
     // Remove the stream immediately after completion
     this.activeStreams.delete(key);
-    console.log(`[StreamingManager] Total active streams: ${this.activeStreams.size}`);
+    console.log(
+      `[StreamingManager] Total active streams: ${this.activeStreams.size}`
+    );
   }
 
   getStream(convId: string, messageId: string): StreamingState | undefined {
@@ -80,14 +86,14 @@ class StreamingManager {
   }
 
   getActiveStreamsForConv(convId: string): StreamingState[] {
-    return Array.from(this.activeStreams.values()).filter(stream =>
-      stream.convId === convId
+    return Array.from(this.activeStreams.values()).filter(
+      (stream) => stream.convId === convId
     );
   }
 
   getAllStreamsForConv(convId: string): StreamingState[] {
-    return Array.from(this.activeStreams.values()).filter(stream =>
-      stream.convId === convId
+    return Array.from(this.activeStreams.values()).filter(
+      (stream) => stream.convId === convId
     );
   }
 }
@@ -205,18 +211,24 @@ export class WSServer extends WSEventEmitter {
   /**
    * Get connection information for debugging
    */
-  getConnectionInfo(): { [convId: string]: { connectionCount: number; sessionIds: string[] } } {
-    const info: { [convId: string]: { connectionCount: number; sessionIds: string[] } } = {};
+  getConnectionInfo(): {
+    [convId: string]: { connectionCount: number; sessionIds: string[] };
+  } {
+    const info: {
+      [convId: string]: { connectionCount: number; sessionIds: string[] };
+    } = {};
 
     for (const connInfo of this.connections.values()) {
       if (!info[connInfo.convId]) {
         info[connInfo.convId] = {
           connectionCount: 0,
-          sessionIds: []
+          sessionIds: [],
         };
       }
-      info[connInfo.convId].connectionCount++;
-      info[connInfo.convId].sessionIds.push(connInfo.sessionId);
+      if (connInfo.convId && info[connInfo.convId]!) {
+        info[connInfo.convId]!.connectionCount++;
+        info[connInfo.convId]!.sessionIds.push(connInfo.sessionId);
+      }
     }
 
     return info;
@@ -270,16 +282,24 @@ export class WSServer extends WSEventEmitter {
   private sendAccumulatedChunks(ws: ServerWebSocket, convId: string): void {
     const activeStreams = this.streamingManager.getActiveStreamsForConv(convId);
 
-    console.log(`sendAccumulatedChunks: Found ${activeStreams.length} active streams for convId: ${convId}`);
+    console.log(
+      `sendAccumulatedChunks: Found ${activeStreams.length} active streams for convId: ${convId}`
+    );
 
     for (const stream of activeStreams) {
       if (stream.fullResponse.length > 0) {
         // Send the current accumulated response as a single chunk
-        console.log(`Sending accumulated active stream: ${stream.messageId}, accumulated length: ${stream.fullResponse.length}`);
+        console.log(
+          `Sending accumulated active stream: ${stream.messageId}, accumulated length: ${stream.fullResponse.length}`
+        );
         this.sendToWebSocket(ws, {
           type: "llm_chunk",
           id: stream.messageId,
-          data: { chunk: stream.fullResponse, isComplete: false, isAccumulated: true },
+          data: {
+            chunk: stream.fullResponse,
+            isComplete: false,
+            isAccumulated: true,
+          },
           metadata: {
             timestamp: stream.lastChunkTime,
             convId: stream.convId,
@@ -307,8 +327,15 @@ export class WSServer extends WSEventEmitter {
 
     console.log(`=== New Connection ===`);
     console.log(`convId: ${convId} (from URL: ${!!urlClientId})`);
-    console.log(`Total active streams in manager: ${Array.from(this.streamingManager['activeStreams'].keys()).length}`);
-    console.log(`Active stream keys:`, Array.from(this.streamingManager['activeStreams'].keys()));
+    console.log(
+      `Total active streams in manager: ${
+        Array.from(this.streamingManager["activeStreams"].keys()).length
+      }`
+    );
+    console.log(
+      `Active stream keys:`,
+      Array.from(this.streamingManager["activeStreams"].keys())
+    );
 
     const connectionInfo: ConnectionInfo = {
       convId,
@@ -460,8 +487,12 @@ export class WSServer extends WSEventEmitter {
     if (!conversation) return;
 
     // Generate IDs for user and assistant messages
-    const userMsgId = `user_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-    const assistantMsgId = `assistant_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`; // Generate unique ID for assistant
+    const userMsgId = `user_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 11)}`;
+    const assistantMsgId = `assistant_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 11)}`; // Generate unique ID for assistant
     const startTime = Date.now(); // Track start time for completion time calculation
 
     try {
@@ -491,10 +522,16 @@ export class WSServer extends WSEventEmitter {
         // Calculate elapsed time for this chunk
         const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
 
-        console.log(`[Backend Chunk ${chunkCount}] Received ${chunk.length} chars, total now: ${fullResponse.length}, elapsed: ${elapsedSeconds}s`);
+        console.log(
+          `[Backend Chunk ${chunkCount}] Received ${chunk.length} chars, total now: ${fullResponse.length}, elapsed: ${elapsedSeconds}s`
+        );
 
         // Add chunk to streaming manager
-        this.streamingManager.addChunk(connectionInfo.convId, assistantMsgId, chunk);
+        this.streamingManager.addChunk(
+          connectionInfo.convId,
+          assistantMsgId,
+          chunk
+        );
 
         // Create chunk message with elapsed time
         const chunkMessage = {
@@ -503,7 +540,7 @@ export class WSServer extends WSEventEmitter {
           data: {
             chunk,
             isComplete: false,
-            elapsedTime: elapsedSeconds
+            elapsedTime: elapsedSeconds,
           },
           metadata: {
             timestamp: Date.now(),
@@ -515,17 +552,33 @@ export class WSServer extends WSEventEmitter {
         this.broadcastToConv(connectionInfo.convId, chunkMessage);
       }
 
-      console.log(`[Backend Complete] Streaming finished. Total chunks: ${chunkCount}, Final fullResponse length: ${fullResponse.length}`);
-      console.log(`[Backend Complete] First 100 chars: "${fullResponse.substring(0, 100)}..."`);
-      console.log(`[Backend Complete] Last 100 chars: "...${fullResponse.substring(fullResponse.length - 100)}"`);
+      console.log(
+        `[Backend Complete] Streaming finished. Total chunks: ${chunkCount}, Final fullResponse length: ${fullResponse.length}`
+      );
+      console.log(
+        `[Backend Complete] First 100 chars: "${fullResponse.substring(
+          0,
+          100
+        )}..."`
+      );
+      console.log(
+        `[Backend Complete] Last 100 chars: "...${fullResponse.substring(
+          fullResponse.length - 100
+        )}"`
+      );
 
       // Calculate completion time in seconds
       const completionTimeMs = Date.now() - startTime;
       const completionTimeSeconds = Math.floor(completionTimeMs / 1000);
-      console.log(`[Backend Complete] Completion time: ${completionTimeSeconds}s (${completionTimeMs}ms)`);
+      console.log(
+        `[Backend Complete] Completion time: ${completionTimeSeconds}s (${completionTimeMs}ms)`
+      );
 
       // Mark stream as complete in streaming manager
-      this.streamingManager.completeStream(connectionInfo.convId, assistantMsgId);
+      this.streamingManager.completeStream(
+        connectionInfo.convId,
+        assistantMsgId
+      );
 
       // Send completion message to all connections for this conversation
       const completionMessage = {
@@ -533,14 +586,16 @@ export class WSServer extends WSEventEmitter {
         id: assistantMsgId,
         data: {
           fullText: fullResponse,
-          completionTime: completionTimeSeconds
+          completionTime: completionTimeSeconds,
         },
         metadata: {
           timestamp: Date.now(),
           convId: connectionInfo.convId,
         },
       };
-      console.log(`[Backend Complete] Broadcasting completion message with ${fullResponse.length} chars, completionTime: ${completionTimeSeconds}s`);
+      console.log(
+        `[Backend Complete] Broadcasting completion message with ${fullResponse.length} chars, completionTime: ${completionTimeSeconds}s`
+      );
       this.broadcastToConv(connectionInfo.convId, completionMessage);
 
       // Save updated conversation history to persistent storage with message IDs
@@ -549,27 +604,49 @@ export class WSServer extends WSEventEmitter {
       // Add message IDs and completionTime to the last user and assistant messages
       const historyWithIds = currentHistory.map((msg: any, index: number) => {
         // Check if this is the latest user message (second-to-last) or assistant message (last)
-        if (index === currentHistory.length - 2 && msg.role === 'user') {
+        if (index === currentHistory.length - 2 && msg.role === "user") {
           return { ...msg, id: userMsgId };
-        } else if (index === currentHistory.length - 1 && msg.role === 'assistant') {
-          return { ...msg, id: assistantMsgId, completionTime: completionTimeSeconds };
+        } else if (
+          index === currentHistory.length - 1 &&
+          msg.role === "assistant"
+        ) {
+          return {
+            ...msg,
+            id: assistantMsgId,
+            completionTime: completionTimeSeconds,
+          };
         }
         // Keep existing ID or don't add one for system/older messages
         return msg;
       });
 
-      console.log(`[Backend Complete] Saving conversation history for ${connectionInfo.convId}`);
-      console.log(`[Backend Complete] History has ${historyWithIds.length} messages`);
-      console.log(`[Backend Complete] History messages:`, historyWithIds.map((m: any) => ({
-        role: m.role,
-        id: m.id,
-        contentLength: typeof m.content === 'string' ? m.content.length : 'N/A'
-      })));
-      this.messagePersistence.setClientHistory(connectionInfo.convId, historyWithIds);
+      console.log(
+        `[Backend Complete] Saving conversation history for ${connectionInfo.convId}`
+      );
+      console.log(
+        `[Backend Complete] History has ${historyWithIds.length} messages`
+      );
+      console.log(
+        `[Backend Complete] History messages:`,
+        historyWithIds.map((m: any) => ({
+          role: m.role,
+          id: m.id,
+          contentLength:
+            typeof m.content === "string" ? m.content.length : "N/A",
+        }))
+      );
+      this.messagePersistence.setClientHistory(
+        connectionInfo.convId,
+        historyWithIds
+      );
 
       // Verify it was saved
-      const savedHistory = this.messagePersistence.getClientHistory(connectionInfo.convId);
-      console.log(`[Backend Complete] Verification: Saved history has ${savedHistory.length} messages`);
+      const savedHistory = this.messagePersistence.getClientHistory(
+        connectionInfo.convId
+      );
+      console.log(
+        `[Backend Complete] Verification: Saved history has ${savedHistory.length} messages`
+      );
 
       // Clean up assistant message ID from connection info
       delete (connectionInfo as any).assistantMsgId;
@@ -580,9 +657,13 @@ export class WSServer extends WSEventEmitter {
       delete (connectionInfo as any).assistantMsgId;
 
       // Mark stream as complete even on error
-      this.streamingManager.completeStream(connectionInfo.convId, assistantMsgId);
+      this.streamingManager.completeStream(
+        connectionInfo.convId,
+        assistantMsgId
+      );
 
-      const errorMessage = "I apologize, but I encountered an error processing your request. Please try again.";
+      const errorMessage =
+        "I apologize, but I encountered an error processing your request. Please try again.";
 
       // Send error response to all connections
       const errorChunkMessage = {
@@ -656,39 +737,52 @@ export class WSServer extends WSEventEmitter {
 
         case "get_history":
           // Get history from persistent storage (which should match conversation history)
-          console.log(`Backend: Getting history for convId: ${connectionInfo.convId}`);
-          const history = this.messagePersistence.getClientHistory(connectionInfo.convId);
+          console.log(
+            `Backend: Getting history for convId: ${connectionInfo.convId}`
+          );
+          const history = this.messagePersistence.getClientHistory(
+            connectionInfo.convId
+          );
 
           // Filter out system messages - they should never be sent to client
-          const clientHistory = history.filter(msg => msg.role !== 'system');
+          const clientHistory = history.filter((msg) => msg.role !== "system");
 
           console.log(`Backend: Retrieved history:`, {
             hasHistory: !!history,
             messageCount: history?.length || 0,
-            filteredMessages: clientHistory.length
+            filteredMessages: clientHistory.length,
           });
 
           // Also check conversation object directly
           if (connectionInfo.conversation) {
             // Access the private _history array through any available method or property
-            const convHistory = (connectionInfo.conversation as any)._history || [];
+            const convHistory =
+              (connectionInfo.conversation as any)._history || [];
             console.log(`Backend: Conversation history:`, {
               messageCount: convHistory.length,
-              messages: convHistory
+              messages: convHistory,
             });
           }
 
           // Send accumulated chunks from any active streams for this conversation
-          console.log(`Backend: Checking for active streams to send accumulated chunks`);
+          console.log(
+            `Backend: Checking for active streams to send accumulated chunks`
+          );
           this.sendAccumulatedChunks(ws, connectionInfo.convId);
 
           this.sendToWebSocket(ws, {
             type: "control_response",
             id: message.id,
-            data: { status: "history", history: clientHistory, type: control.type },
+            data: {
+              status: "history",
+              history: clientHistory,
+              type: control.type,
+            },
             metadata: { timestamp: Date.now() },
           });
-          console.log(`Backend: Sent history response (filtered out system messages)`);
+          console.log(
+            `Backend: Sent history response (filtered out system messages)`
+          );
           break;
 
         case "get_status":
@@ -743,14 +837,19 @@ export class WSServer extends WSEventEmitter {
     }
   }
 
-  private async createConversation(initialHistory: any[] = [], convId: string): Promise<Conversation> {
+  private async createConversation(
+    initialHistory: any[] = [],
+    convId: string
+  ): Promise<Conversation> {
     const tools = await this.getDefaultTools(convId);
     const defaultSystemPrompt = `You are a helpful AI assistant connected via WebSocket.
 You have access to tools that can help you provide better responses.
 Always be helpful and conversational.`;
 
     // Check if initialHistory already contains a system message
-    const hasSystemMessage = initialHistory.some(msg => msg.role === 'system');
+    const hasSystemMessage = initialHistory.some(
+      (msg) => msg.role === "system"
+    );
 
     return new Conversation({
       systemPrompt: hasSystemMessage ? undefined : defaultSystemPrompt,
@@ -761,8 +860,12 @@ Always be helpful and conversational.`;
           before: async (toolCallId: string, toolName: string, args: any) => {
             console.log(`[Tool Hook] Before: ${toolName} (${toolCallId})`);
             // Get the assistant message ID from the connection info
-            const connectionInfo = Array.from(this.connections.values()).find(c => c.convId === convId);
-            const assistantMsgId = connectionInfo ? (connectionInfo as any).assistantMsgId : undefined;
+            const connectionInfo = Array.from(this.connections.values()).find(
+              (c) => c.convId === convId
+            );
+            const assistantMsgId = connectionInfo
+              ? (connectionInfo as any).assistantMsgId
+              : undefined;
 
             // Broadcast tool call start to all connections for this conversation
             this.broadcastToConv(convId, {
@@ -777,11 +880,16 @@ Always be helpful and conversational.`;
               },
               metadata: {
                 timestamp: Date.now(),
-                convId
+                convId,
               },
             });
           },
-          after: async (toolCallId: string, toolName: string, _args: any, result: any) => {
+          after: async (
+            toolCallId: string,
+            toolName: string,
+            _args: any,
+            result: any
+          ) => {
             console.log(`[Tool Hook] After: ${toolName} (${toolCallId})`);
             // Broadcast tool result to all connections for this conversation
             this.broadcastToConv(convId, {
@@ -790,16 +898,23 @@ Always be helpful and conversational.`;
               data: {
                 toolCallId,
                 toolName,
-                result
+                result,
               },
               metadata: {
                 timestamp: Date.now(),
-                convId
+                convId,
               },
             });
           },
-          error: async (toolCallId: string, toolName: string, _args: any, error: Error) => {
-            console.log(`[Tool Hook] Error: ${toolName} (${toolCallId}) - ${error.message}`);
+          error: async (
+            toolCallId: string,
+            toolName: string,
+            _args: any,
+            error: Error
+          ) => {
+            console.log(
+              `[Tool Hook] Error: ${toolName} (${toolCallId}) - ${error.message}`
+            );
             // Broadcast tool error to all connections for this conversation
             this.broadcastToConv(convId, {
               type: "tool_result",
@@ -807,11 +922,11 @@ Always be helpful and conversational.`;
               data: {
                 toolCallId,
                 toolName,
-                result: { error: error.message }
+                result: { error: error.message },
               },
               metadata: {
                 timestamp: Date.now(),
-                convId
+                convId,
               },
             });
           },
@@ -823,7 +938,9 @@ Always be helpful and conversational.`;
 
   private async getDefaultTools(convId: string): Promise<Tool[]> {
     const tools = getBuiltinTools(convId);
-    console.log(`Loaded ${tools.length} built-in tools for conversation ${convId}`);
+    console.log(
+      `Loaded ${tools.length} built-in tools for conversation ${convId}`
+    );
     return tools;
   }
 

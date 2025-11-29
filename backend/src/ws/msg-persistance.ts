@@ -42,7 +42,10 @@ export class MessagePersistence {
   /**
    * Set message history for a conversation
    */
-  setClientHistory(convId: string, messages: ChatCompletionMessageParam[]): void {
+  setClientHistory(
+    convId: string,
+    messages: ChatCompletionMessageParam[]
+  ): void {
     this.convHistories[convId] = {
       convId,
       messages: [...messages], // Store a copy
@@ -76,14 +79,16 @@ export class MessagePersistence {
     const history = this.convHistories[convId];
     if (!history) return;
 
-    if (keepSystemPrompt && history.messages[0]?.role === "system") {
-      this.convHistories[convId].messages = [history.messages[0]];
-      this.convHistories[convId].messageCount = 1;
-    } else {
-      this.convHistories[convId].messages = [];
-      this.convHistories[convId].messageCount = 0;
+    if (convId && this.convHistories[convId]) {
+      if (keepSystemPrompt && history.messages[0]?.role === "system") {
+        this.convHistories[convId].messages = [history.messages[0]];
+        this.convHistories[convId].messageCount = 1;
+      } else {
+        this.convHistories[convId].messages = [];
+        this.convHistories[convId].messageCount = 0;
+      }
+      this.convHistories[convId].lastUpdated = Date.now();
     }
-    this.convHistories[convId].lastUpdated = Date.now();
   }
 
   /**
@@ -101,7 +106,9 @@ export class MessagePersistence {
    * Get all conversation histories metadata
    */
   getAllClientHistories(): Omit<ConvMessageHistory, "messages">[] {
-    return Object.values(this.convHistories).map(({ messages, ...metadata }) => metadata);
+    return Object.values(this.convHistories).map(
+      ({ messages, ...metadata }) => metadata
+    );
   }
 
   /**
@@ -115,13 +122,15 @@ export class MessagePersistence {
   } {
     const histories = Object.values(this.convHistories);
     const totalMessages = histories.reduce((sum, h) => sum + h.messageCount, 0);
-    const timestamps = histories.map(h => h.lastUpdated);
+    const timestamps = histories.map((h) => h.lastUpdated);
 
     return {
       totalClients: histories.length,
       totalMessages,
-      oldestHistory: timestamps.length > 0 ? Math.min(...timestamps) : undefined,
-      newestHistory: timestamps.length > 0 ? Math.max(...timestamps) : undefined,
+      oldestHistory:
+        timestamps.length > 0 ? Math.min(...timestamps) : undefined,
+      newestHistory:
+        timestamps.length > 0 ? Math.max(...timestamps) : undefined,
     };
   }
 
@@ -133,7 +142,10 @@ export class MessagePersistence {
     let cleaned = 0;
 
     for (const convId in this.convHistories) {
-      if (this.convHistories[convId].lastUpdated < cutoff) {
+      if (
+        this.convHistories[convId] &&
+        this.convHistories[convId].lastUpdated < cutoff
+      ) {
         delete this.convHistories[convId];
         cleaned++;
       }
@@ -146,7 +158,10 @@ export class MessagePersistence {
    * Check if conversation has history
    */
   hasClientHistory(convId: string): boolean {
-    return !!this.convHistories[convId] && this.convHistories[convId].messages.length > 0;
+    return (
+      !!this.convHistories[convId] &&
+      this.convHistories[convId].messages.length > 0
+    );
   }
 
   /**

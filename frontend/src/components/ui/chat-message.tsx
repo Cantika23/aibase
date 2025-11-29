@@ -445,7 +445,7 @@ function ToolCall({
             return (
               <div
                 key={index}
-                className="flex items-center gap-2 rounded border border-blue-200 bg-blue-50/50 px-2.5 py-1.5 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400"
+                className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/50 px-2.5 py-1.5 text-xs text-slate-700 dark:border-slate-800 dark:bg-blue-950/30 dark:text-blue-400"
               >
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span className="font-mono text-xs">
@@ -460,7 +460,7 @@ function ToolCall({
             return (
               <div
                 key={index}
-                className="flex items-center gap-2 rounded border border-green-200 bg-green-50/50 px-2.5 py-1.5 text-xs text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
+                className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50/50 px-2.5 py-1.5 text-xs text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
               >
                 <Code2 className="h-3 w-3" />
                 <span className="font-mono text-xs">

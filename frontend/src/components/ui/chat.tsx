@@ -255,7 +255,7 @@ export function ChatMessages({
       onScroll={handleScroll}
       onTouchStart={handleTouchStart}
     >
-      <div className="grid grid-cols-1 max-w-[650px]  w-full mx-auto pt-10 pb-4">
+      <div className="grid grid-cols-1 max-w-[650px]  w-full mx-auto pt-10 pb-[200px]">
         <div className="max-w-full [grid-column:1/1] [grid-row:1/1]">
           {children}
         </div>

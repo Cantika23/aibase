@@ -351,6 +351,7 @@ export class WSClient extends WSEventEmitter {
           fullText: message.data?.fullText || "",
           messageId: message.id,
           isAccumulated: message.data?.isAccumulated || message.metadata?.isAccumulated || false,
+          completionTime: message.data?.completionTime,
         });
         // Return after handling if we already resolved pending message
         if (shouldResolvePending) {
