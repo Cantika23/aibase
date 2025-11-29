@@ -13,9 +13,9 @@ export interface PostgreSQLOptions {
   format?: "json" | "raw";
   /** Query timeout in milliseconds (default: 30000) */
   timeout?: number;
-  /** Memory category to read connection URL from (default: 'database') */
+  /** Memory category to read connection URL from (required when connectionUrl not provided) */
   memoryCategory?: string;
-  /** Memory key to read connection URL from (default: 'postgresql_url') */
+  /** Memory key to read connection URL from (required when connectionUrl not provided) */
   memoryKey?: string;
 }
 
@@ -39,7 +39,8 @@ export interface PostgreSQLResult {
  * Create a PostgreSQL query function that reads connection URL from memory tool
  *
  * Uses Bun's native SQL API for PostgreSQL database queries.
- * Connection URL is automatically read from memory (database.postgresql_url by default).
+ * Connection URL can be read from memory by specifying memoryCategory and memoryKey,
+ * or provided directly via connectionUrl parameter.
  *
  * Usage in script tool:
  *
@@ -51,16 +52,20 @@ export interface PostgreSQLResult {
  *   value: 'postgresql://user:password@localhost:5432/mydb'
  * });
  *
- * // 2. Query the database (connection URL read from memory automatically):
+ * // 2. Query the database (connection URL read from memory):
  * const users = await postgresql({
- *   query: 'SELECT * FROM users WHERE active = true LIMIT 10'
+ *   query: 'SELECT * FROM users WHERE active = true LIMIT 10',
+ *   memoryCategory: 'database',
+ *   memoryKey: 'postgresql_url'
  * });
  * console.log(`Found ${users.rowCount} users`);
  * console.log(users.data); // Array of user objects
  *
  * // 3. Query with aggregation:
  * const stats = await postgresql({
- *   query: 'SELECT status, COUNT(*) as count FROM orders GROUP BY status'
+ *   query: 'SELECT status, COUNT(*) as count FROM orders GROUP BY status',
+ *   memoryCategory: 'database',
+ *   memoryKey: 'postgresql_url'
  * });
  *
  * // 4. Override connection URL (bypass memory):
@@ -72,6 +77,8 @@ export interface PostgreSQLResult {
  * // 5. Query with custom timeout:
  * const large = await postgresql({
  *   query: 'SELECT * FROM large_table',
+ *   memoryCategory: 'database',
+ *   memoryKey: 'postgresql_url',
  *   timeout: 60000 // 60 seconds
  * });
  *
@@ -93,8 +100,6 @@ export function createPostgreSQLFunction(projectId?: string) {
 
     const format = options.format || "json";
     const timeout = options.timeout || 30000;
-    const memoryCategory = options.memoryCategory || "database";
-    const memoryKey = options.memoryKey || "postgresql_url";
     const startTime = Date.now();
 
     try {
@@ -103,6 +108,16 @@ export function createPostgreSQLFunction(projectId?: string) {
 
       // If not provided, read from memory tool
       if (!connectionUrl) {
+        // Require memoryCategory and memoryKey when reading from memory
+        if (!options.memoryCategory || !options.memoryKey) {
+          throw new Error(
+            "postgresql requires 'memoryCategory' and 'memoryKey' parameters when 'connectionUrl' is not provided. " +
+            "Usage: postgresql({ query: '...', memoryCategory: 'database', memoryKey: 'postgresql_url' })"
+          );
+        }
+
+        const memoryCategory = options.memoryCategory;
+        const memoryKey = options.memoryKey;
         const memoryTool = new MemoryTool();
         if (projectId) {
           memoryTool.setProjectId(projectId);

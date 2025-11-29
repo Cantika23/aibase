@@ -20,7 +20,8 @@ import { ScriptRuntime } from "../runtime/script-runtime";
  * - duckdb(options) for SQL queries on data files
  *   Options: { query, database?, format?, readonly? }
  * - postgresql(options) for PostgreSQL database queries
- *   Options: { query, connectionUrl?, format?, timeout?, memoryCategory?, memoryKey? }
+ *   Options: { query, connectionUrl?, memoryCategory, memoryKey, format?, timeout? }
+ *   Note: memoryCategory and memoryKey are required when connectionUrl is not provided
  * - convId and projectId for context
  * - console for debugging
  * - fetch for HTTP requests
@@ -91,20 +92,24 @@ PostgreSQL query examples (connection URL stored in memory):
   // First, store the connection URL in memory using the memory tool:
   // await memory({ action: 'set', category: 'database', key: 'postgresql_url', value: 'postgresql://user:pass@host:5432/db' })
 
-  // Query users from PostgreSQL
+  // Query users from PostgreSQL (memoryCategory and memoryKey are required)
   const users = await postgresql({
-    query: "SELECT * FROM users WHERE active = true LIMIT 10"
+    query: "SELECT * FROM users WHERE active = true LIMIT 10",
+    memoryCategory: "database",
+    memoryKey: "postgresql_url"
   });
   progress(\`Found \${users.rowCount} users\`);
   return users.data;
 
   // Query with aggregation
   const stats = await postgresql({
-    query: "SELECT status, COUNT(*) as count FROM orders GROUP BY status"
+    query: "SELECT status, COUNT(*) as count FROM orders GROUP BY status",
+    memoryCategory: "database",
+    memoryKey: "postgresql_url"
   });
   return stats.data;
 
-  // Use custom connection URL (override memory)
+  // Use custom connection URL (memoryCategory and memoryKey not needed)
   const products = await postgresql({
     query: "SELECT * FROM products WHERE price > 100",
     connectionUrl: "postgresql://user:pass@localhost:5432/shop"
@@ -114,6 +119,8 @@ PostgreSQL query examples (connection URL stored in memory):
   // Query with timeout
   const large = await postgresql({
     query: "SELECT * FROM large_table",
+    memoryCategory: "database",
+    memoryKey: "postgresql_url",
     timeout: 60000 // 60 seconds
   });
   return { rowCount: large.rowCount, executionTime: large.executionTime };`,
