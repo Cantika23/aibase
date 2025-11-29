@@ -276,6 +276,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
       // Calculate completion time
       const completionTimeSeconds = loadingStartTime ? Math.floor((Date.now() - loadingStartTime) / 1000) : 0;
+      console.log(`[Complete] Calculated completion time: ${completionTimeSeconds}s (loadingStartTime: ${loadingStartTime})`);
 
       // Don't process empty completions
       const fullText = data.fullText || '';
@@ -307,12 +308,15 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
           // Only use fullText if the message was created without chunks (e.g., on reconnect)
           if (existingMessage.content.length > 0 && !data.isAccumulated) {
             console.log(`[Complete] Keeping streamed content (${existingMessage.content.length} chars), ignoring fullText`);
+            console.log(`[Complete] Adding completionTime: ${completionTimeSeconds}s to message ${data.messageId}`);
             // Still add completion time metadata
-            return prev.map((msg, idx) =>
+            const updated = prev.map((msg, idx) =>
               idx === messageIndex
                 ? { ...msg, completionTime: completionTimeSeconds }
                 : msg
             );
+            console.log(`[Complete] Updated message:`, updated[messageIndex]);
+            return updated;
           }
 
           // Use fullText only for accumulated messages on reconnect

@@ -135,10 +135,12 @@ export interface Message {
   isThinking?: boolean; // Temporary thinking indicator
 }
 
-export interface ChatMessageProps extends Message {
+export interface ChatMessageProps extends Omit<Message, 'completionTime' | 'isThinking'> {
   showTimeStamp?: boolean;
   animation?: Animation;
   actions?: React.ReactNode;
+  completionTime?: number;
+  isThinking?: boolean;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -151,10 +153,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   experimental_attachments,
   toolInvocations,
   parts,
+  completionTime,
+  isThinking,
   ...props
 }) => {
-  const completionTime = (props as Message).completionTime;
-  const isThinking = (props as Message).isThinking;
   const files = useMemo(() => {
     return experimental_attachments?.map((attachment) => {
       const dataArray = dataUrlToUint8Array(attachment.url);
@@ -171,6 +173,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  // Debug: Log completion time for assistant messages
+  if (role === "assistant" && !isThinking) {
+    console.log(`[ChatMessage] Assistant message:`, {
+      role,
+      hasCompletionTime: completionTime !== undefined,
+      completionTime,
+      showTimeStamp,
+      createdAt: !!createdAt
+    });
+  }
 
   // If this is a thinking indicator, show animated thinking message
   if (isThinking) {
