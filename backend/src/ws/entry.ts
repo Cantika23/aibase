@@ -719,7 +719,7 @@ export class WSServer extends WSEventEmitter {
   }
 
   private async createConversation(initialHistory: any[] = [], convId: string): Promise<Conversation> {
-    const tools = await this.getDefaultTools();
+    const tools = await this.getDefaultTools(convId);
     const defaultSystemPrompt = `You are a helpful AI assistant connected via WebSocket.
 You have access to tools that can help you provide better responses.
 Always be helpful and conversational.`;
@@ -791,9 +791,9 @@ Always be helpful and conversational.`;
     });
   }
 
-  private async getDefaultTools(): Promise<Tool[]> {
-    const tools = getBuiltinTools();
-    console.log(`Loaded ${tools.length} built-in tools`);
+  private async getDefaultTools(convId: string): Promise<Tool[]> {
+    const tools = getBuiltinTools(convId);
+    console.log(`Loaded ${tools.length} built-in tools for conversation ${convId}`);
     return tools;
   }
 
