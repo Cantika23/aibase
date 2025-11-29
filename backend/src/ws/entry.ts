@@ -919,10 +919,12 @@ Always be helpful and conversational.`;
       (msg) => msg.role === "system"
     );
 
-    return new Conversation({
+    return await Conversation.create({
       systemPrompt: hasSystemMessage ? undefined : defaultSystemPrompt,
       initialHistory,
       tools,
+      convId,
+      projectId: "default",
       hooks: {
         tools: {
           before: async (toolCallId: string, toolName: string, args: any) => {

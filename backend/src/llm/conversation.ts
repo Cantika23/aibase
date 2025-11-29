@@ -180,6 +180,16 @@ export interface ConversationOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
+
+  /**
+   * Conversation ID for loading context-specific data
+   */
+  convId?: string;
+
+  /**
+   * Project ID for loading context-specific data
+   */
+  projectId?: string;
 }
 
 /**
@@ -199,10 +209,24 @@ export class Conversation {
   } = {};
   private currentAbortController: AbortController | null = null;
 
-  constructor(options: ConversationOptions = {}) {
+  /**
+   * Create a new Conversation instance
+   * Use this static factory method instead of constructor to support async initialization
+   */
+  static async create(options: ConversationOptions = {}): Promise<Conversation> {
+    const conversation = new Conversation();
+    await conversation.initialize(options);
+    return conversation;
+  }
+
+  private constructor() {
     this.client = new OpenAI({ baseURL: process.env.OPENAI_BASE_URL, apiKey: process.env.OPENAI_API_KEY });
     this.model = process.env.OPENAI_MODEL as string;
+    this.hooks = {};
+    this.maxHistoryLength = 0;
+  }
 
+  private async initialize(options: ConversationOptions = {}): Promise<void> {
     this.hooks = options.hooks || {};
     this.maxHistoryLength = options.maxHistoryLength || 0;
 
@@ -215,7 +239,9 @@ export class Conversation {
 
     // Initialize history with system prompt
     // Start with default context and append custom systemPrompt if provided
-    const baseContext = defaultContext();
+    const convId = options.convId || "default";
+    const projectId = options.projectId || "default";
+    const baseContext = await defaultContext(convId, projectId);
     const systemPrompt = options.systemPrompt
       ? `${baseContext}\n\n${options.systemPrompt}`
       : baseContext;
