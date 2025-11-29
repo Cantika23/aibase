@@ -13,6 +13,8 @@ import { Conversation, Tool } from "../llm/conversation";
 import { getBuiltinTools } from "../tools";
 import { WSEventEmitter } from "./events";
 import { MessagePersistence } from "./msg-persistance";
+import * as fs from "fs/promises";
+import * as path from "path";
 
 // Use Bun's built-in WebSocket type for compatibility
 // This matches Bun's ServerWebSocket interface
@@ -832,6 +834,26 @@ export class WSServer extends WSEventEmitter {
             });
           }
 
+          // Load todos for this conversation
+          let todos = null;
+          try {
+            const todosPath = path.join(
+              process.cwd(),
+              "data",
+              "default",
+              connectionInfo.convId,
+              "todos.json"
+            );
+            const todosContent = await fs.readFile(todosPath, "utf-8");
+            todos = JSON.parse(todosContent);
+            console.log(`Backend: Loaded todos for convId ${connectionInfo.convId}:`, {
+              todoCount: todos?.items?.length || 0,
+            });
+          } catch (error) {
+            // No todos file exists yet, which is fine
+            console.log(`Backend: No todos found for convId ${connectionInfo.convId}`);
+          }
+
           // Send accumulated chunks from any active streams for this conversation
           console.log(
             `Backend: Checking for active streams to send accumulated chunks`
@@ -844,12 +866,13 @@ export class WSServer extends WSEventEmitter {
             data: {
               status: "history",
               history: clientHistory,
+              todos: todos,
               type: control.type,
             },
             metadata: { timestamp: Date.now() },
           });
           console.log(
-            `Backend: Sent history response (filtered out system messages)`
+            `Backend: Sent history response (filtered out system messages) with todos`
           );
           break;
 
