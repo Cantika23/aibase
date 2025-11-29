@@ -566,44 +566,52 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         const toolInvocations = Array.from(currentToolInvocationsRef.current.values());
         console.log("[Tool Call] Tool invocations array:", toolInvocations);
 
+        // Separate thinking indicator from other messages
+        const thinkingMsg = prev.find(m => m.isThinking);
+        const otherMessages = prev.filter(m => !m.isThinking);
+
         // Look for message with matching ID if provided
         if (data.assistantMessageId) {
-          const existingIndex = prev.findIndex(m => m.id === data.assistantMessageId);
+          const existingIndex = otherMessages.findIndex(m => m.id === data.assistantMessageId);
           console.log("[Tool Call] Looking for message with ID:", data.assistantMessageId, "found at index:", existingIndex);
 
           if (existingIndex !== -1) {
             // Update existing message
             console.log("[Tool Call] Updating existing message at index:", existingIndex);
-            return prev.map((msg, idx) =>
+            const updated = otherMessages.map((msg, idx) =>
               idx === existingIndex
                 ? { ...msg, toolInvocations }
                 : msg
             );
+            return thinkingMsg ? [...updated, thinkingMsg] : updated;
           }
         }
 
-        // Check if last message is assistant
-        const lastMsg = prev[prev.length - 1];
+        // Check if last non-thinking message is assistant
+        const lastMsg = otherMessages[otherMessages.length - 1];
         if (lastMsg && lastMsg.role === "assistant") {
           console.log("[Tool Call] Updating last assistant message:", lastMsg.id);
-          return prev.map((msg, idx) =>
-            idx === prev.length - 1
+          const updated = otherMessages.map((msg, idx) =>
+            idx === otherMessages.length - 1
               ? { ...msg, toolInvocations }
               : msg
           );
+          return thinkingMsg ? [...updated, thinkingMsg] : updated;
         }
 
         // Otherwise, create a placeholder assistant message using the ID from backend
         const messageId = data.assistantMessageId || currentMessageIdRef.current || `msg_${Date.now()}_assistant`;
         currentMessageIdRef.current = messageId;
         console.log("[Tool Call] Creating new message with ID:", messageId);
-        return [...prev, {
+        const newMessage = {
           id: messageId,
           role: "assistant" as const,
           content: "",
           createdAt: new Date(),
           toolInvocations,
-        }];
+        };
+        const updated = [...otherMessages, newMessage];
+        return thinkingMsg ? [...updated, thinkingMsg] : updated;
       });
     };
 
