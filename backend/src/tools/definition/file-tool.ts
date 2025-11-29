@@ -20,7 +20,7 @@ export class FileTool extends Tool {
       },
       path: {
         type: "string",
-        description: "File or directory path (relative to conversation file storage, use '.' for root). Not required for list_project_files action.",
+        description: "File or directory path (relative to conversation file storage). Defaults to '.' (root) for list action. Not required for list and list_project_files actions.",
       },
       newPath: {
         type: "string",
@@ -82,10 +82,8 @@ export class FileTool extends Tool {
     try {
       switch (args.action) {
         case "list":
-          if (!args.path) {
-            throw new Error("path is required for list action");
-          }
-          return await this.listFiles(args.path);
+          // Default to listing the root of conversation's file directory if no path provided
+          return await this.listFiles(args.path || ".");
         case "info":
           if (!args.path) {
             throw new Error("path is required for info action");
@@ -151,7 +149,6 @@ export class FileTool extends Tool {
     return JSON.stringify(
       {
         path: path.relative(baseDir, resolvedPath),
-        absolutePath: resolvedPath,
         name: path.basename(resolvedPath),
         type: stats.isDirectory() ? "directory" : "file",
         size: stats.size,
