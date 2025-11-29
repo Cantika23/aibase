@@ -145,7 +145,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   role,
   content,
   createdAt,
-  showTimeStamp = false,
+  showTimeStamp = true,
   animation = "scale",
   actions,
   experimental_attachments,
@@ -342,17 +342,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         >
           {formattedTime}
+          {!isUser && completionTime !== undefined && completionTime > 0 && (
+            <> • {completionTime}s</>
+          )}
         </time>
-      ) : null}
-
-      {/* Show completion time for assistant messages */}
-      {!isUser && completionTime !== undefined && completionTime > 0 ? (
-        <div className={cn(
-          "mt-1 block px-1 text-xs text-muted-foreground opacity-70",
-          animation !== "none" && "duration-500 animate-in fade-in-0"
-        )}>
-          Completed in {completionTime}s
-        </div>
       ) : null}
     </div>
   );
