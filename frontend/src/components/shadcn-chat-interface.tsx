@@ -24,8 +24,6 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [error, setError] = useState<string | null>(null);
-  const [loadingStartTime, setLoadingStartTime] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Use the client ID management hook
   const { convId, metadata: convMetadata } = useConvId();
@@ -46,35 +44,6 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
   // Track tool invocations for the current assistant message
   const currentToolInvocationsRef = useRef<Map<string, any>>(new Map());
-
-  // Track loading start time in ref to avoid closure issues
-  const loadingStartTimeRef = useRef<number | null>(null);
-
-  // Update elapsed time when loading and update thinking message
-  useEffect(() => {
-    if (!isLoading || loadingStartTime === null) {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - loadingStartTime) / 1000);
-      setElapsedSeconds(elapsed);
-
-      // Update thinking message with elapsed time
-      setMessages(prev => {
-        const thinkingIndex = prev.findIndex(m => m.isThinking);
-        if (thinkingIndex === -1) return prev;
-
-        return prev.map((msg, idx) =>
-          idx === thinkingIndex
-            ? { ...msg, content: `Thinking${elapsed > 0 ? `... ${elapsed}s` : '...'}` }
-            : msg
-        );
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isLoading, loadingStartTime]);
 
   // Create a stable component reference for tab management
   const componentRef = useRef({});
@@ -133,13 +102,8 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
 
       const messageId = data.messageId || `msg_${Date.now()}_assistant`;
 
-      // If we're receiving chunks but loadingStartTime isn't set (e.g., page refresh during streaming),
-      // set it now so we can track completion time
-      if (!loadingStartTimeRef.current && !data.isAccumulated) {
-        console.log("[Chunk] Setting loadingStartTime for in-progress message");
-        const startTime = Date.now();
-        loadingStartTimeRef.current = startTime;
-        setLoadingStartTime(startTime);
+      // Set loading state when chunks arrive (for thinking indicator)
+      if (!isLoading && !data.isAccumulated) {
         setIsLoading(true);
       }
 
@@ -278,18 +242,19 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       console.log(`[State] setMessages completed for ${messageId}`);
     };
 
-    const handleLLMComplete = (data: { fullText: string; messageId: string; isAccumulated?: boolean }) => {
+    const handleLLMComplete = (data: { fullText: string; messageId: string; isAccumulated?: boolean; completionTime?: number }) => {
       // Only active tab processes completion
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
       console.log("ShadcnChatInterface: handleLLMComplete called with:", {
         messageId: data.messageId,
         contentLength: data.fullText.length,
-        isAccumulated: data.isAccumulated
+        isAccumulated: data.isAccumulated,
+        completionTime: data.completionTime
       });
 
-      // Calculate completion time
-      const completionTimeSeconds = loadingStartTimeRef.current ? Math.floor((Date.now() - loadingStartTimeRef.current) / 1000) : 0;
-      console.log(`[Complete] Calculated completion time: ${completionTimeSeconds}s (loadingStartTime: ${loadingStartTimeRef.current})`);
+      // Use completion time from backend
+      const completionTimeSeconds = data.completionTime ?? 0;
+      console.log(`[Complete] Completion time from backend: ${completionTimeSeconds}s`);
 
       // Don't process empty completions
       const fullText = data.fullText || '';
@@ -297,10 +262,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
         console.log("Skipping empty completion");
         currentMessageRef.current = null;
         currentMessageIdRef.current = null;
-        loadingStartTimeRef.current = null;
         setIsLoading(false);
-        setLoadingStartTime(null);
-        setElapsedSeconds(0);
         return;
       }
 
@@ -358,20 +320,14 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
       currentMessageRef.current = null;
       currentMessageIdRef.current = null;
       currentToolInvocationsRef.current.clear(); // Clear tool invocations for next message
-      loadingStartTimeRef.current = null;
       setIsLoading(false);
-      setLoadingStartTime(null);
-      setElapsedSeconds(0);
 
       console.log("Completion handling complete");
     };
 
     const handleCommunicationError = (data: { code: string; message: string }) => {
       setError(`Communication error: ${data.message}`);
-      loadingStartTimeRef.current = null;
       setIsLoading(false);
-      setLoadingStartTime(null);
-      setElapsedSeconds(0);
 
       // Add error message to chat
       const errorMessage: Message = {
@@ -727,20 +683,13 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
     setMessages(prev => [...prev, userMessage, thinkingMessage]);
     const messageText = input.trim();
     setInput("");
-    const startTime = Date.now();
-    loadingStartTimeRef.current = startTime;
     setIsLoading(true);
-    setLoadingStartTime(startTime);
-    setElapsedSeconds(0);
     setError(null);
 
     try {
       await wsClient.sendMessage(messageText);
     } catch (error) {
-      loadingStartTimeRef.current = null;
       setIsLoading(false);
-      setLoadingStartTime(null);
-      setElapsedSeconds(0);
       setError(error instanceof Error ? error.message : "Failed to send message");
 
       // Remove both the user message and thinking indicator if send failed
@@ -759,10 +708,7 @@ export function ShadcnChatInterface({ wsUrl, className }: ShadcnChatInterfacePro
   }, [wsClient]);
 
   const abort = useCallback(() => {
-    loadingStartTimeRef.current = null;
     setIsLoading(false);
-    setLoadingStartTime(null);
-    setElapsedSeconds(0);
     currentMessageRef.current = null;
     currentMessageIdRef.current = null;
     // Remove thinking indicator

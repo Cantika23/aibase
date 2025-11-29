@@ -462,6 +462,7 @@ export class WSServer extends WSEventEmitter {
     // Generate IDs for user and assistant messages
     const userMsgId = `user_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const assistantMsgId = `assistant_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`; // Generate unique ID for assistant
+    const startTime = Date.now(); // Track start time for completion time calculation
 
     try {
       // Store assistant message ID in connection info for tool hooks to access
@@ -511,6 +512,11 @@ export class WSServer extends WSEventEmitter {
       console.log(`[Backend Complete] First 100 chars: "${fullResponse.substring(0, 100)}..."`);
       console.log(`[Backend Complete] Last 100 chars: "...${fullResponse.substring(fullResponse.length - 100)}"`);
 
+      // Calculate completion time in seconds
+      const completionTimeMs = Date.now() - startTime;
+      const completionTimeSeconds = Math.floor(completionTimeMs / 1000);
+      console.log(`[Backend Complete] Completion time: ${completionTimeSeconds}s (${completionTimeMs}ms)`);
+
       // Mark stream as complete in streaming manager
       this.streamingManager.completeStream(connectionInfo.convId, assistantMsgId);
 
@@ -518,25 +524,28 @@ export class WSServer extends WSEventEmitter {
       const completionMessage = {
         type: "llm_complete" as const,
         id: assistantMsgId,
-        data: { fullText: fullResponse },
+        data: {
+          fullText: fullResponse,
+          completionTime: completionTimeSeconds
+        },
         metadata: {
           timestamp: Date.now(),
           convId: connectionInfo.convId,
         },
       };
-      console.log(`[Backend Complete] Broadcasting completion message with ${fullResponse.length} chars`);
+      console.log(`[Backend Complete] Broadcasting completion message with ${fullResponse.length} chars, completionTime: ${completionTimeSeconds}s`);
       this.broadcastToConv(connectionInfo.convId, completionMessage);
 
       // Save updated conversation history to persistent storage with message IDs
       const currentHistory = conversation.history;
 
-      // Add message IDs to the last user and assistant messages
+      // Add message IDs and completionTime to the last user and assistant messages
       const historyWithIds = currentHistory.map((msg: any, index: number) => {
         // Check if this is the latest user message (second-to-last) or assistant message (last)
         if (index === currentHistory.length - 2 && msg.role === 'user') {
           return { ...msg, id: userMsgId };
         } else if (index === currentHistory.length - 1 && msg.role === 'assistant') {
-          return { ...msg, id: assistantMsgId };
+          return { ...msg, id: assistantMsgId, completionTime: completionTimeSeconds };
         }
         // Keep existing ID or don't add one for system/older messages
         return msg;
