@@ -165,16 +165,12 @@ export class WSClient extends WSEventEmitter {
         this.pendingUserMessage.reject(new Error("New message sent"));
       }
 
-      // Add timeout to prevent hanging
-      const timeout = setTimeout(() => {
-        this.pendingUserMessage = null;
-        reject(new Error("Message response timeout"));
-      }, 60000); // 60 second timeout
-
+      // No timeout - rely on connection close detection and manual abort
+      // Long-running tasks (complex tool use, large responses) can take > 60s
       this.pendingUserMessage = {
         resolve,
         reject,
-        timeout,
+        timeout: null,
       };
 
       this.send(message);
