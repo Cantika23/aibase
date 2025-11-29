@@ -1086,11 +1086,26 @@ export function ShadcnChatInterface({
         data.toolCallId
       );
       if (existingInvocation) {
-        currentToolInvocationsRef.current.set(data.toolCallId, {
+        const updatedInvocation = {
           ...existingInvocation,
-          state: "result",
+          state: "result" as const,
           result: data.result,
-        });
+        };
+        currentToolInvocationsRef.current.set(data.toolCallId, updatedInvocation);
+
+        // Update parts array to reflect the new state
+        const existingPartIndex = currentPartsRef.current.findIndex(
+          p => p.type === "tool-invocation" && p.toolInvocation?.toolCallId === data.toolCallId
+        );
+
+        if (existingPartIndex !== -1) {
+          // Update existing tool part with result - create new array
+          currentPartsRef.current = currentPartsRef.current.map((part, idx) =>
+            idx === existingPartIndex
+              ? { ...part, toolInvocation: updatedInvocation }
+              : part
+          );
+        }
 
         // Update the current assistant message
         setMessages((prev) => {
@@ -1099,8 +1114,13 @@ export function ShadcnChatInterface({
             const toolInvocations = Array.from(
               currentToolInvocationsRef.current.values()
             );
+            const parts = currentPartsRef.current.length > 0
+              ? [...currentPartsRef.current]
+              : undefined;
             return prev.map((msg, idx) =>
-              idx === prev.length - 1 ? { ...msg, toolInvocations } : msg
+              idx === prev.length - 1
+                ? { ...msg, toolInvocations, ...(parts && { parts }) }
+                : msg
             );
           }
           return prev;

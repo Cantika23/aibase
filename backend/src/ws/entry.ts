@@ -977,7 +977,8 @@ Always be helpful and conversational.`;
               : undefined;
 
             // Extract status and result if passed from script tool
-            const status = args.__status || "calling";
+            // Use "executing" for regular tools to match frontend expectations
+            const status = args.__status || "executing";
             const result = args.__result;
 
             // Clean args by removing internal fields
