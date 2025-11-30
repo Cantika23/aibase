@@ -167,10 +167,16 @@ export function MessageInput({
   }
 
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null)
+  const lastHeightRef = useRef<number>(0)
 
   useEffect(() => {
     if (textAreaRef.current) {
-      setTextAreaHeight(textAreaRef.current.offsetHeight)
+      const newHeight = textAreaRef.current.offsetHeight
+      // Only update if height actually changed
+      if (newHeight !== lastHeightRef.current) {
+        lastHeightRef.current = newHeight
+        setTextAreaHeight(newHeight)
+      }
     }
   }, [props.value, setTextAreaHeight])
 

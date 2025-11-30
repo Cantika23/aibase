@@ -92,21 +92,6 @@ export function MainChat({ wsUrl, className, isTodoPanelVisible = true }: Shadcn
     return () => clearInterval(intervalId);
   }, [messages.some((m) => m.isThinking), thinkingStartTimeRef.current]);
 
-  // Debug: Track messages state changes
-  useEffect(() => {
-    console.log(`[State-Effect] Messages state changed:`, {
-      count: messages.length,
-      messages: messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        contentLength: m.content.length,
-        contentPreview: m.content.substring(0, 50),
-        completionTime: m.completionTime,
-        isThinking: m.isThinking,
-      })),
-    });
-  }, [messages]);
-
   // Set up WebSocket event handlers
   useWebSocketHandlers({
     wsClient,
