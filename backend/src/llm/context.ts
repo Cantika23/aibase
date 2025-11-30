@@ -221,7 +221,31 @@ EXAMPLES:
   "code": "progress('Querying large table...'); const result = await postgresql({ query: 'SELECT * FROM products WHERE price > 100 ORDER BY price DESC', connectionUrl: 'postgresql://user:pass@localhost:5432/shop', timeout: 60000 }); return { products: result.rowCount, data: result.data };"
 }
 
-Available: fetch, webSearch({ query, region?, safesearch?, timelimit?, maxResults? }), duckdb({ query, database?, format?, readonly? }), postgresql({ query, connectionUrl, format?, timeout? }), progress(msg), file(...), todo(...), memory(...), convId, projectId, console
+14. PDF READER - READ ENTIRE PDF:
+{
+  "purpose": "Extract text from PDF file",
+  "code": "progress('Reading PDF...'); const pdf = await pdfReader({ filePath: 'document.pdf' }); progress(\`Extracted \${pdf.totalPages} pages\`); return { text: pdf.text, pages: pdf.totalPages, preview: pdf.text.substring(0, 500) + '...' };"
+}
+
+15. PDF READER - PASSWORD PROTECTED:
+{
+  "purpose": "Read password-protected PDF",
+  "code": "progress('Opening encrypted PDF...'); const pdf = await pdfReader({ filePath: 'secure.pdf', password: 'secret123' }); return { text: pdf.text, pages: pdf.totalPages };"
+}
+
+16. PDF READER - LIMITED PAGES:
+{
+  "purpose": "Preview first 3 pages of PDF",
+  "code": "progress('Reading preview...'); const pdf = await pdfReader({ filePath: 'report.pdf', maxPages: 3 }); return { preview: pdf.text, pagesRead: pdf.totalPages };"
+}
+
+17. PDF READER - BATCH PROCESS PDFs:
+{
+  "purpose": "Extract text from all PDF files",
+  "code": "const files = await file({ action: 'list' }); const pdfs = files.filter(f => f.name.endsWith('.pdf')); const results = []; for (const pdf of pdfs) { progress(\`Processing \${pdf.name}\`); const content = await pdfReader({ filePath: pdf.name }); results.push({ file: pdf.name, pages: content.totalPages, textLength: content.text.length, preview: content.text.substring(0, 200) }); } return { processed: results.length, results };"
+}
+
+Available: fetch, webSearch({ query, region?, safesearch?, timelimit?, maxResults? }), duckdb({ query, database?, format?, readonly? }), postgresql({ query, connectionUrl, format?, timeout? }), pdfReader({ filePath?, buffer?, password?, maxPages?, debug? }), progress(msg), file(...), todo(...), memory(...), convId, projectId, console
 
 MEMORY TOOL - TWO-LEVEL STRUCTURE:
 Memory has TWO levels: [category] -> key: value
@@ -248,6 +272,14 @@ CRITICAL DATABASE USAGE:
 
 Note: For Excel files use read_xlsx('file.xlsx', header=true, all_varchar=true, range='A1:Z1000') - IMPORTANT: range parameter is required for multi-column Excel files!
       Without range, only the first column is read. Use all_varchar=true to avoid type errors. Cast to numeric types when needed: CAST(column AS DOUBLE)
+
+PDF READING:
+To read PDF files, use the pdfReader() function in script tool:
+- Basic: pdfReader({ filePath: 'document.pdf' })
+- Password-protected: pdfReader({ filePath: 'file.pdf', password: 'secret' })
+- Limit pages: pdfReader({ filePath: 'file.pdf', maxPages: 5 })
+Returns: { text: string, pages: PDFPage[], totalPages: number }
+
 Write as async function body - NO import/export, just await and return!`;
 
   // Try to load project memory (shared across all conversations)
