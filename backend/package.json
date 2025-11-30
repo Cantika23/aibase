@@ -16,6 +16,7 @@
     "@phukon/duckduckgo-search": "^1.1.0",
     "@types/multer": "^2.0.0",
     "multer": "^2.0.2",
-    "openai": "^6.9.1"
+    "openai": "^6.9.1",
+    "pdfreader": "^3.0.8"
   }
 }

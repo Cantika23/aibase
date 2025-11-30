@@ -22,6 +22,8 @@ import { ScriptRuntime } from "../runtime/script-runtime";
  * - postgresql(options) for PostgreSQL database queries
  *   Options: { query, connectionUrl, format?, timeout? }
  *   Note: connectionUrl is required
+ * - pdfReader(options) for extracting text from PDF files
+ *   Options: { filePath?, buffer?, password?, maxPages?, debug? }
  * - convId and projectId for context
  * - console for debugging
  * - fetch for HTTP requests
@@ -30,8 +32,8 @@ export class ScriptTool extends Tool {
   name = "script";
 
   description = `Execute TypeScript code with programmatic access to other tools.
-Use for batch operations, complex workflows, data transformations, SQL queries, and database operations.
-Available functions: progress(message, data?), webSearch(options), duckdb(options), postgresql(options), and all registered tools as async functions.
+Use for batch operations, complex workflows, data transformations, SQL queries, database operations, and PDF text extraction.
+Available functions: progress(message, data?), webSearch(options), duckdb(options), postgresql(options), pdfReader(options), and all registered tools as async functions.
 Context variables: convId, projectId.`;
 
   parameters = {
@@ -110,7 +112,40 @@ PostgreSQL query examples (requires direct connection URL):
     connectionUrl: "postgresql://user:pass@localhost:5432/mydb",
     timeout: 60000 // 60 seconds
   });
-  return { rowCount: large.rowCount, executionTime: large.executionTime };`,
+  return { rowCount: large.rowCount, executionTime: large.executionTime };
+
+PDF reader examples (extract text from PDF files):
+  // Read entire PDF
+  const pdf = await pdfReader({
+    filePath: "document.pdf"
+  });
+  progress(\`Extracted \${pdf.totalPages} pages\`);
+  return { text: pdf.text, pages: pdf.totalPages };
+
+  // Read password-protected PDF
+  const secure = await pdfReader({
+    filePath: "secure.pdf",
+    password: "secret123"
+  });
+  return secure.text;
+
+  // Read first 5 pages only
+  const preview = await pdfReader({
+    filePath: "long-document.pdf",
+    maxPages: 5
+  });
+  return { preview: preview.text, totalPages: preview.totalPages };
+
+  // Process multiple PDFs
+  const files = await file({ action: 'list' });
+  const pdfFiles = files.filter(f => f.name.endsWith('.pdf'));
+  const results = [];
+  for (const pdf of pdfFiles) {
+    progress(\`Processing \${pdf.name}\`);
+    const content = await pdfReader({ filePath: pdf.name });
+    results.push({ file: pdf.name, pages: content.totalPages, text: content.text });
+  }
+  return results;`,
       },
     },
     required: ["purpose", "code"],

@@ -252,7 +252,6 @@ Write as async function body - NO import/export, just await and return!`;
 
   // Try to load project memory (shared across all conversations)
   const memory = await loadMemory(projectId);
-  console.log("memory", memory, projectId);
   if (memory && Object.keys(memory).length > 0) {
     context += formatMemoryForContext(memory);
   }

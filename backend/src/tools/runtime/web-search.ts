@@ -75,7 +75,6 @@ export function createWebSearchFunction() {
       const results = await ddgs.text({
         keywords: query,
         region: options.region || "wt-wt",
-        safesearch: options.safesearch || "moderate",
         timelimit: timelimit || null,
         maxResults: maxResults,
       });

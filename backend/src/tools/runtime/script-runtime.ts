@@ -2,6 +2,7 @@ import type { Tool } from "../../llm/conversation";
 import { createWebSearchFunction } from "./web-search";
 import { createDuckDBFunction } from "./duckdb";
 import { createPostgreSQLFunction } from "./postgresql";
+import { createPDFReaderFunction } from "./pdfreader";
 
 /**
  * Context provided to the script execution environment
@@ -72,6 +73,9 @@ export class ScriptRuntime {
 
       // Inject PostgreSQL query function
       postgresql: this.createPostgreSQLFunction(),
+
+      // Inject PDF reader function
+      pdfReader: this.createPDFReaderFunction(),
     };
 
     // Inject all registered tools as callable functions
@@ -123,6 +127,16 @@ export class ScriptRuntime {
   private createPostgreSQLFunction() {
     // Return the PostgreSQL function (requires direct connection URL)
     return createPostgreSQLFunction();
+  }
+
+  /**
+   * Get the PDF reader function
+   */
+  private createPDFReaderFunction() {
+    // Set working directory to the conversation's files directory
+    const cwd = `data/${this.context.projectId}/${this.context.convId}/files`;
+    // Return the PDF reader function from the modular implementation
+    return createPDFReaderFunction(cwd);
   }
 
   /**
