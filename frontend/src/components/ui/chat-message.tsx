@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "framer-motion";
 import { Ban, ChevronRight, Code2, Loader2 } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 
 import { cn } from "@/lib/utils";
 import {
@@ -714,7 +715,7 @@ function MemoryToolGroup({ invocations }: { invocations: ToolInvocation[] }) {
 
 function FileToolGroup({ invocations }: { invocations: ToolInvocation[] }) {
   const [isOpen, setIsOpen] = useState(false);
-  const { setSelectedFileTool } = useUIStore();
+  const setSelectedFileTool = useUIStore((state) => state.setSelectedFileTool);
 
   // Determine the overall state of the group based on the latest state
   const latestState = invocations[invocations.length - 1]?.state || "call";
@@ -848,7 +849,14 @@ function ToolCall({
     selectedFileTool,
     setSelectedScript,
     setSelectedFileTool,
-  } = useUIStore();
+  } = useUIStore(
+    useShallow((state) => ({
+      selectedScript: state.selectedScript,
+      selectedFileTool: state.selectedFileTool,
+      setSelectedScript: state.setSelectedScript,
+      setSelectedFileTool: state.setSelectedFileTool,
+    }))
+  );
 
   if (!toolInvocations?.length) return null;
 

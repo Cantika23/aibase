@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowUp, Info, Loader2, Mic, Paperclip, Square } from "lucide-react"
 import { omit } from "remeda"
+import { useShallow } from "zustand/react/shallow"
 
 import { cn } from "@/lib/utils"
 import { useAudioRecording } from "@/hooks/use-audio-recording"
@@ -54,8 +55,20 @@ export function MessageInput({
   const pasteTimestampRef = useRef<number>(0);
 
   // Zustand stores
-  const { showInterruptPrompt, textAreaHeight, setShowInterruptPrompt, setTextAreaHeight } = useUIStore();
-  const { isDragging, setIsDragging } = useFileStore();
+  const { showInterruptPrompt, textAreaHeight, setShowInterruptPrompt, setTextAreaHeight } = useUIStore(
+    useShallow((state) => ({
+      showInterruptPrompt: state.showInterruptPrompt,
+      textAreaHeight: state.textAreaHeight,
+      setShowInterruptPrompt: state.setShowInterruptPrompt,
+      setTextAreaHeight: state.setTextAreaHeight,
+    }))
+  );
+  const { isDragging, setIsDragging } = useFileStore(
+    useShallow((state) => ({
+      isDragging: state.isDragging,
+      setIsDragging: state.setIsDragging,
+    }))
+  );
 
   const {
     isListening,

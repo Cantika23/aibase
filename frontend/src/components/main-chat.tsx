@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { useWebSocketHandlers } from "@/hooks/use-websocket-handlers";
 import { useMessageSubmission } from "@/hooks/use-message-submission";
+import { useShallow } from "zustand/react/shallow";
 
 interface ShadcnChatInterfaceProps {
   wsUrl: string;
@@ -34,9 +35,27 @@ export function MainChat({ wsUrl, className, isTodoPanelVisible = true }: Shadcn
     setIsLoading,
     setError,
     setTodos,
-  } = useChatStore();
+  } = useChatStore(
+    useShallow((state) => ({
+      messages: state.messages,
+      input: state.input,
+      isLoading: state.isLoading,
+      error: state.error,
+      todos: state.todos,
+      setMessages: state.setMessages,
+      setInput: state.setInput,
+      setIsLoading: state.setIsLoading,
+      setError: state.setError,
+      setTodos: state.setTodos,
+    }))
+  );
 
-  const { uploadProgress, setUploadProgress } = useFileStore();
+  const { uploadProgress, setUploadProgress } = useFileStore(
+    useShallow((state) => ({
+      uploadProgress: state.uploadProgress,
+      setUploadProgress: state.setUploadProgress,
+    }))
+  );
 
   // Use the client ID management hook
   const { convId, generateNewConvId } = useConvId();

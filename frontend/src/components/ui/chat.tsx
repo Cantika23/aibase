@@ -2,6 +2,7 @@
 
 import { ArrowDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import { forwardRef, useCallback, useRef, type ReactElement } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { Button } from "@/components/ui/button";
 import { type Message } from "@/components/ui/chat-message";
@@ -292,7 +293,13 @@ interface ChatFormProps {
 
 export const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(
   ({ children, handleSubmit, isPending, className }, ref) => {
-    const { files, setFiles, clearFiles } = useFileStore();
+    const { files, setFiles, clearFiles } = useFileStore(
+      useShallow((state) => ({
+        files: state.files,
+        setFiles: state.setFiles,
+        clearFiles: state.clearFiles,
+      }))
+    );
 
     const onSubmit = (event: React.FormEvent) => {
       if (!files) {

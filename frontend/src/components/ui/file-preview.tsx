@@ -1,6 +1,7 @@
 import React, { useEffect } from "react"
 import { motion } from "framer-motion"
 import { FileIcon, X } from "lucide-react"
+import { useShallow } from "zustand/react/shallow"
 import { useFileStore } from "@/stores/file-store"
 
 interface FilePreviewProps {
@@ -68,7 +69,12 @@ ImageFilePreview.displayName = "ImageFilePreview"
 
 const TextFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
   ({ file, onRemove }, ref) => {
-    const { preview, setPreview } = useFileStore();
+    const { preview, setPreview } = useFileStore(
+      useShallow((state) => ({
+        preview: state.preview,
+        setPreview: state.setPreview,
+      }))
+    );
 
     useEffect(() => {
       const reader = new FileReader()

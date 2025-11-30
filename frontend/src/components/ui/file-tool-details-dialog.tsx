@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { codeToHtml } from "shiki";
+import { useShallow } from "zustand/react/shallow";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +63,12 @@ export function FileToolDetailsDialog({
   result,
   error,
 }: FileToolDetailsDialogProps) {
-  const { highlightedResult, setHighlightedResult } = useUIStore();
+  const { highlightedResult, setHighlightedResult } = useUIStore(
+    useShallow((state) => ({
+      highlightedResult: state.highlightedResult,
+      setHighlightedResult: state.setHighlightedResult,
+    }))
+  );
   const ActionIcon = getActionIcon(action);
 
   useEffect(() => {

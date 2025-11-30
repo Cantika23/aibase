@@ -3,6 +3,7 @@ import { codeToHtml } from "shiki";
 import { format } from "prettier/standalone";
 import prettierPluginTypeScript from "prettier/plugins/typescript";
 import prettierPluginEstree from "prettier/plugins/estree";
+import { useShallow } from "zustand/react/shallow";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +42,14 @@ export function ScriptDetailsDialog({
     highlightedResult,
     setHighlightedCode,
     setHighlightedResult,
-  } = useUIStore();
+  } = useUIStore(
+    useShallow((state) => ({
+      highlightedCode: state.highlightedCode,
+      highlightedResult: state.highlightedResult,
+      setHighlightedCode: state.setHighlightedCode,
+      setHighlightedResult: state.setHighlightedResult,
+    }))
+  );
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedResult, setCopiedResult] = useState(false);
