@@ -375,6 +375,8 @@ export class WSClient extends WSEventEmitter {
           toolName: message.data?.toolName,
           args: message.data?.args,
           status: message.data?.status,
+          result: message.data?.result,
+          error: message.data?.error,
           assistantMessageId: message.data?.assistantMessageId,
         } as ToolCallData);
         break;

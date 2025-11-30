@@ -97,7 +97,7 @@ export class WebSocketServer {
       port: this.options.port,
       hostname: this.options.hostname,
       development: this.options.development,
-      fetch: (req, server) => {
+      fetch: async (req, server) => {
         const url = new URL(req.url);
 
         // Handle WebSocket upgrade requests

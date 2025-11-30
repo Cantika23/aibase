@@ -238,12 +238,12 @@ Write as async function body - NO import/export, just await and return!`;
     context += formatMemoryForContext(memory);
   }
 
-  // Try to load conversation-specific todos
-  const todoList = await loadTodos(convId, projectId);
+  // // Try to load conversation-specific todos
+  // const todoList = await loadTodos(convId, projectId);
 
-  if (todoList && todoList.items.length > 0) {
-    context += formatTodosForContext(todoList);
-  }
+  // if (todoList && todoList.items.length > 0) {
+  //   context += formatTodosForContext(todoList);
+  // }
 
   return context;
 };

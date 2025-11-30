@@ -4,23 +4,23 @@ import * as path from "path";
 
 /**
  * File Tool - Built-in file operations
- * Actions: list, info, delete, rename, uploadUrl, list_project_files
- * All operations are restricted to /data/{proj-id}/{conv-id}/files directory
+ * Actions: list, info, delete, rename, uploadUrl
+ * All operations are restricted to /data/{proj-id}/*/files/* pattern
  */
 export class FileTool extends Tool {
   name = "file";
-  description = "Perform file operations: list files in directory, get file info, delete file, rename/move file, upload file from URL, or list all files across all conversations in the project. All paths are relative to the conversation's file storage directory (/data/{proj-id}/{conv-id}/files).";
+  description = "Perform file operations: list files in directory, get file info, delete file, rename/move file, or upload file from URL. All paths are relative to the project directory (/data/{proj-id}/) and must be within */files/* subdirectories.";
   parameters = {
     type: "object",
     properties: {
       action: {
         type: "string",
-        enum: ["list", "info", "delete", "rename", "uploadUrl", "list_project_files"],
+        enum: ["list", "info", "delete", "rename", "uploadUrl"],
         description: "The action to perform",
       },
       path: {
         type: "string",
-        description: "File or directory path (relative to conversation file storage). Defaults to '.' (root) for list action. For uploadUrl, this is the destination filename. Not required for list and list_project_files actions.",
+        description: "File or directory path relative to project directory (must be within */files/* pattern). For list action, defaults to listing all */files/* directories if not specified. For uploadUrl, this is the destination filename.",
       },
       newPath: {
         type: "string",
@@ -55,11 +55,12 @@ export class FileTool extends Tool {
    * Get the base directory for file operations
    */
   private getBaseDir(): string {
-    return path.join(process.cwd(), "data", this.projectId, this.convId, "files");
+    return path.join(process.cwd(), "data", this.projectId);
   }
 
   /**
    * Resolve and validate a path within the base directory
+   * Ensures path matches /data/{proj-id}/*/files/* pattern
    */
   private async resolvePath(userPath: string): Promise<string> {
     const baseDir = this.getBaseDir();
@@ -75,11 +76,21 @@ export class FileTool extends Tool {
       throw new Error("Access denied: Path is outside allowed directory");
     }
 
+    // Validate that path matches */files/* pattern
+    const relativePath = path.relative(baseDir, resolvedPath);
+    const pathParts = relativePath.split(path.sep);
+
+    // Path should be: {conv-id}/files/{filename}
+    // So we need at least 3 parts, and second part must be "files"
+    if (pathParts.length < 2 || pathParts[1] !== "files") {
+      throw new Error("Access denied: Path must be within */files/* subdirectories");
+    }
+
     return resolvedPath;
   }
 
   async execute(args: {
-    action: "list" | "info" | "delete" | "rename" | "uploadUrl" | "list_project_files";
+    action: "list" | "info" | "delete" | "rename" | "uploadUrl";
     path?: string;
     newPath?: string;
     url?: string;
@@ -87,8 +98,7 @@ export class FileTool extends Tool {
     try {
       switch (args.action) {
         case "list":
-          // Default to listing the root of conversation's file directory if no path provided
-          return await this.listFiles(args.path || ".");
+          return await this.listFiles(args.path);
         case "info":
           if (!args.path) {
             throw new Error("path is required for info action");
@@ -115,8 +125,6 @@ export class FileTool extends Tool {
             throw new Error("path is required for uploadUrl action (destination filename)");
           }
           return await this.uploadFromUrl(args.url, args.path);
-        case "list_project_files":
-          return await this.listProjectFiles();
         default:
           throw new Error(`Unknown action: ${args.action}`);
       }
@@ -125,11 +133,18 @@ export class FileTool extends Tool {
     }
   }
 
-  private async listFiles(dirPath: string): Promise<string> {
-    const resolvedPath = await this.resolvePath(dirPath);
+  private async listFiles(dirPath?: string): Promise<string> {
     const baseDir = this.getBaseDir();
 
+    // If no path provided, list all files in all */files/* directories
+    if (!dirPath) {
+      return await this.listAllProjectFiles();
+    }
+
+    // If path provided, list files in that specific directory
+    const resolvedPath = await this.resolvePath(dirPath);
     const stats = await fs.stat(resolvedPath);
+
     if (!stats.isDirectory()) {
       throw new Error(`Path is not a directory: ${dirPath}`);
     }
@@ -138,13 +153,12 @@ export class FileTool extends Tool {
     const files = entries.map((entry) => ({
       name: entry.name,
       type: entry.isDirectory() ? "directory" : "file",
-      // Return relative path from base directory
       path: path.relative(baseDir, path.join(resolvedPath, entry.name)),
     }));
 
     return JSON.stringify(
       {
-        directory: path.relative(baseDir, resolvedPath) || ".",
+        directory: path.relative(baseDir, resolvedPath),
         baseDirectory: baseDir,
         count: files.length,
         entries: files,
@@ -152,6 +166,80 @@ export class FileTool extends Tool {
       null,
       2
     );
+  }
+
+  private async listAllProjectFiles(): Promise<string> {
+    const baseDir = this.getBaseDir();
+    await fs.mkdir(baseDir, { recursive: true });
+
+    const allFiles: any[] = [];
+
+    try {
+      // List all conversation directories in the project
+      const entries = await fs.readdir(baseDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+
+        const convId = entry.name;
+        const filesDir = path.join(baseDir, convId, "files");
+
+        // Check if files directory exists for this conversation
+        try {
+          await fs.access(filesDir);
+          const stats = await fs.stat(filesDir);
+
+          if (stats.isDirectory()) {
+            // Recursively list all files in this conversation's files directory
+            const files = await this.listFilesRecursive(filesDir, baseDir);
+            allFiles.push(...files);
+          }
+        } catch (error) {
+          // Files directory doesn't exist for this conversation, skip it
+          continue;
+        }
+      }
+
+      return JSON.stringify(
+        {
+          baseDirectory: baseDir,
+          totalFiles: allFiles.length,
+          files: allFiles,
+        },
+        null,
+        2
+      );
+    } catch (error) {
+      throw new Error(`Failed to list files: ${(error as Error).message}`);
+    }
+  }
+
+  private async listFilesRecursive(dirPath: string, baseDir: string): Promise<any[]> {
+    const files: any[] = [];
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      const relativePath = path.relative(baseDir, fullPath);
+
+      if (entry.isDirectory()) {
+        // Recursively list files in subdirectories
+        const subFiles = await this.listFilesRecursive(fullPath, baseDir);
+        files.push(...subFiles);
+      } else {
+        const stats = await fs.stat(fullPath);
+        files.push({
+          name: entry.name,
+          path: relativePath,
+          type: "file",
+          size: stats.size,
+          sizeHuman: this.formatBytes(stats.size),
+          modified: stats.mtime.toISOString(),
+        });
+      }
+    }
+
+    return files;
   }
 
   private async getFileInfo(filePath: string): Promise<string> {
@@ -252,65 +340,6 @@ export class FileTool extends Tool {
       sizeHuman: this.formatBytes(stats.size),
       created: stats.birthtime.toISOString(),
     });
-  }
-
-  private async listProjectFiles(): Promise<string> {
-    const projectDir = path.join(process.cwd(), "data", this.projectId);
-
-    // Create project directory if it doesn't exist
-    await fs.mkdir(projectDir, { recursive: true });
-
-    try {
-      // List all conversation directories in the project
-      const entries = await fs.readdir(projectDir, { withFileTypes: true });
-      const conversations: any[] = [];
-
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-
-        const convId = entry.name;
-        const filesDir = path.join(projectDir, convId, "files");
-
-        // Check if files directory exists for this conversation
-        try {
-          await fs.access(filesDir);
-          const stats = await fs.stat(filesDir);
-
-          if (stats.isDirectory()) {
-            // List files in this conversation's files directory
-            const fileEntries = await fs.readdir(filesDir, { withFileTypes: true });
-            const files = fileEntries.map((fileEntry) => ({
-              name: fileEntry.name,
-              type: fileEntry.isDirectory() ? "directory" : "file",
-              path: path.join(convId, "files", fileEntry.name),
-            }));
-
-            conversations.push({
-              convId,
-              isCurrent: convId === this.convId,
-              filesCount: files.length,
-              files,
-            });
-          }
-        } catch (error) {
-          // Files directory doesn't exist for this conversation, skip it
-          continue;
-        }
-      }
-
-      return JSON.stringify(
-        {
-          projectId: this.projectId,
-          currentConvId: this.convId,
-          conversationsCount: conversations.length,
-          conversations,
-        },
-        null,
-        2
-      );
-    } catch (error) {
-      throw new Error(`Failed to list project files: ${(error as Error).message}`);
-    }
   }
 
   private formatBytes(bytes: number): string {

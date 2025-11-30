@@ -12,9 +12,9 @@ export function getBuiltinTools(convId: string = "default", projectId: string = 
   fileTool.setConvId(convId);
   fileTool.setProjectId(projectId);
 
-  const todoTool = new TodoTool();
-  todoTool.setConvId(convId);
-  todoTool.setProjectId(projectId);
+  // const todoTool = new TodoTool();
+  // todoTool.setConvId(convId);
+  // todoTool.setProjectId(projectId);
 
   const scriptTool = new ScriptTool();
   scriptTool.setConvId(convId);
@@ -25,7 +25,7 @@ export function getBuiltinTools(convId: string = "default", projectId: string = 
 
   return [
     fileTool,
-    todoTool,
+    // todoTool,
     scriptTool,
     memoryTool,
   ];

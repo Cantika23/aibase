@@ -299,7 +299,56 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   }
 
   if (parts && parts.length > 0) {
-    return parts.map((part, index) => {
+    // Group adjacent memory tool invocations in parts
+    const groupedParts: Array<MessagePart | MessagePart[]> = [];
+    let currentMemoryParts: ToolInvocationPart[] = [];
+
+    parts.forEach((part) => {
+      if (part.type === "tool-invocation" && part.toolInvocation.toolName === "memory") {
+        currentMemoryParts.push(part as ToolInvocationPart);
+      } else {
+        // If we have accumulated memory parts, push them as a group
+        if (currentMemoryParts.length > 0) {
+          groupedParts.push(
+            currentMemoryParts.length === 1
+              ? currentMemoryParts[0]
+              : currentMemoryParts
+          );
+          currentMemoryParts = [];
+        }
+        // Push the non-memory part
+        groupedParts.push(part);
+      }
+    });
+
+    // Don't forget to push any remaining memory group
+    if (currentMemoryParts.length > 0) {
+      groupedParts.push(
+        currentMemoryParts.length === 1
+          ? currentMemoryParts[0]
+          : currentMemoryParts
+      );
+    }
+
+    return groupedParts.map((partOrGroup, index) => {
+      // Handle memory tool groups
+      if (Array.isArray(partOrGroup)) {
+        const memoryInvocations = partOrGroup.map((p) => {
+          if (p.type === "tool-invocation") {
+            return p.toolInvocation;
+          }
+          throw new Error("Invalid part in memory group");
+        });
+        return (
+          <MemoryToolGroup
+            key={`memory-group-${index}`}
+            invocations={memoryInvocations}
+          />
+        );
+      }
+
+      const part = partOrGroup;
+
       if (part.type === "text") {
         return (
           <div
@@ -309,16 +358,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             )}
             key={`text-${index}`}
           >
-            <div
-              className={cn("mo", chatBubbleVariants({ isUser, animation }))}
-            >
-              <MarkdownRenderer>{part.text}</MarkdownRenderer>
-              {actions ? (
-                <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-                  {actions}
-                </div>
-              ) : null}
-            </div>
+            {part.text.trim() && (
+              <div
+                className={cn("mo", chatBubbleVariants({ isUser, animation }))}
+              >
+                <MarkdownRenderer>{part.text}</MarkdownRenderer>
+                {actions ? (
+                  <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+                    {actions}
+                  </div>
+                ) : null}
+              </div>
+            )}
 
             {showTimeStamp && createdAt ? (
               <time
@@ -490,13 +541,130 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   );
 };
 
+function MemoryToolGroup({ invocations }: { invocations: ToolInvocation[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Determine the overall state of the group based on the latest state
+  const latestState = invocations[invocations.length - 1]?.state || "call";
+  const hasError = invocations.some((inv) => inv.state === "error");
+
+  // Get color classes based on state
+  const getGroupColorClasses = () => {
+    if (hasError) {
+      return "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/30";
+    }
+    switch (latestState) {
+      case "partial-call":
+      case "call":
+        return "border-blue-200 bg-blue-50/50 dark:border-slate-800 dark:bg-blue-950/30";
+      case "executing":
+        return "border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30";
+      case "progress":
+        return "border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30";
+      case "result":
+        return "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30";
+      default:
+        return "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-950/30";
+    }
+  };
+
+  const getIconColorClasses = () => {
+    if (hasError) {
+      return "text-red-700 dark:text-red-400";
+    }
+    switch (latestState) {
+      case "partial-call":
+      case "call":
+        return "text-slate-700 dark:text-blue-400";
+      case "executing":
+        return "text-purple-700 dark:text-purple-400";
+      case "progress":
+        return "text-amber-700 dark:text-amber-400";
+      case "result":
+        return "text-green-700 dark:text-green-400";
+      default:
+        return "text-slate-700 dark:text-slate-400";
+    }
+  };
+
+  const getMemoryActionLabel = (inv: ToolInvocation) => {
+    const action = inv.args?.action || "operation";
+    const category = inv.args?.category;
+    const key = inv.args?.key;
+
+    if (category && key) {
+      return `${action} ${category}.${key}`;
+    } else if (category) {
+      return `${action} ${category}`;
+    }
+    return action;
+  };
+
+  return (
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className={cn(
+        "group w-full rounded-xl border px-2.5 py-1.5 cursor-pointer hover:opacity-80 transition-opacity",
+        getGroupColorClasses()
+      )}
+    >
+      <CollapsibleTrigger asChild>
+        <div className="flex items-center gap-2 text-xs w-full">
+          {latestState === "call" ||
+          latestState === "partial-call" ||
+          latestState === "executing" ||
+          latestState === "progress" ? (
+            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+          ) : hasError ? (
+            <Ban className="h-3 w-3 flex-shrink-0" />
+          ) : (
+            <Code2 className="h-3 w-3 flex-shrink-0" />
+          )}
+          <span className={cn("font-mono flex-1", getIconColorClasses())}>
+            Memory ({invocations.length}{" "}
+            {invocations.length === 1 ? "operation" : "operations"})
+          </span>
+          <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90 flex-shrink-0" />
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 ml-5 space-y-1">
+          {invocations.map((inv, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "text-xs py-0.5",
+                inv.state === "error"
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-slate-600 dark:text-slate-400"
+              )}
+            >
+              <span className="font-mono">{getMemoryActionLabel(inv)}</span>
+              {inv.state === "error" && inv.error && (
+                <div className="text-[10px] ml-2 text-red-500 dark:text-red-400">
+                  {inv.error}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function ToolCall({
   toolInvocations,
 }: Pick<ChatMessageProps, "toolInvocations">) {
-  const { selectedScript, selectedFileTool, setSelectedScript, setSelectedFileTool } = useUIStore();
+  const {
+    selectedScript,
+    selectedFileTool,
+    setSelectedScript,
+    setSelectedFileTool,
+  } = useUIStore();
 
   if (!toolInvocations?.length) return null;
-
 
   // Collect all progress messages for script tools
   const scriptProgressMap = new Map<string, string[]>();
@@ -514,6 +682,37 @@ function ToolCall({
       scriptProgressMap.get(key)!.push(inv.result.message);
     }
   });
+
+  // Group adjacent memory tool calls
+  const groupedInvocations: Array<ToolInvocation | ToolInvocation[]> = [];
+  let currentMemoryGroup: ToolInvocation[] = [];
+
+  toolInvocations.forEach((invocation) => {
+    if (invocation.toolName === "memory") {
+      currentMemoryGroup.push(invocation);
+    } else {
+      // If we have accumulated memory tools, push them as a group
+      if (currentMemoryGroup.length > 0) {
+        groupedInvocations.push(
+          currentMemoryGroup.length === 1
+            ? currentMemoryGroup[0]
+            : currentMemoryGroup
+        );
+        currentMemoryGroup = [];
+      }
+      // Push the non-memory tool
+      groupedInvocations.push(invocation);
+    }
+  });
+
+  // Don't forget to push any remaining memory group
+  if (currentMemoryGroup.length > 0) {
+    groupedInvocations.push(
+      currentMemoryGroup.length === 1
+        ? currentMemoryGroup[0]
+        : currentMemoryGroup
+    );
+  }
 
   return (
     <>
@@ -541,8 +740,19 @@ function ToolCall({
         result={selectedFileTool?.result}
         error={selectedFileTool?.error}
       />
-      <div className="flex flex-col gap-1.5">
-        {toolInvocations.map((invocation, index) => {
+      <div className="flex flex-col gap-1.5 items-start">
+        {groupedInvocations.map((invocationOrGroup, index) => {
+          // Handle memory tool groups
+          if (Array.isArray(invocationOrGroup)) {
+            return (
+              <MemoryToolGroup
+                key={`memory-group-${index}`}
+                invocations={invocationOrGroup}
+              />
+            );
+          }
+
+          const invocation = invocationOrGroup;
           // Check for cancelled state - handle both formats
           const isCancelled =
             invocation.state === "result" &&
@@ -585,10 +795,27 @@ function ToolCall({
                 if ("result" in invocation && invocation.result) {
                   // For completed scripts, result is wrapped as { purpose, result }
                   // Extract the nested result if it exists, otherwise use the whole result
-                  actualResult = invocation.result.result !== undefined
-                    ? invocation.result.result
-                    : invocation.result;
+                  actualResult =
+                    invocation.result.result !== undefined
+                      ? invocation.result.result
+                      : invocation.result;
                 }
+
+                // Debug logging
+                console.log("[Dialog Open] Script invocation data:", {
+                  toolCallId: invocation.toolCallId,
+                  state: invocation.state,
+                  hasResultKey: "result" in invocation,
+                  invocationResult:
+                    "result" in invocation ? invocation.result : undefined,
+                  invocationResultType:
+                    "result" in invocation
+                      ? typeof invocation.result
+                      : "undefined",
+                  extractedResult: actualResult,
+                  extractedResultType: typeof actualResult,
+                  fullInvocation: invocation,
+                });
 
                 setSelectedScript({
                   purpose,
@@ -620,7 +847,7 @@ function ToolCall({
             }
           };
 
-          if (invocation.toolName === 'todo') return <></>
+          if (invocation.toolName === "todo") return <></>;
 
           let toolName = (
             <span className="font-mono text-xs">
@@ -767,11 +994,6 @@ function ToolCall({
                       )}
                     </span>
                   </div>
-                  {invocation.error && (
-                    <div className="text-red-600 dark:text-red-500 ml-5">
-                      Error: {invocation.error}
-                    </div>
-                  )}
                 </div>
               );
             default:

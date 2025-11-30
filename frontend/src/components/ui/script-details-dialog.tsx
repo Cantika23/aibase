@@ -35,7 +35,12 @@ export function ScriptDetailsDialog({
   result,
   error,
 }: ScriptDetailsDialogProps) {
-  const { highlightedCode, highlightedResult, setHighlightedCode, setHighlightedResult } = useUIStore();
+  const {
+    highlightedCode,
+    highlightedResult,
+    setHighlightedCode,
+    setHighlightedResult,
+  } = useUIStore();
 
   useEffect(() => {
     if (open && code) {
@@ -118,9 +123,7 @@ export function ScriptDetailsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span>{purpose}</span>
-            <Badge>
-              {getStateLabel()}
-            </Badge>
+            <Badge>{getStateLabel()}</Badge>
           </DialogTitle>
         </DialogHeader>
 
@@ -159,16 +162,16 @@ export function ScriptDetailsDialog({
             {/* Code and Result Side by Side */}
             <div className="grid grid-cols-2 gap-4 h-full min-h-0">
               {/* Script Code - Left */}
-              <div className="flex flex-col min-h-0">
+              <div className="flex flex-col min-h-0 h-[80vh]">
                 <h3 className="text-sm font-semibold mb-2">Code</h3>
-                <div className="flex-1 text-[11px] rounded-md overflow-auto border">
+                <div className="flex-1 flex text-[11px]">
                   {highlightedCode ? (
                     <div
                       dangerouslySetInnerHTML={{ __html: highlightedCode }}
-                      className="whitespace-pre-wrap  [&>pre]:p-4 [&>pre]:overflow-x-auto [&>pre]:bg-[#0d1117]"
+                      className="overflow-auto relative flex-1 [&>pre]:absolute [&>pre]:p-4 [&>pre>code]:whitespace-pre-wrap  [&>pre]:bg-[#0d1117]"
                     />
                   ) : (
-                    <pre className="p-4 bg-[#0d1117] overflow-x-auto">
+                    <pre className="p-4 bg-[#0d1117] overflow-auto">
                       <code>{code}</code>
                     </pre>
                   )}
@@ -180,13 +183,13 @@ export function ScriptDetailsDialog({
                 {result && state === "result" && (
                   <>
                     <h3 className="text-sm font-semibold mb-2">Result</h3>
-                    <div className="flex-1 text-[11px] rounded-md overflow-auto border">
+                    <div className="flex-1 flex text-[11px]">
                       {highlightedResult ? (
                         <div
                           dangerouslySetInnerHTML={{
                             __html: highlightedResult,
                           }}
-                          className=" [&>pre]:p-4 [&>pre]:overflow-x-auto [&>pre]:bg-[#0d1117]"
+                          className="overflow-auto relative flex-1 [&>pre]:absolute [&>pre]:p-4 [&>pre>code]:whitespace-pre-wrap  [&>pre]:bg-[#0d1117]"
                         />
                       ) : (
                         <pre className="p-4 bg-[#0d1117]  overflow-x-auto">

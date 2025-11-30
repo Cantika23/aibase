@@ -10,7 +10,7 @@ import { activeTabManager } from "@/lib/ws/active-tab-manager";
 import { uploadFilesWithProgress } from "@/lib/file-upload";
 import { useChatStore } from "@/stores/chat-store";
 import { useFileStore } from "@/stores/file-store";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Plus } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -18,6 +18,7 @@ import {
   type ChangeEvent,
 } from "react";
 import { flushSync } from "react-dom";
+import { Button } from "@/components/ui/button";
 
 interface ShadcnChatInterfaceProps {
   wsUrl: string;
@@ -45,7 +46,7 @@ export function ShadcnChatInterface({
   const { uploadProgress, setUploadProgress } = useFileStore();
 
   // Use the client ID management hook
-  const { convId } = useConvId();
+  const { convId, generateNewConvId } = useConvId();
 
   // Use WebSocket connection manager - this ensures only one connection even with Strict Mode
   const wsClient = useWSConnection({
@@ -844,6 +845,16 @@ export function ShadcnChatInterface({
           "messages"
         );
 
+        // Check if the last message is an incomplete assistant message (still streaming)
+        const lastMessage = serverMessages[serverMessages.length - 1];
+        const isLastMessageIncomplete =
+          lastMessage &&
+          lastMessage.role === "assistant" &&
+          !lastMessage.completionTime &&
+          !lastMessage.aborted;
+
+        console.log("[History] Last message incomplete?", isLastMessageIncomplete, lastMessage);
+
         // IMPORTANT: Merge with current state instead of replacing it
         // This prevents history from overwriting streamed content
         setMessages((prev) => {
@@ -852,6 +863,20 @@ export function ShadcnChatInterface({
             console.log(
               "[History] No existing messages, using server messages"
             );
+
+            // Add thinking indicator if last message is incomplete
+            if (isLastMessageIncomplete) {
+              console.log("[History] Adding thinking indicator for incomplete message");
+              const thinkingMessage: Message = {
+                id: `thinking_${Date.now()}`,
+                role: "assistant",
+                content: "Thinking...",
+                createdAt: new Date(),
+                isThinking: true,
+              };
+              return [...serverMessages, thinkingMessage];
+            }
+
             return serverMessages;
           }
 
@@ -882,16 +907,39 @@ export function ShadcnChatInterface({
                 );
               }
             } else {
-              // Message exists locally but not in history (shouldn't happen, but handle it)
+              // Message exists locally but not in history - this is stale data from previous session
+              // Don't keep it, server history is the source of truth
               console.log(
-                `[History] Message ${existingMsg.id} exists locally but not in history, keeping it`
+                `[History] Message ${existingMsg.id} exists locally but not in history, discarding stale message`
               );
-              merged.push(existingMsg);
             }
           });
 
+          // Add thinking indicator if last message is incomplete
+          if (isLastMessageIncomplete) {
+            console.log("[History] Adding thinking indicator for incomplete message after merge");
+            const thinkingMessage: Message = {
+              id: `thinking_${Date.now()}`,
+              role: "assistant",
+              content: "Thinking...",
+              createdAt: new Date(),
+              isThinking: true,
+            };
+            return [...merged, thinkingMessage];
+          }
+
           return merged;
         });
+
+        // Set loading state if last message is incomplete
+        if (isLastMessageIncomplete) {
+          console.log("[History] Setting loading state to true for incomplete message");
+          setIsLoading(true);
+          thinkingStartTimeRef.current = Date.now();
+          // Set the current message ID ref so new chunks can be appended
+          currentMessageIdRef.current = lastMessage.id;
+          console.log("[History] Set currentMessageIdRef to:", lastMessage.id);
+        }
       } else {
         console.log("No messages to process or messages is not an array");
       }
@@ -1386,6 +1434,36 @@ export function ShadcnChatInterface({
     setMessages((prev) => [...prev, newMessage]);
   }, []);
 
+  const handleNewConversation = useCallback(() => {
+    console.log("[New Conversation] Clearing all messages and starting fresh");
+
+    // Clear all messages
+    setMessages([]);
+
+    // Clear input
+    setInput("");
+
+    // Clear error
+    setError(null);
+
+    // Reset loading state
+    setIsLoading(false);
+
+    // Clear all refs
+    currentMessageRef.current = null;
+    currentMessageIdRef.current = null;
+    currentToolInvocationsRef.current.clear();
+    currentPartsRef.current = [];
+    thinkingStartTimeRef.current = null;
+    isSubmittingRef.current = false;
+
+    // Generate new conversation ID and store in local storage
+    const newConvId = generateNewConvId();
+    console.log("[New Conversation] Generated new conversation ID:", newConvId);
+
+    console.log("[New Conversation] Successfully cleared conversation");
+  }, [setMessages, setInput, setError, setIsLoading, generateNewConvId]);
+
   const suggestions = [
     "What can you help me with?",
     "Tell me about your capabilities",
@@ -1394,7 +1472,21 @@ export function ShadcnChatInterface({
   ];
 
   return (
-    <div className={`flex h-screen ${className}`}>
+    <div className={`flex h-screen ${className} relative`}>
+      {/* New Conversation Button - Absolute positioned top right (only show if messages exist) */}
+      {messages.length > 0 && (
+        <Button
+          onClick={handleNewConversation}
+          size="sm"
+          variant="outline"
+          className="absolute top-4 right-4 z-10 shadow-md"
+          title="Start a new conversation"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New
+        </Button>
+      )}
+
       {/* Todo Panel - Sticky on left */}
       {todos?.items?.length > 0 && <TodoPanel todos={todos} isLoading={false} />}
 
