@@ -299,13 +299,30 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   }
 
   if (parts && parts.length > 0) {
-    // Group adjacent memory tool invocations in parts
+    // Group adjacent memory and file tool invocations in parts
     const groupedParts: Array<MessagePart | MessagePart[]> = [];
     let currentMemoryParts: ToolInvocationPart[] = [];
+    let currentFileParts: ToolInvocationPart[] = [];
 
     parts.forEach((part) => {
       if (part.type === "tool-invocation" && part.toolInvocation.toolName === "memory") {
+        // Flush file parts if any
+        if (currentFileParts.length > 0) {
+          groupedParts.push(
+            currentFileParts.length === 1 ? currentFileParts[0] : currentFileParts
+          );
+          currentFileParts = [];
+        }
         currentMemoryParts.push(part as ToolInvocationPart);
+      } else if (part.type === "tool-invocation" && part.toolInvocation.toolName === "file") {
+        // Flush memory parts if any
+        if (currentMemoryParts.length > 0) {
+          groupedParts.push(
+            currentMemoryParts.length === 1 ? currentMemoryParts[0] : currentMemoryParts
+          );
+          currentMemoryParts = [];
+        }
+        currentFileParts.push(part as ToolInvocationPart);
       } else {
         // If we have accumulated memory parts, push them as a group
         if (currentMemoryParts.length > 0) {
@@ -316,12 +333,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           );
           currentMemoryParts = [];
         }
-        // Push the non-memory part
+        // If we have accumulated file parts, push them as a group
+        if (currentFileParts.length > 0) {
+          groupedParts.push(
+            currentFileParts.length === 1 ? currentFileParts[0] : currentFileParts
+          );
+          currentFileParts = [];
+        }
+        // Push the other part
         groupedParts.push(part);
       }
     });
 
-    // Don't forget to push any remaining memory group
+    // Don't forget to push any remaining groups
     if (currentMemoryParts.length > 0) {
       groupedParts.push(
         currentMemoryParts.length === 1
@@ -329,22 +353,41 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           : currentMemoryParts
       );
     }
+    if (currentFileParts.length > 0) {
+      groupedParts.push(
+        currentFileParts.length === 1 ? currentFileParts[0] : currentFileParts
+      );
+    }
 
     return groupedParts.map((partOrGroup, index) => {
-      // Handle memory tool groups
+      // Handle tool groups (memory or file)
       if (Array.isArray(partOrGroup)) {
-        const memoryInvocations = partOrGroup.map((p) => {
+        const invocations = partOrGroup.map((p) => {
           if (p.type === "tool-invocation") {
             return p.toolInvocation;
           }
-          throw new Error("Invalid part in memory group");
+          throw new Error("Invalid part in tool group");
         });
-        return (
-          <MemoryToolGroup
-            key={`memory-group-${index}`}
-            invocations={memoryInvocations}
-          />
-        );
+
+        // Check what type of tool group this is
+        const toolName = invocations[0]?.toolName;
+        if (toolName === "memory") {
+          return (
+            <MemoryToolGroup
+              key={`memory-group-${index}`}
+              invocations={invocations}
+            />
+          );
+        } else if (toolName === "file") {
+          return (
+            <FileToolGroup
+              key={`file-group-${index}`}
+              invocations={invocations}
+            />
+          );
+        }
+        // Unknown tool group type, skip
+        return null;
       }
 
       const part = partOrGroup;
@@ -654,6 +697,134 @@ function MemoryToolGroup({ invocations }: { invocations: ToolInvocation[] }) {
   );
 }
 
+function FileToolGroup({ invocations }: { invocations: ToolInvocation[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const { setSelectedFileTool } = useUIStore();
+
+  // Determine the overall state of the group based on the latest state
+  const latestState = invocations[invocations.length - 1]?.state || "call";
+  const hasError = invocations.some((inv) => inv.state === "error");
+
+  // Get color classes based on state
+  const getGroupColorClasses = () => {
+    if (hasError) {
+      return "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/30";
+    }
+    switch (latestState) {
+      case "partial-call":
+      case "call":
+        return "border-blue-200 bg-blue-50/50 dark:border-slate-800 dark:bg-blue-950/30";
+      case "executing":
+        return "border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30";
+      case "progress":
+        return "border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30";
+      case "result":
+        return "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30";
+      default:
+        return "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-950/30";
+    }
+  };
+
+  const getIconColorClasses = () => {
+    if (hasError) {
+      return "text-red-700 dark:text-red-400";
+    }
+    switch (latestState) {
+      case "partial-call":
+      case "call":
+        return "text-slate-700 dark:text-blue-400";
+      case "executing":
+        return "text-purple-700 dark:text-purple-400";
+      case "progress":
+        return "text-amber-700 dark:text-amber-400";
+      case "result":
+        return "text-green-700 dark:text-green-400";
+      default:
+        return "text-slate-700 dark:text-slate-400";
+    }
+  };
+
+  const getFileActionLabel = (inv: ToolInvocation) => {
+    const action = inv.args?.action || "operation";
+    const path = inv.args?.path;
+
+    if (path) {
+      return `${action} ${path}`;
+    }
+    return action;
+  };
+
+  const handleFileClick = (inv: ToolInvocation) => {
+    if (inv.args?.action) {
+      setSelectedFileTool({
+        action: inv.args.action,
+        path: inv.args.path,
+        newPath: inv.args.newPath,
+        state: inv.state === "partial-call" ? "call" : inv.state,
+        result: "result" in inv ? inv.result : undefined,
+        error: "error" in inv ? inv.error : undefined,
+      });
+    }
+  };
+
+  return (
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className={cn(
+        "group w-full rounded-xl border px-2.5 py-1.5 cursor-pointer hover:opacity-80 transition-opacity",
+        getGroupColorClasses()
+      )}
+    >
+      <CollapsibleTrigger asChild>
+        <div className="flex items-center gap-2 text-xs w-full">
+          {latestState === "call" ||
+          latestState === "partial-call" ||
+          latestState === "executing" ||
+          latestState === "progress" ? (
+            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+          ) : hasError ? (
+            <Ban className="h-3 w-3 flex-shrink-0" />
+          ) : (
+            <Code2 className="h-3 w-3 flex-shrink-0" />
+          )}
+          <span className={cn("font-mono flex-1", getIconColorClasses())}>
+            File ({invocations.length}{" "}
+            {invocations.length === 1 ? "operation" : "operations"})
+          </span>
+          <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90 flex-shrink-0" />
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 ml-5 space-y-1">
+          {invocations.map((inv, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "text-xs py-0.5 cursor-pointer hover:underline",
+                inv.state === "error"
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-slate-600 dark:text-slate-400"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFileClick(inv);
+              }}
+            >
+              <span className="font-mono">{getFileActionLabel(inv)}</span>
+              {inv.state === "error" && inv.error && (
+                <div className="text-[10px] ml-2 text-red-500 dark:text-red-400">
+                  {inv.error}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function ToolCall({
   toolInvocations,
 }: Pick<ChatMessageProps, "toolInvocations">) {
@@ -683,13 +854,32 @@ function ToolCall({
     }
   });
 
-  // Group adjacent memory tool calls
+  // Group adjacent memory and file tool calls
   const groupedInvocations: Array<ToolInvocation | ToolInvocation[]> = [];
   let currentMemoryGroup: ToolInvocation[] = [];
+  let currentFileGroup: ToolInvocation[] = [];
 
   toolInvocations.forEach((invocation) => {
     if (invocation.toolName === "memory") {
+      // Flush file group if any
+      if (currentFileGroup.length > 0) {
+        groupedInvocations.push(
+          currentFileGroup.length === 1 ? currentFileGroup[0] : currentFileGroup
+        );
+        currentFileGroup = [];
+      }
       currentMemoryGroup.push(invocation);
+    } else if (invocation.toolName === "file") {
+      // Flush memory group if any
+      if (currentMemoryGroup.length > 0) {
+        groupedInvocations.push(
+          currentMemoryGroup.length === 1
+            ? currentMemoryGroup[0]
+            : currentMemoryGroup
+        );
+        currentMemoryGroup = [];
+      }
+      currentFileGroup.push(invocation);
     } else {
       // If we have accumulated memory tools, push them as a group
       if (currentMemoryGroup.length > 0) {
@@ -700,17 +890,29 @@ function ToolCall({
         );
         currentMemoryGroup = [];
       }
-      // Push the non-memory tool
+      // If we have accumulated file tools, push them as a group
+      if (currentFileGroup.length > 0) {
+        groupedInvocations.push(
+          currentFileGroup.length === 1 ? currentFileGroup[0] : currentFileGroup
+        );
+        currentFileGroup = [];
+      }
+      // Push the other tool
       groupedInvocations.push(invocation);
     }
   });
 
-  // Don't forget to push any remaining memory group
+  // Don't forget to push any remaining groups
   if (currentMemoryGroup.length > 0) {
     groupedInvocations.push(
       currentMemoryGroup.length === 1
         ? currentMemoryGroup[0]
         : currentMemoryGroup
+    );
+  }
+  if (currentFileGroup.length > 0) {
+    groupedInvocations.push(
+      currentFileGroup.length === 1 ? currentFileGroup[0] : currentFileGroup
     );
   }
 
@@ -742,14 +944,26 @@ function ToolCall({
       />
       <div className="flex flex-col gap-1.5 items-start">
         {groupedInvocations.map((invocationOrGroup, index) => {
-          // Handle memory tool groups
+          // Handle tool groups (memory or file)
           if (Array.isArray(invocationOrGroup)) {
-            return (
-              <MemoryToolGroup
-                key={`memory-group-${index}`}
-                invocations={invocationOrGroup}
-              />
-            );
+            const toolName = invocationOrGroup[0]?.toolName;
+            if (toolName === "memory") {
+              return (
+                <MemoryToolGroup
+                  key={`memory-group-${index}`}
+                  invocations={invocationOrGroup}
+                />
+              );
+            } else if (toolName === "file") {
+              return (
+                <FileToolGroup
+                  key={`file-group-${index}`}
+                  invocations={invocationOrGroup}
+                />
+              );
+            }
+            // Unknown tool group type, skip
+            return null;
           }
 
           const invocation = invocationOrGroup;
