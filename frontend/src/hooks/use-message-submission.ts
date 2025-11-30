@@ -286,12 +286,30 @@ export function useMessageSubmission({
     thinkingStartTimeRef.current = null;
     isSubmittingRef.current = false;
 
+    // Disconnect websocket to force reconnection with new convId
+    if (wsClient && wsClient.isConnected()) {
+      console.log("[New Conversation] Disconnecting websocket to force reconnection");
+      wsClient.disconnect();
+    }
+
     // Generate new conversation ID and store in local storage
     const newConvId = generateNewConvId();
     console.log("[New Conversation] Generated new conversation ID:", newConvId);
 
+    // Reconnect with new convId after a short delay to ensure clean disconnect
+    setTimeout(() => {
+      if (wsClient) {
+        console.log("[New Conversation] Reconnecting with new convId:", newConvId);
+        wsClient.connect().catch((error) => {
+          console.error("[New Conversation] Failed to reconnect:", error);
+          setError("Failed to connect to server");
+        });
+      }
+    }, 100);
+
     console.log("[New Conversation] Successfully cleared conversation");
   }, [
+    wsClient,
     setMessages,
     setInput,
     setError,
