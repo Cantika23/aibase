@@ -29,5 +29,12 @@ EXPOSE 5040
 # Set environment to production
 ENV NODE_ENV=production
 
+# Create data directory for persistent storage
+RUN mkdir -p /app/data
+
+# Define volume for persistent data
+# This includes: todos, memory, uploaded files, and conversation data
+VOLUME ["/app/data"]
+
 # Start backend server (serves frontend static files)
 CMD ["bun", "run", "backend/src/server/index.ts"]
