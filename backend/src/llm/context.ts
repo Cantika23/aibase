@@ -278,7 +278,7 @@ To read PDF files, use the pdfReader() function in script tool:
 - Basic: pdfReader({ filePath: 'document.pdf' })
 - Password-protected: pdfReader({ filePath: 'file.pdf', password: 'secret' })
 - Limit pages: pdfReader({ filePath: 'file.pdf', maxPages: 5 })
-Returns: { text: string, pages: PDFPage[], totalPages: number }
+Returns: { text: string, totalPages: number, info?: object, version?: string }
 
 Write as async function body - NO import/export, just await and return!`;
 

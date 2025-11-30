@@ -17,6 +17,6 @@
     "@types/multer": "^2.0.0",
     "multer": "^2.0.2",
     "openai": "^6.9.1",
-    "pdfreader": "^3.0.8"
+    "pdf-parse": "^2.4.5"
   }
 }
