@@ -47,17 +47,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     minute: "2-digit",
   });
 
-  // Debug: Log completion time for assistant messages
-  if (role === "assistant" && !isThinking) {
-    console.log(`[ChatMessage] Assistant message:`, {
-      role,
-      hasCompletionTime: completionTime !== undefined,
-      completionTime,
-      showTimeStamp,
-      createdAt: !!createdAt,
-    });
-  }
-
   // If this is a thinking indicator, show animated thinking message
   if (isThinking) {
     return (
