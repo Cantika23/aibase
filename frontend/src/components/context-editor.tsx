@@ -146,14 +146,16 @@ export function ContextEditor() {
           </span>
         )}
         <div className="flex gap-2">
-          <Button
-            onClick={handleReset}
-            variant="outline"
-            size="sm"
-            disabled={!hasChanges || isLoading}
-          >
-            Reset
-          </Button>
+          {hasChanges && (
+            <Button
+              onClick={handleReset}
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+            >
+              Discard Changes
+            </Button>
+          )}
           <Button
             onClick={handleResetToDefault}
             variant="outline"
