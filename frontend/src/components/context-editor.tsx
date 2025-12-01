@@ -8,6 +8,9 @@ import { markdown } from "@codemirror/lang-markdown";
 const API_URL =
   (typeof window !== "undefined" && window.location.origin) || "http://localhost:5040";
 
+// Default project ID (could be made configurable later)
+const PROJECT_ID = "A1";
+
 export function ContextEditor() {
   const [content, setContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
@@ -20,7 +23,7 @@ export function ContextEditor() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/context`);
+      const response = await fetch(`${API_URL}/api/context?projectId=${PROJECT_ID}`);
       const data = await response.json();
 
       if (!data.success) {
@@ -49,7 +52,7 @@ export function ContextEditor() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, projectId: PROJECT_ID }),
       });
 
       const data = await response.json();

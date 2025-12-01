@@ -2,17 +2,17 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import { join, dirname } from "path";
 
 /**
- * Get the context template directory path
+ * Get the context template directory path for a project
  */
-function getContextDir(): string {
-  return join(process.cwd(), "..", "docs");
+function getContextDir(projectId: string): string {
+  return join(process.cwd(), "data", projectId);
 }
 
 /**
- * Get the context template file path
+ * Get the context template file path for a project
  */
-function getContextFilePath(): string {
-  return join(getContextDir(), "context.md");
+function getContextFilePath(projectId: string): string {
+  return join(getContextDir(projectId), "context.md");
 }
 
 /**
@@ -55,9 +55,9 @@ Write as async function body - NO import/export, just await and return!
 /**
  * Load context template from file
  */
-async function loadContext(): Promise<string> {
+async function loadContext(projectId: string): Promise<string> {
   try {
-    const contextPath = getContextFilePath();
+    const contextPath = getContextFilePath(projectId);
     const content = await readFile(contextPath, "utf-8");
     return content;
   } catch (error) {
@@ -69,9 +69,9 @@ async function loadContext(): Promise<string> {
 /**
  * Save context template to file
  */
-async function saveContext(content: string): Promise<void> {
-  const contextDir = getContextDir();
-  const contextPath = getContextFilePath();
+async function saveContext(projectId: string, content: string): Promise<void> {
+  const contextDir = getContextDir(projectId);
+  const contextPath = getContextFilePath(projectId);
 
   // Ensure directory exists
   await mkdir(contextDir, { recursive: true });
@@ -85,13 +85,18 @@ async function saveContext(content: string): Promise<void> {
  */
 export async function handleGetContext(req: Request): Promise<Response> {
   try {
-    const content = await loadContext();
+    // Get projectId from query params (default to "A1" for backward compatibility)
+    const url = new URL(req.url);
+    const projectId = url.searchParams.get("projectId") || "A1";
+
+    const content = await loadContext(projectId);
 
     return Response.json({
       success: true,
       data: {
         content,
-        path: getContextFilePath(),
+        path: getContextFilePath(projectId),
+        projectId,
       },
     });
   } catch (error) {
@@ -112,7 +117,7 @@ export async function handleGetContext(req: Request): Promise<Response> {
 export async function handleUpdateContext(req: Request): Promise<Response> {
   try {
     const body = await req.json();
-    const { content } = body;
+    const { content, projectId = "A1" } = body;
 
     if (typeof content !== "string") {
       return Response.json(
@@ -125,12 +130,13 @@ export async function handleUpdateContext(req: Request): Promise<Response> {
     }
 
     // Save the new content
-    await saveContext(content);
+    await saveContext(projectId, content);
 
     return Response.json({
       success: true,
       message: "Context template updated successfully",
-      path: getContextFilePath(),
+      path: getContextFilePath(projectId),
+      projectId,
     });
   } catch (error) {
     console.error("Error updating context:", error);

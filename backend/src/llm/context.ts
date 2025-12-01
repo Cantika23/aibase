@@ -162,19 +162,19 @@ Write as async function body - NO import/export, just await and return!
 `;
 
 /**
- * Get the path to the context template file
+ * Get the path to the context template file for a project
  */
-function getContextTemplatePath(): string {
-  // Go up one level from backend to project root, then into docs
-  return path.join(process.cwd(), "..", "docs", "context.md");
+function getContextTemplatePath(projectId: string): string {
+  // Store context per-project in data directory
+  return path.join(process.cwd(), "data", projectId, "context.md");
 }
 
 /**
  * Ensure the context template file exists, create it with default content if missing
  */
-async function ensureContextTemplate(): Promise<void> {
-  const templatePath = getContextTemplatePath();
-  const docsDir = path.dirname(templatePath);
+async function ensureContextTemplate(projectId: string): Promise<void> {
+  const templatePath = getContextTemplatePath(projectId);
+  const projectDir = path.dirname(templatePath);
 
   try {
     // Check if file exists
@@ -184,8 +184,8 @@ async function ensureContextTemplate(): Promise<void> {
     console.log(`Context template not found at ${templatePath}, creating default template...`);
 
     try {
-      // Ensure docs directory exists
-      await fs.mkdir(docsDir, { recursive: true });
+      // Ensure project directory exists
+      await fs.mkdir(projectDir, { recursive: true });
 
       // Write default template
       await fs.writeFile(templatePath, DEFAULT_TEMPLATE, "utf-8");
@@ -200,11 +200,11 @@ async function ensureContextTemplate(): Promise<void> {
 /**
  * Load context template from file
  */
-async function loadContextTemplate(): Promise<string> {
-  const templatePath = getContextTemplatePath();
+async function loadContextTemplate(projectId: string): Promise<string> {
+  const templatePath = getContextTemplatePath(projectId);
 
   // Ensure template exists before loading
-  await ensureContextTemplate();
+  await ensureContextTemplate(projectId);
 
   try {
     const content = await fs.readFile(templatePath, "utf-8");
@@ -252,8 +252,8 @@ export const defaultContext = async (
   convId: string,
   projectId: string
 ): Promise<string> => {
-  // Load the context template from markdown file
-  const template = await loadContextTemplate();
+  // Load the context template from per-project markdown file
+  const template = await loadContextTemplate(projectId);
 
   // Load project memory (shared across all conversations)
   const memory = await loadMemory(projectId);
