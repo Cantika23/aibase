@@ -15,7 +15,6 @@ export interface UploadedFileInfo {
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const DEFAULT_PROJECT_ID = 'A1'; // Hardcoded for now
 
 /**
  * Handle file upload via HTTP POST
@@ -25,11 +24,18 @@ export async function handleFileUpload(req: Request): Promise<Response> {
     // Get conversation ID and project ID from query params
     const url = new URL(req.url);
     const convId = url.searchParams.get('convId');
-    const projectId = url.searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+    const projectId = url.searchParams.get('projectId');
 
     if (!convId) {
       return Response.json(
         { success: false, error: 'Missing convId parameter' },
+        { status: 400 }
+      );
+    }
+
+    if (!projectId) {
+      return Response.json(
+        { success: false, error: 'Missing projectId parameter' },
         { status: 400 }
       );
     }

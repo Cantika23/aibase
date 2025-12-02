@@ -134,9 +134,10 @@ export class WSConnectionManager {
   }
 
   private generateConnectionKey(options: WSClientOptions): string {
-    // Create a unique key based on URL and key options
+    // Create a unique key based on URL and key options, including projectId
     const keyParts = [
       options.url,
+      options.projectId || 'no-project', // Include projectId in the key
       options.reconnectAttempts?.toString() || '5',
       options.reconnectDelay?.toString() || '1000',
       options.heartbeatInterval?.toString() || '30000',
@@ -168,6 +169,7 @@ export function useWSConnection(options: WSClientOptions) {
   // Memoize options to prevent unnecessary recreations
   const memoizedOptions = useMemo(() => options, [
     options.url,
+    options.projectId, // Include projectId so connection is recreated when project changes
     options.reconnectAttempts,
     options.reconnectDelay,
     options.heartbeatInterval,

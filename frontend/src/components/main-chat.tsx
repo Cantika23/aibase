@@ -7,6 +7,7 @@ import { CompactionStatus } from "@/components/compaction-status";
 import { useConvId } from "@/lib/conv-id";
 import { useWSConnection } from "@/lib/ws/ws-connection-manager";
 import { useChatStore } from "@/stores/chat-store";
+import { useProjectStore } from "@/stores/project-store";
 import { useFileStore } from "@/stores/file-store";
 import { AlertCircle, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
@@ -21,8 +22,11 @@ interface ShadcnChatInterfaceProps {
   isTodoPanelVisible?: boolean;
 }
 
-export function MainChat({ wsUrl, className, isTodoPanelVisible = true }: ShadcnChatInterfaceProps) {
-
+export function MainChat({
+  wsUrl,
+  className,
+  isTodoPanelVisible = true,
+}: ShadcnChatInterfaceProps) {
   // Zustand stores (reactive state only)
   const {
     messages,
@@ -57,12 +61,16 @@ export function MainChat({ wsUrl, className, isTodoPanelVisible = true }: Shadcn
     }))
   );
 
+  // Get current project
+  const { currentProject } = useProjectStore();
+
   // Use the client ID management hook
   const { convId, generateNewConvId } = useConvId();
 
   // Use WebSocket connection manager - this ensures only one connection even with Strict Mode
   const wsClient = useWSConnection({
     url: wsUrl,
+    projectId: currentProject?.id, // Include project ID in WebSocket connection
     reconnectAttempts: 5,
     reconnectDelay: 1000,
     heartbeatInterval: 30000,
@@ -164,13 +172,6 @@ export function MainChat({ wsUrl, className, isTodoPanelVisible = true }: Shadcn
     }
   }, [handleNewConversation]);
 
-  const suggestions = [
-    "What can you help me with?",
-    "Tell me about your capabilities",
-    "Help me write a function",
-    "Explain machine learning",
-  ];
-
   return (
     <div className={`flex h-screen ${className} relative`}>
       {/* New Conversation Button - Absolute positioned top right (only show if messages exist) */}
@@ -207,7 +208,7 @@ export function MainChat({ wsUrl, className, isTodoPanelVisible = true }: Shadcn
       <div className="flex-1 flex flex-col min-w-0">
         {/* Error Alert */}
         {error && (
-          <Alert className="mx-4 mb-2 border-red-200 bg-red-50">
+          <Alert className="mt-[60px] mx-auto mb-2 w-[650px] border-red-200 bg-red-50">
             <AlertCircle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">
               {error}

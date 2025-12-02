@@ -23,21 +23,20 @@ export interface UploadProgress {
 export interface UploadOptions {
   onProgress?: (progress: UploadProgress) => void;
   signal?: AbortSignal;
-  projectId?: string;
+  projectId: string; // Required project ID
 }
 
 const UPLOAD_ENDPOINT = "/api/upload"; // Use relative URL to leverage Vite proxy
-const DEFAULT_PROJECT_ID = "A1"; // Hardcoded for now
 
 /**
  * Upload files using HTTP multipart/form-data
  */
 export async function uploadFiles(
   files: File[],
-  options?: UploadOptions
+  options: UploadOptions
 ): Promise<UploadedFile[]> {
   const convId = ConvIdManager.getConvId();
-  const projectId = options?.projectId || DEFAULT_PROJECT_ID;
+  const projectId = options.projectId;
   const formData = new FormData();
 
   // Add all files to form data
@@ -89,7 +88,7 @@ export function uploadFilesWithProgress(
 ): Promise<UploadedFile[]> {
   return new Promise((resolve, reject) => {
     const convId = ConvIdManager.getConvId();
-    const projectId = options.projectId || DEFAULT_PROJECT_ID;
+    const projectId = options.projectId;
     const formData = new FormData();
 
     for (const file of files) {
@@ -152,7 +151,6 @@ export function uploadFilesWithProgress(
 /**
  * Get file URL for display/download
  */
-export function getFileUrl(convId: string, fileName: string, projectId?: string): string {
-  const projId = projectId || DEFAULT_PROJECT_ID;
-  return `/api/files/${projId}/${convId}/${fileName}`; // Use relative URL to leverage Vite proxy
+export function getFileUrl(convId: string, fileName: string, projectId: string): string {
+  return `/api/files/${projectId}/${convId}/${fileName}`; // Use relative URL to leverage Vite proxy
 }

@@ -3,6 +3,7 @@ import { WSClient } from "@/lib/ws/ws-client";
 import type { Message } from "@/components/ui/chat";
 import { uploadFiles } from "@/lib/file-upload";
 import { useChatStore } from "@/stores/chat-store";
+import { useProjectStore } from "@/stores/project-store";
 
 export interface UseChatOptions {
   wsUrl: string;
@@ -38,14 +39,26 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
     setError,
   } = useChatStore();
 
+  const { currentProject } = useProjectStore();
+
   const wsClientRef = useRef<WSClient | null>(null);
   const currentMessageRef = useRef<string | null>(null);
   const currentMessageIdRef = useRef<string | null>(null);
 
   // Initialize WebSocket client
   useEffect(() => {
+    // Don't connect if no project is selected
+    if (!currentProject?.id) {
+      setConnectionStatus("disconnected");
+      setError("No project selected. Please select a project to start chatting.");
+      return;
+    }
+
+    console.log(`[useChat] Initializing WebSocket for project: ${currentProject.id}`);
+
     const wsClient = new WSClient({
       url: wsUrl,
+      projectId: currentProject.id,
       reconnectAttempts: 5,
       reconnectDelay: 1000,
       heartbeatInterval: 30000,
@@ -158,7 +171,7 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
     return () => {
       wsClient.disconnect();
     };
-  }, [wsUrl, onError, onStatusChange]);
+  }, [wsUrl, currentProject?.id, onError, onStatusChange]);
 
   const handleSubmit = useCallback(async (e?: React.FormEvent, options?: { experimental_attachments?: FileList }) => {
     e?.preventDefault();
@@ -184,8 +197,11 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
 
       // Upload files via HTTP if provided
       if (options?.experimental_attachments && options.experimental_attachments.length > 0) {
+        if (!currentProject) {
+          throw new Error("No project selected");
+        }
         const files = Array.from(options.experimental_attachments);
-        const uploadedFiles = await uploadFiles(files);
+        const uploadedFiles = await uploadFiles(files, { projectId: currentProject.id });
         fileIds = uploadedFiles.map(f => f.id);
         console.log(`Uploaded ${uploadedFiles.length} files:`, fileIds);
       }

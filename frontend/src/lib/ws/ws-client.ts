@@ -77,6 +77,12 @@ export class WSClient extends WSEventEmitter {
     const convId = this.getConvId();
     const url = new URL(this.options.url);
     url.searchParams.set("convId", convId);
+
+    // Add projectId if provided
+    if (this.options.projectId) {
+      url.searchParams.set("projectId", this.options.projectId);
+    }
+
     const finalUrl = url.toString();
 
     return new Promise((resolve, reject) => {

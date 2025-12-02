@@ -2,11 +2,14 @@ import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { MainChat } from "./main-chat";
 import { MemoryEditor } from "./memory-editor";
 import { ContextEditor } from "./context-editor";
+import { ProjectSelectorPage } from "./project-selector-page";
+import { ProjectRouteHandler } from "./project-route-handler";
 import { Button } from "./ui/button";
-import { MessageSquare, Database, TableProperties, Binary, ListTodo, FileText } from "lucide-react";
+import { MessageSquare, Binary, ListTodo, FileText, ArrowLeft } from "lucide-react";
 import { Toaster } from "./ui/sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useChatStore } from "@/stores/chat-store";
+import { useProjectStore } from "@/stores/project-store";
 import { useShallow } from "zustand/react/shallow";
 
 interface AppRouterProps {
@@ -24,53 +27,94 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
     }))
   );
 
+  const { currentProject } = useProjectStore();
+
+  // Check if we're on a chat-related route
+  const isChatRoute = location.pathname.startsWith("/projects/");
+  const isProjectSelectorRoute = location.pathname === "/";
+
   return (
     <div className="flex h-screen flex-col">
-      {/* Navigation Bar */}
-      <div className="absolute top-0 left-0 m-3 z-1 flex gap-2">
-        <Button
-          variant={location.pathname === "/" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => navigate("/")}
-        >
-          <MessageSquare />
-          {location.pathname === "/" && <>Chat</>}
-        </Button>
-        <Button
-          variant={location.pathname === "/memory" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => navigate("/memory")}
-        >
-          <Binary />
-          {location.pathname === "/memory" && <>Memory</>}
-        </Button>
-        <Button
-          variant={location.pathname === "/context" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => navigate("/context")}
-        >
-          <FileText />
-          {location.pathname === "/context" && <>Context</>}
-        </Button>
-        {location.pathname === "/" && todos?.items?.length > 0 && (
+      {/* Navigation Bar - Only show on chat routes */}
+      {isChatRoute && currentProject && (
+        <div className="absolute top-0 left-0 m-3 z-10 flex gap-2">
+          {/* Back to Projects Button */}
           <Button
-            variant={isTodoPanelVisible ? "outline" : "ghost"}
+            variant="ghost"
             size="sm"
-            onClick={() => setIsTodoPanelVisible(!isTodoPanelVisible)}
-            title={isTodoPanelVisible ? "Hide tasks" : "Show tasks"}
+            onClick={() => navigate("/")}
+            title="Back to Projects"
           >
-            <ListTodo />
-            {isTodoPanelVisible && <>Tasks</>}
+            <ArrowLeft />
           </Button>
-        )}
-      </div>
+
+          {/* Navigation Buttons */}
+          <Button
+            variant={location.pathname === `/projects/${currentProject.id}/chat` ? "default" : "ghost"}
+            size="sm"
+            onClick={() => navigate(`/projects/${currentProject.id}/chat`)}
+          >
+            <MessageSquare />
+            {location.pathname === `/projects/${currentProject.id}/chat` && <>Chat</>}
+          </Button>
+          <Button
+            variant={location.pathname === `/projects/${currentProject.id}/memory` ? "default" : "ghost"}
+            size="sm"
+            onClick={() => navigate(`/projects/${currentProject.id}/memory`)}
+          >
+            <Binary />
+            {location.pathname === `/projects/${currentProject.id}/memory` && <>Memory</>}
+          </Button>
+          <Button
+            variant={location.pathname === `/projects/${currentProject.id}/context` ? "default" : "ghost"}
+            size="sm"
+            onClick={() => navigate(`/projects/${currentProject.id}/context`)}
+          >
+            <FileText />
+            {location.pathname === `/projects/${currentProject.id}/context` && <>Context</>}
+          </Button>
+          {location.pathname === `/projects/${currentProject.id}/chat` && todos?.items?.length > 0 && (
+            <Button
+              variant={isTodoPanelVisible ? "outline" : "ghost"}
+              size="sm"
+              onClick={() => setIsTodoPanelVisible(!isTodoPanelVisible)}
+              title={isTodoPanelVisible ? "Hide tasks" : "Show tasks"}
+            >
+              <ListTodo />
+              {isTodoPanelVisible && <>Tasks</>}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         <Routes>
-          <Route path="/" element={<MainChat wsUrl={wsUrl} isTodoPanelVisible={isTodoPanelVisible} />} />
-          <Route path="/memory" element={<MemoryEditor />} />
-          <Route path="/context" element={<ContextEditor />} />
+          <Route path="/" element={<ProjectSelectorPage />} />
+          <Route
+            path="/projects/:projectId/chat"
+            element={
+              <ProjectRouteHandler>
+                <MainChat wsUrl={wsUrl} isTodoPanelVisible={isTodoPanelVisible} />
+              </ProjectRouteHandler>
+            }
+          />
+          <Route
+            path="/projects/:projectId/memory"
+            element={
+              <ProjectRouteHandler>
+                <MemoryEditor />
+              </ProjectRouteHandler>
+            }
+          />
+          <Route
+            path="/projects/:projectId/context"
+            element={
+              <ProjectRouteHandler>
+                <ContextEditor />
+              </ProjectRouteHandler>
+            }
+          />
         </Routes>
       </div>
 

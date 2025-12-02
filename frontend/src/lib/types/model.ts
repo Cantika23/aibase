@@ -108,6 +108,7 @@ export interface ConnectionStats {
 
 export interface WSClientOptions {
   url: string;
+  projectId?: string; // Current project ID for the connection
   reconnectAttempts?: number;
   reconnectDelay?: number;
   heartbeatInterval?: number;

@@ -116,9 +116,19 @@ async function saveContext(projectId: string, content: string): Promise<void> {
  */
 export async function handleGetContext(req: Request): Promise<Response> {
   try {
-    // Get projectId from query params (default to "A1" for backward compatibility)
+    // Get projectId from query params
     const url = new URL(req.url);
-    const projectId = url.searchParams.get("projectId") || "A1";
+    const projectId = url.searchParams.get("projectId");
+
+    if (!projectId) {
+      return Response.json(
+        {
+          success: false,
+          error: "Project ID is required",
+        },
+        { status: 400 }
+      );
+    }
 
     const content = await loadContext(projectId);
 
@@ -172,7 +182,17 @@ export async function handleGetDefaultContext(req: Request): Promise<Response> {
 export async function handleUpdateContext(req: Request): Promise<Response> {
   try {
     const body = await req.json();
-    const { content, projectId = "A1" } = body as any;
+    const { content, projectId } = body as any;
+
+    if (!projectId) {
+      return Response.json(
+        {
+          success: false,
+          error: "Project ID is required",
+        },
+        { status: 400 }
+      );
+    }
 
     if (typeof content !== "string") {
       return Response.json(

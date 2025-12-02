@@ -24,7 +24,6 @@ export interface ChatHistoryFile {
 export class ChatHistoryStorage {
   private static instance: ChatHistoryStorage;
   private baseDir: string;
-  private defaultProjectId = 'A1'; // Hardcoded for now
   private convStartTimes = new Map<string, number>(); // Track conversation start times
 
   private constructor() {
@@ -42,15 +41,14 @@ export class ChatHistoryStorage {
   /**
    * Get the chat directory path for a conversation
    */
-  private getChatDir(convId: string, projectId?: string): string {
-    const projId = projectId || this.defaultProjectId;
-    return path.join(this.baseDir, projId, convId, 'chats');
+  private getChatDir(convId: string, projectId: string): string {
+    return path.join(this.baseDir, projectId, convId, 'chats');
   }
 
   /**
    * Get the chat file path for a conversation
    */
-  private getChatFilePath(convId: string, projectId?: string): string {
+  private getChatFilePath(convId: string, projectId: string): string {
     const chatDir = this.getChatDir(convId, projectId);
     const timestamp = this.convStartTimes.get(convId) || Date.now();
 
@@ -65,7 +63,7 @@ export class ChatHistoryStorage {
   /**
    * Ensure chat directory exists
    */
-  private async ensureChatDir(convId: string, projectId?: string): Promise<void> {
+  private async ensureChatDir(convId: string, projectId: string): Promise<void> {
     const chatDir = this.getChatDir(convId, projectId);
     await fs.mkdir(chatDir, { recursive: true });
   }
@@ -76,10 +74,9 @@ export class ChatHistoryStorage {
    */
   async loadChatHistory(
     convId: string,
-    projectId?: string
+    projectId: string
   ): Promise<ChatCompletionMessageParam[]> {
-    const projId = projectId || this.defaultProjectId;
-    const chatDir = this.getChatDir(convId, projId);
+    const chatDir = this.getChatDir(convId, projectId);
 
     try {
       // Check if chat directory exists
@@ -130,21 +127,19 @@ export class ChatHistoryStorage {
   async saveChatHistory(
     convId: string,
     messages: ChatCompletionMessageParam[],
-    projectId?: string
+    projectId: string
   ): Promise<void> {
-    const projId = projectId || this.defaultProjectId;
-
     try {
       // Ensure directory exists
-      await this.ensureChatDir(convId, projId);
+      await this.ensureChatDir(convId, projectId);
 
-      const filePath = this.getChatFilePath(convId, projId);
+      const filePath = this.getChatFilePath(convId, projectId);
       const timestamp = this.convStartTimes.get(convId) || Date.now();
 
       const chatHistory: ChatHistoryFile = {
         metadata: {
           convId,
-          projectId: projId,
+          projectId,
           createdAt: timestamp,
           lastUpdatedAt: Date.now(),
           messageCount: messages.length,
@@ -171,7 +166,7 @@ export class ChatHistoryStorage {
    */
   async listChatHistoryFiles(
     convId: string,
-    projectId?: string
+    projectId: string
   ): Promise<string[]> {
     const chatDir = this.getChatDir(convId, projectId);
 
@@ -191,7 +186,7 @@ export class ChatHistoryStorage {
    */
   async deleteChatHistory(
     convId: string,
-    projectId?: string
+    projectId: string
   ): Promise<void> {
     const chatDir = this.getChatDir(convId, projectId);
 
@@ -210,7 +205,7 @@ export class ChatHistoryStorage {
    */
   async getChatHistoryMetadata(
     convId: string,
-    projectId?: string
+    projectId: string
   ): Promise<ChatHistoryMetadata | null> {
     const chatDir = this.getChatDir(convId, projectId);
 

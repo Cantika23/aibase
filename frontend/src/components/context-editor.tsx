@@ -4,13 +4,11 @@ import { Save, Zap } from "lucide-react";
 import { toast } from "sonner";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
+import { useProjectStore } from "@/stores/project-store";
 
 const API_URL =
   (typeof window !== "undefined" && window.location.origin) ||
   "http://localhost:5040";
-
-// Default project ID (could be made configurable later)
-const PROJECT_ID = "A1";
 
 export function ContextEditor() {
   const [content, setContent] = useState("");
@@ -18,14 +16,20 @@ export function ContextEditor() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { currentProject } = useProjectStore();
 
   const loadContext = async () => {
+    if (!currentProject) {
+      setError("No project selected. Please select a project first.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await fetch(
-        `${API_URL}/api/context?projectId=${PROJECT_ID}`
+        `${API_URL}/api/context?projectId=${currentProject.id}`
       );
       const data = await response.json();
 
@@ -47,6 +51,11 @@ export function ContextEditor() {
   };
 
   const handleSave = async () => {
+    if (!currentProject) {
+      toast.error("No project selected");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -55,7 +64,7 @@ export function ContextEditor() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content, projectId: PROJECT_ID }),
+        body: JSON.stringify({ content, projectId: currentProject.id }),
       });
 
       const data = await response.json();
@@ -120,7 +129,7 @@ export function ContextEditor() {
 
   useEffect(() => {
     loadContext();
-  }, []);
+  }, [currentProject?.id]);
 
   const hasChanges = content !== originalContent;
 

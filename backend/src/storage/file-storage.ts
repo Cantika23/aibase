@@ -17,7 +17,6 @@ export interface StoredFile {
 export class FileStorage {
   private static instance: FileStorage;
   private baseDir: string;
-  private defaultProjectId = 'A1'; // Hardcoded for now
 
   private constructor() {
     // Use absolute path from project root
@@ -34,15 +33,14 @@ export class FileStorage {
   /**
    * Get the directory path for a conversation
    */
-  private getConvDir(convId: string, projectId?: string): string {
-    const projId = projectId || this.defaultProjectId;
-    return path.join(this.baseDir, projId, convId, 'files');
+  private getConvDir(convId: string, projectId: string): string {
+    return path.join(this.baseDir, projectId, convId, 'files');
   }
 
   /**
    * Ensure conversation directory exists
    */
-  private async ensureConvDir(convId: string, projectId?: string): Promise<void> {
+  private async ensureConvDir(convId: string, projectId: string): Promise<void> {
     const convDir = this.getConvDir(convId, projectId);
     await fs.mkdir(convDir, { recursive: true });
   }
@@ -55,10 +53,9 @@ export class FileStorage {
     fileName: string,
     fileBuffer: Buffer,
     fileType: string,
-    projectId?: string
+    projectId: string
   ): Promise<StoredFile> {
-    const projId = projectId || this.defaultProjectId;
-    await this.ensureConvDir(convId, projId);
+    await this.ensureConvDir(convId, projectId);
 
     // Sanitize filename to prevent directory traversal
     const sanitizedFileName = path.basename(fileName);
@@ -69,7 +66,7 @@ export class FileStorage {
     const nameWithoutExt = path.basename(sanitizedFileName, ext);
     const uniqueFileName = `${nameWithoutExt}_${timestamp}${ext}`;
 
-    const filePath = path.join(this.getConvDir(convId, projId), uniqueFileName);
+    const filePath = path.join(this.getConvDir(convId, projectId), uniqueFileName);
 
     // Write buffer directly to disk
     await fs.writeFile(filePath, fileBuffer);
@@ -89,9 +86,8 @@ export class FileStorage {
   /**
    * List all files for a conversation
    */
-  async listFiles(convId: string, projectId?: string): Promise<StoredFile[]> {
-    const projId = projectId || this.defaultProjectId;
-    const convDir = this.getConvDir(convId, projId);
+  async listFiles(convId: string, projectId: string): Promise<StoredFile[]> {
+    const convDir = this.getConvDir(convId, projectId);
 
     try {
       const entries = await fs.readdir(convDir, { withFileTypes: true });
@@ -125,10 +121,9 @@ export class FileStorage {
   /**
    * Get a specific file
    */
-  async getFile(convId: string, fileName: string, projectId?: string): Promise<Buffer> {
-    const projId = projectId || this.defaultProjectId;
+  async getFile(convId: string, fileName: string, projectId: string): Promise<Buffer> {
     const sanitizedFileName = path.basename(fileName);
-    const filePath = path.join(this.getConvDir(convId, projId), sanitizedFileName);
+    const filePath = path.join(this.getConvDir(convId, projectId), sanitizedFileName);
 
     return await fs.readFile(filePath);
   }
@@ -136,10 +131,9 @@ export class FileStorage {
   /**
    * Delete a file
    */
-  async deleteFile(convId: string, fileName: string, projectId?: string): Promise<void> {
-    const projId = projectId || this.defaultProjectId;
+  async deleteFile(convId: string, fileName: string, projectId: string): Promise<void> {
     const sanitizedFileName = path.basename(fileName);
-    const filePath = path.join(this.getConvDir(convId, projId), sanitizedFileName);
+    const filePath = path.join(this.getConvDir(convId, projectId), sanitizedFileName);
 
     await fs.unlink(filePath);
   }
@@ -147,9 +141,8 @@ export class FileStorage {
   /**
    * Delete all files for a conversation
    */
-  async deleteAllFiles(convId: string, projectId?: string): Promise<void> {
-    const projId = projectId || this.defaultProjectId;
-    const convDir = this.getConvDir(convId, projId);
+  async deleteAllFiles(convId: string, projectId: string): Promise<void> {
+    const convDir = this.getConvDir(convId, projectId);
 
     try {
       await fs.rm(convDir, { recursive: true, force: true });
@@ -164,7 +157,7 @@ export class FileStorage {
   /**
    * Get total storage size for a conversation
    */
-  async getStorageSize(convId: string, projectId?: string): Promise<number> {
+  async getStorageSize(convId: string, projectId: string): Promise<number> {
     const files = await this.listFiles(convId, projectId);
     return files.reduce((total, file) => total + file.size, 0);
   }

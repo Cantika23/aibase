@@ -314,22 +314,43 @@ export class WSServer extends WSEventEmitter {
   }
 
   private async handleConnectionOpen(ws: ServerWebSocket): Promise<void> {
-    // Extract client ID from URL parameters if provided
+    // Extract client ID and project ID from URL parameters if provided
     let urlClientId: string | null = null;
+    let urlProjectId: string | null = null;
 
     try {
-      // Extract client ID from the data passed during upgrade
+      // Extract client ID and project ID from the data passed during upgrade
       urlClientId = ws.data?.convId || null;
+      urlProjectId = ws.data?.projectId || null;
     } catch (error) {
-      console.warn("Failed to extract client ID from WebSocket data:", error);
+      console.warn("Failed to extract IDs from WebSocket data:", error);
     }
 
     // Use provided client ID or generate a new one
     const convId = urlClientId || this.generateClientId();
+    const projectId = urlProjectId;
+
+    // Project ID is required
+    if (!projectId) {
+      console.error("Project ID is required for WebSocket connection");
+      this.sendToWebSocket(ws, {
+        type: "error",
+        id: this.generateMessageId(),
+        data: {
+          code: "MISSING_PROJECT_ID",
+          message: "Project ID is required. Please select or create a project.",
+        },
+        metadata: { timestamp: Date.now() },
+      });
+      ws.close(1008, "Project ID required");
+      return;
+    }
+
     const sessionId = this.generateSessionId();
 
     console.log(`=== New Connection ===`);
     console.log(`convId: ${convId} (from URL: ${!!urlClientId})`);
+    console.log(`projectId: ${projectId}`);
     console.log(
       `Total active streams in manager: ${
         Array.from(this.streamingManager["activeStreams"].keys()).length
@@ -342,6 +363,7 @@ export class WSServer extends WSEventEmitter {
 
     const connectionInfo: ConnectionInfo = {
       convId,
+      projectId,
       sessionId,
       connectedAt: Date.now(),
       lastActivity: Date.now(),
@@ -663,7 +685,7 @@ export class WSServer extends WSEventEmitter {
       // Check if compaction is needed (automatic)
       try {
         const compactionResult = await this.messagePersistence.checkAndCompact(
-          connectionInfo.projectId || "A1",
+          connectionInfo.projectId,
           connectionInfo.convId
         );
         if (compactionResult.compacted) {
@@ -671,7 +693,7 @@ export class WSServer extends WSEventEmitter {
             `[Auto-Compaction] Compacted chat for ${connectionInfo.convId}, saved ~${compactionResult.tokensSaved} tokens`
           );
           // Optionally notify all clients about the compaction
-          this.broadcastToConversation(connectionInfo.convId, {
+          this.broadcastToConv(connectionInfo.convId, {
             type: "notification",
             id: `compaction_${Date.now()}`,
             data: {
@@ -864,7 +886,7 @@ export class WSServer extends WSEventEmitter {
             const todosPath = path.join(
               process.cwd(),
               "data",
-              "A1",
+              connectionInfo.projectId,
               connectionInfo.convId,
               "todos.json"
             );
@@ -919,7 +941,7 @@ export class WSServer extends WSEventEmitter {
           console.log(`[Compaction] Manual compaction requested for convId: ${connectionInfo.convId}`);
           try {
             const compactionResult = await this.messagePersistence.checkAndCompact(
-              connectionInfo.projectId || "A1",
+              connectionInfo.projectId,
               connectionInfo.convId
             );
 
@@ -1240,6 +1262,7 @@ Always be helpful and conversational.`;
 
 interface ConnectionInfo {
   convId: string;
+  projectId: string;
   sessionId: string;
   connectedAt: number;
   lastActivity: number;

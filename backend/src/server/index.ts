@@ -38,6 +38,13 @@ import { WSServer } from "../ws/entry";
 import { handleFileUpload, handleFileDownload } from "./upload-handler";
 import { handleGetMemory, handleSetMemory, handleDeleteMemory } from "./memory-handler";
 import { handleGetContext, handleUpdateContext, handleGetDefaultContext } from "./context-handler";
+import {
+  handleGetProjects,
+  handleGetProject,
+  handleCreateProject,
+  handleUpdateProject,
+  handleDeleteProject,
+} from "./projects-handler";
 
 /**
  * Convenience function to create a WebSocket server
@@ -104,12 +111,13 @@ export class WebSocketServer {
 
         // Handle WebSocket upgrade requests
         if (url.pathname.startsWith("/api/ws")) {
-          // Extract conversation ID from URL before upgrading
+          // Extract conversation ID and project ID from URL before upgrading
           const convId = url.searchParams.get("convId");
+          const projectId = url.searchParams.get("projectId");
 
-          // Pass conversation ID as data to WebSocket connection
+          // Pass conversation ID and project ID as data to WebSocket connection
           const upgraded = server.upgrade(req, {
-            data: { convId }
+            data: { convId, projectId }
           });
           if (upgraded) {
             return undefined; // WebSocket connection established
@@ -135,6 +143,28 @@ export class WebSocketServer {
             return handleSetMemory(req);
           } else if (req.method === "DELETE") {
             return handleDeleteMemory(req);
+          }
+        }
+
+        // Projects API endpoints
+        if (url.pathname === "/api/projects" && req.method === "GET") {
+          return handleGetProjects(req);
+        }
+
+        if (url.pathname === "/api/projects" && req.method === "POST") {
+          return handleCreateProject(req);
+        }
+
+        // Match /api/projects/:id endpoints
+        const projectIdMatch = url.pathname.match(/^\/api\/projects\/([^\/]+)$/);
+        if (projectIdMatch) {
+          const projectId = projectIdMatch[1];
+          if (req.method === "GET") {
+            return handleGetProject(req, projectId);
+          } else if (req.method === "PUT") {
+            return handleUpdateProject(req, projectId);
+          } else if (req.method === "DELETE") {
+            return handleDeleteProject(req, projectId);
           }
         }
 
