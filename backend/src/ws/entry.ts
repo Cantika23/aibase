@@ -23,6 +23,7 @@ import * as path from "path";
 interface ExtendedAssistantMessage extends ChatCompletionAssistantMessageParam {
   id?: string;
   completionTime?: number;
+  thinkingDuration?: number;
   aborted?: boolean;
   tokenUsage?: {
     promptTokens: number;
@@ -42,6 +43,7 @@ interface StreamingState {
   chunks: string[];
   fullResponse: string;
   startTime: number;
+  firstChunkTime?: number; // Time when first chunk arrived
   lastChunkTime: number;
 }
 
@@ -68,6 +70,11 @@ class StreamingManager {
     const key = `${convId}_${messageId}`;
     const stream = this.activeStreams.get(key);
     if (!stream) return;
+
+    // Track first chunk time for thinking duration
+    if (!stream.firstChunkTime) {
+      stream.firstChunkTime = Date.now();
+    }
 
     stream.chunks.push(chunk);
     stream.fullResponse += chunk;
@@ -643,6 +650,17 @@ export class WSServer extends WSEventEmitter {
         `[Backend Complete] Completion time: ${completionTimeSeconds}s (${completionTimeMs}ms)`
       );
 
+      // Get stream state to calculate thinking duration
+      const stream = this.streamingManager.getStream(connectionInfo.convId, assistantMsgId);
+      let thinkingDurationSeconds: number | undefined;
+      if (stream?.firstChunkTime) {
+        const thinkingDurationMs = stream.firstChunkTime - startTime;
+        thinkingDurationSeconds = Math.floor(thinkingDurationMs / 1000);
+        console.log(
+          `[Backend Complete] Thinking duration: ${thinkingDurationSeconds}s (${thinkingDurationMs}ms)`
+        );
+      }
+
       // Mark stream as complete in streaming manager
       this.streamingManager.completeStream(
         connectionInfo.convId,
@@ -673,6 +691,7 @@ export class WSServer extends WSEventEmitter {
         data: {
           fullText: fullResponse,
           completionTime: completionTimeSeconds,
+          thinkingDuration: thinkingDurationSeconds,
           tokenUsage: tokenUsage
             ? {
                 promptTokens: tokenUsage.promptTokens,
@@ -709,6 +728,7 @@ export class WSServer extends WSEventEmitter {
             ...msg,
             id: assistantMsgId,
             completionTime: completionTimeSeconds,
+            ...(thinkingDurationSeconds !== undefined && { thinkingDuration: thinkingDurationSeconds }),
             ...(tokenUsage && { tokenUsage: {
               promptTokens: tokenUsage.promptTokens,
               completionTokens: tokenUsage.completionTokens,

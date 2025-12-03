@@ -27,6 +27,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   toolInvocations,
   parts,
   completionTime,
+  thinkingDuration,
   isThinking,
   aborted,
 }) => {
@@ -174,87 +175,102 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       );
     }
 
-    return groupedParts.map((partOrGroup, index) => {
-      // Handle tool groups (memory or file)
+    return (
+      <>
+        {groupedParts.map((partOrGroup, index) => {
+          // Handle tool groups (memory or file)
 
-      if (Array.isArray(partOrGroup)) {
-        const invocations = partOrGroup.map((p) => {
-          if (p.type === "tool-invocation") {
-            return p.toolInvocation;
+          if (Array.isArray(partOrGroup)) {
+            const invocations = partOrGroup.map((p) => {
+              if (p.type === "tool-invocation") {
+                return p.toolInvocation;
+              }
+              throw new Error("Invalid part in tool group");
+            });
+
+            // Check what type of tool group this is
+            const toolName = invocations[0]?.toolName;
+            if (toolName === "memory") {
+              return (
+                <MemoryToolGroup
+                  key={`memory-group-${index}`}
+                  invocations={invocations}
+                />
+              );
+            } else if (toolName === "file") {
+              return (
+                <FileToolGroup
+                  key={`file-group-${index}`}
+                  invocations={invocations}
+                />
+              );
+            }
+            // Unknown tool group type, skip
+            return null;
           }
-          throw new Error("Invalid part in tool group");
-        });
 
-        // Check what type of tool group this is
-        const toolName = invocations[0]?.toolName;
-        if (toolName === "memory") {
-          return (
-            <MemoryToolGroup
-              key={`memory-group-${index}`}
-              invocations={invocations}
-            />
-          );
-        } else if (toolName === "file") {
-          return (
-            <FileToolGroup
-              key={`file-group-${index}`}
-              invocations={invocations}
-            />
-          );
-        }
-        // Unknown tool group type, skip
-        return null;
-      }
+          const part = partOrGroup;
 
-      const part = partOrGroup;
-
-      if (part.type === "text") {
-        if (!part.text.trim()) return null;
-        return (
-          <div
-            className={cn(
-              "flex flex-col",
-              isUser ? "items-end" : "items-start"
-            )}
-            key={`text-${index}`}
-          >
-            <div
-              className={cn("mo", chatBubbleVariants({ isUser, animation }))}
-            >
-              <MarkdownRenderer>{part.text}</MarkdownRenderer>
-              {actions ? (
-                <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-                  {actions}
-                </div>
-              ) : null}
-            </div>
-
-            {showTimeStamp && createdAt ? (
-              <time
-                dateTime={createdAt.toISOString()}
+          if (part.type === "text") {
+            if (!part.text.trim()) return null;
+            return (
+              <div
                 className={cn(
-                  "t2",
-                  "mt-1 block px-1 text-xs opacity-50",
-                  animation !== "none" && "duration-500 animate-in fade-in-0"
+                  "flex flex-col",
+                  isUser ? "items-end" : "items-start"
                 )}
+                key={`text-${index}`}
               >
-                {formattedTime}
-              </time>
-            ) : null}
-          </div>
-        );
-      } else if (part.type === "reasoning") {
-        return <ReasoningBlock key={`reasoning-${index}`} part={part} />;
-      } else if (part.type === "tool-invocation") {
-        return (
-          <ToolCall
-            key={`tool-${index}`}
-            toolInvocations={[part.toolInvocation]}
-          />
-        );
-      }
-      return null;
-    });
+                <div
+                  className={cn("mo", chatBubbleVariants({ isUser, animation }))}
+                >
+                  <MarkdownRenderer>{part.text}</MarkdownRenderer>
+                  {actions ? (
+                    <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+                      {actions}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          } else if (part.type === "reasoning") {
+            return <ReasoningBlock key={`reasoning-${index}`} part={part} />;
+          } else if (part.type === "tool-invocation") {
+            return (
+              <ToolCall
+                key={`tool-${index}`}
+                toolInvocations={[part.toolInvocation]}
+              />
+            );
+          }
+          return null;
+        })}
+
+        {/* Add timestamp after all parts for assistant messages */}
+        {!isUser && showTimeStamp && createdAt && (
+          <time
+            dateTime={createdAt.toISOString()}
+            className={cn(
+              "t2-summary",
+              "mt-1 block px-1 text-xs opacity-50",
+              animation !== "none" && "duration-500 animate-in fade-in-0"
+            )}
+          >
+            {formattedTime}
+            {completionTime !== undefined && <> • {completionTime}s</>}
+            {aborted && (
+              <>
+                {" "}
+                •{" "}
+                <span className="text-orange-600 dark:text-orange-400">
+                  Cancelled
+                </span>
+              </>
+            )}
+          </time>
+        )}
+      </>
+    );
   }
 
   // Split content at first meaningful newline (skip leading newlines) if we have tool invocations

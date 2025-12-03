@@ -65,7 +65,8 @@ export interface Message {
   attachments?: UploadedFileAttachment[]; // Uploaded files from user
   toolInvocations?: ToolInvocation[];
   parts?: MessagePart[];
-  completionTime?: number; // Time in seconds to complete the message
+  completionTime?: number; // Time in seconds to complete the message (total duration)
+  thinkingDuration?: number; // Time in seconds from user submit to first chunk
   tokenUsage?: {
     promptTokens: number;
     completionTokens: number;
@@ -77,12 +78,13 @@ export interface Message {
 
 export interface ChatMessageProps extends Omit<
   Message,
-  "completionTime" | "isThinking" | "aborted" | "tokenUsage"
+  "completionTime" | "thinkingDuration" | "isThinking" | "aborted" | "tokenUsage"
 > {
   showTimeStamp?: boolean;
   animation?: Animation;
   actions?: React.ReactNode;
   completionTime?: number;
+  thinkingDuration?: number;
   tokenUsage?: {
     promptTokens: number;
     completionTokens: number;

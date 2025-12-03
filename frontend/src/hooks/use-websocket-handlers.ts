@@ -406,6 +406,7 @@ export function useWebSocketHandlers({
       messageId: string;
       isAccumulated?: boolean;
       completionTime?: number;
+      thinkingDuration?: number;
       tokenUsage?: {
         promptTokens: number;
         completionTokens: number;
@@ -420,6 +421,7 @@ export function useWebSocketHandlers({
         contentLength: data.fullText.length,
         isAccumulated: data.isAccumulated,
         completionTime: data.completionTime,
+        thinkingDuration: data.thinkingDuration,
         tokenUsage: data.tokenUsage,
       });
 
@@ -492,6 +494,7 @@ export function useWebSocketHandlers({
                   ...msg,
                   content: fullText,
                   completionTime: completionTimeSeconds,
+                  ...(data.thinkingDuration !== undefined && { thinkingDuration: data.thinkingDuration }),
                   ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
                   ...(toolInvocations && toolInvocations.length > 0 && { toolInvocations }),
                 }
@@ -517,6 +520,7 @@ export function useWebSocketHandlers({
           content: fullText,
           createdAt: new Date(),
           completionTime: completionTimeSeconds,
+          ...(data.thinkingDuration !== undefined && { thinkingDuration: data.thinkingDuration }),
           ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
           ...(toolInvocations && toolInvocations.length > 0 && { toolInvocations }),
         };
@@ -789,6 +793,7 @@ export function useWebSocketHandlers({
                 ...(finalCompletionTime !== undefined && {
                   completionTime: finalCompletionTime,
                 }),
+                ...(msg.thinkingDuration !== undefined && { thinkingDuration: msg.thinkingDuration }),
                 ...(msg.aborted && { aborted: true }),
                 ...(msg.tokenUsage && { tokenUsage: msg.tokenUsage }),
               };
@@ -966,10 +971,12 @@ export function useWebSocketHandlers({
         console.log("Processing todos data:", data.todos);
         console.log("Processing hasActiveStream:", data.hasActiveStream);
         console.log("Processing maxTokens:", data.maxTokens);
+        console.log("Processing tokenUsage:", data.tokenUsage);
         handleHistoryResponse({
           messages: data.history || [],
           hasActiveStream: data.hasActiveStream,
-          maxTokens: data.maxTokens
+          maxTokens: data.maxTokens,
+          tokenUsage: data.tokenUsage
         });
 
         // Update todos state if provided

@@ -368,6 +368,7 @@ export class WSClient extends WSEventEmitter {
           messageId: message.id,
           isAccumulated: message.data?.isAccumulated || message.metadata?.isAccumulated || false,
           completionTime: message.data?.completionTime,
+          thinkingDuration: message.data?.thinkingDuration,
           tokenUsage: message.data?.tokenUsage,
           maxTokens: message.data?.maxTokens,
         });
