@@ -45,6 +45,11 @@ import {
   handleUpdateProject,
   handleDeleteProject,
 } from "./projects-handler";
+import {
+  handleGetConversations,
+  handleGetConversationMessages,
+  handleDeleteConversation,
+} from "./conversations-handler";
 
 /**
  * Convenience function to create a WebSocket server
@@ -166,6 +171,25 @@ export class WebSocketServer {
           } else if (req.method === "DELETE") {
             return handleDeleteProject(req, projectId);
           }
+        }
+
+        // Conversations API endpoints
+        if (url.pathname === "/api/conversations" && req.method === "GET") {
+          return handleGetConversations(req);
+        }
+
+        // Match /api/conversations/:convId/messages endpoints
+        const convMessagesMatch = url.pathname.match(/^\/api\/conversations\/([^\/]+)\/messages$/);
+        if (convMessagesMatch && req.method === "GET") {
+          const convId = convMessagesMatch[1];
+          return handleGetConversationMessages(req, convId);
+        }
+
+        // Match /api/conversations/:convId endpoints
+        const convIdMatch = url.pathname.match(/^\/api\/conversations\/([^\/]+)$/);
+        if (convIdMatch && req.method === "DELETE") {
+          const convId = convIdMatch[1];
+          return handleDeleteConversation(req, convId);
         }
 
         // Context API endpoints

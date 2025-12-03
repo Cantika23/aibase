@@ -82,7 +82,8 @@ export class MessagePersistence {
    */
   setClientHistory(
     convId: string,
-    messages: ChatCompletionMessageParam[]
+    messages: ChatCompletionMessageParam[],
+    projectId: string
   ): void {
     this.convHistories[convId] = {
       convId,
@@ -92,7 +93,7 @@ export class MessagePersistence {
     };
 
     // Asynchronously save to disk (don't wait)
-    this.chatHistoryStorage.saveChatHistory(convId, messages).catch(error => {
+    this.chatHistoryStorage.saveChatHistory(convId, messages, projectId).catch(error => {
       console.error(`[MessagePersistence] Error saving history for ${convId}:`, error);
     });
   }
@@ -101,7 +102,7 @@ export class MessagePersistence {
    * Add a message to conversation history
    * Also saves to disk
    */
-  addClientMessage(convId: string, message: ChatCompletionMessageParam): void {
+  addClientMessage(convId: string, message: ChatCompletionMessageParam, projectId: string): void {
     if (!this.convHistories[convId]) {
       this.convHistories[convId] = {
         convId,
@@ -117,7 +118,7 @@ export class MessagePersistence {
 
     // Asynchronously save to disk (don't wait)
     const messages = this.convHistories[convId].messages;
-    this.chatHistoryStorage.saveChatHistory(convId, messages).catch(error => {
+    this.chatHistoryStorage.saveChatHistory(convId, messages, projectId).catch(error => {
       console.error(`[MessagePersistence] Error saving history for ${convId}:`, error);
     });
   }

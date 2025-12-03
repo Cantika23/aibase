@@ -234,4 +234,49 @@ export class ChatHistoryStorage {
       throw error;
     }
   }
+
+  /**
+   * List all conversations for a project
+   * Returns metadata for each conversation sorted by lastUpdatedAt (descending)
+   */
+  async listAllConversations(
+    projectId: string
+  ): Promise<ChatHistoryMetadata[]> {
+    const projectDir = path.join(this.baseDir, projectId);
+
+    try {
+      // Check if project directory exists
+      const dirExists = await fs.access(projectDir).then(() => true).catch(() => false);
+      if (!dirExists) {
+        return [];
+      }
+
+      // Read all conversation directories
+      const entries = await fs.readdir(projectDir, { withFileTypes: true });
+      const convDirs = entries.filter(entry => entry.isDirectory());
+
+      const conversations: ChatHistoryMetadata[] = [];
+
+      // Get metadata for each conversation
+      for (const convDir of convDirs) {
+        const convId = convDir.name;
+        const metadata = await this.getChatHistoryMetadata(convId, projectId);
+
+        if (metadata) {
+          conversations.push(metadata);
+        }
+      }
+
+      // Sort by lastUpdatedAt descending (most recent first)
+      conversations.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
+
+      return conversations;
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return [];
+      }
+      console.error('[ChatHistoryStorage] Error listing conversations:', error);
+      throw error;
+    }
+  }
 }

@@ -424,7 +424,7 @@ export class WSServer extends WSEventEmitter {
       originalAddMessage(message);
       // Immediately persist the updated conversation history
       const history = (conversation as any)._history || [];
-      this.messagePersistence.setClientHistory(convId, history);
+      this.messagePersistence.setClientHistory(convId, history, projectId);
     };
 
     // Start heartbeat for this connection
@@ -700,7 +700,8 @@ export class WSServer extends WSEventEmitter {
       );
       this.messagePersistence.setClientHistory(
         connectionInfo.convId,
-        historyWithIds
+        historyWithIds,
+        connectionInfo.projectId
       );
 
       // Verify it was saved
@@ -785,7 +786,7 @@ export class WSServer extends WSEventEmitter {
           });
 
           // Save to persistent storage
-          this.messagePersistence.setClientHistory(connectionInfo.convId, historyWithIds);
+          this.messagePersistence.setClientHistory(connectionInfo.convId, historyWithIds, connectionInfo.projectId);
           console.log(`[Abort] Saved aborted message to history`);
         }
 

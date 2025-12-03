@@ -2,14 +2,23 @@ import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { MainChat } from "./main-chat";
 import { MemoryEditor } from "./memory-editor";
 import { ContextEditor } from "./context-editor";
+import { ConversationHistoryPage } from "./conversation-history";
 import { ProjectSelectorPage } from "./project-selector-page";
 import { ProjectRouteHandler } from "./project-route-handler";
 import { Button } from "./ui/button";
-import { MessageSquare, Binary, ListTodo, FileText, ArrowLeft } from "lucide-react";
+import {
+  MessageSquare,
+  Binary,
+  ListTodo,
+  FileText,
+  ArrowLeft,
+  MessagesSquare,
+} from "lucide-react";
 import { Toaster } from "./ui/sonner";
 import { useState, useEffect } from "react";
 import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
+import { useConversationStore } from "@/stores/conversation-store";
 import { useShallow } from "zustand/react/shallow";
 
 interface AppRouterProps {
@@ -28,6 +37,14 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
   );
 
   const { currentProject } = useProjectStore();
+  const { conversations, loadConversations } = useConversationStore();
+
+  // Load conversations when project changes
+  useEffect(() => {
+    if (currentProject?.id) {
+      loadConversations(currentProject.id);
+    }
+  }, [currentProject?.id, loadConversations]);
 
   // Check if we're on a chat-related route
   const isChatRoute = location.pathname.startsWith("/projects/");
@@ -50,40 +67,76 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
 
           {/* Navigation Buttons */}
           <Button
-            variant={location.pathname === `/projects/${currentProject.id}/chat` ? "default" : "ghost"}
+            variant={
+              location.pathname === `/projects/${currentProject.id}/chat`
+                ? "default"
+                : "ghost"
+            }
             size="sm"
             onClick={() => navigate(`/projects/${currentProject.id}/chat`)}
           >
             <MessageSquare />
-            {location.pathname === `/projects/${currentProject.id}/chat` && <>Chat</>}
+            {location.pathname === `/projects/${currentProject.id}/chat` && (
+              <>Chat</>
+            )}
           </Button>
+          {conversations.length > 0 && (
+            <Button
+              variant={
+                location.pathname === `/projects/${currentProject.id}/history`
+                  ? "default"
+                  : "ghost"
+              }
+              size="sm"
+              onClick={() => navigate(`/projects/${currentProject.id}/history`)}
+              title="Conversation History"
+            >
+              <MessagesSquare />
+              {location.pathname === `/projects/${currentProject.id}/history` && (
+                <>History</>
+              )}
+            </Button>
+          )}
           <Button
-            variant={location.pathname === `/projects/${currentProject.id}/memory` ? "default" : "ghost"}
+            variant={
+              location.pathname === `/projects/${currentProject.id}/memory`
+                ? "default"
+                : "ghost"
+            }
             size="sm"
             onClick={() => navigate(`/projects/${currentProject.id}/memory`)}
           >
             <Binary />
-            {location.pathname === `/projects/${currentProject.id}/memory` && <>Memory</>}
+            {location.pathname === `/projects/${currentProject.id}/memory` && (
+              <>Memory</>
+            )}
           </Button>
           <Button
-            variant={location.pathname === `/projects/${currentProject.id}/context` ? "default" : "ghost"}
+            variant={
+              location.pathname === `/projects/${currentProject.id}/context`
+                ? "default"
+                : "ghost"
+            }
             size="sm"
             onClick={() => navigate(`/projects/${currentProject.id}/context`)}
           >
             <FileText />
-            {location.pathname === `/projects/${currentProject.id}/context` && <>Context</>}
+            {location.pathname === `/projects/${currentProject.id}/context` && (
+              <>Context</>
+            )}
           </Button>
-          {location.pathname === `/projects/${currentProject.id}/chat` && todos?.items?.length > 0 && (
-            <Button
-              variant={isTodoPanelVisible ? "outline" : "ghost"}
-              size="sm"
-              onClick={() => setIsTodoPanelVisible(!isTodoPanelVisible)}
-              title={isTodoPanelVisible ? "Hide tasks" : "Show tasks"}
-            >
-              <ListTodo />
-              {isTodoPanelVisible && <>Tasks</>}
-            </Button>
-          )}
+          {location.pathname === `/projects/${currentProject.id}/chat` &&
+            todos?.items?.length > 0 && (
+              <Button
+                variant={isTodoPanelVisible ? "outline" : "ghost"}
+                size="sm"
+                onClick={() => setIsTodoPanelVisible(!isTodoPanelVisible)}
+                title={isTodoPanelVisible ? "Hide tasks" : "Show tasks"}
+              >
+                <ListTodo />
+                {isTodoPanelVisible && <>Tasks</>}
+              </Button>
+            )}
         </div>
       )}
 
@@ -95,7 +148,18 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
             path="/projects/:projectId/chat"
             element={
               <ProjectRouteHandler>
-                <MainChat wsUrl={wsUrl} isTodoPanelVisible={isTodoPanelVisible} />
+                <MainChat
+                  wsUrl={wsUrl}
+                  isTodoPanelVisible={isTodoPanelVisible}
+                />
+              </ProjectRouteHandler>
+            }
+          />
+          <Route
+            path="/projects/:projectId/history"
+            element={
+              <ProjectRouteHandler>
+                <ConversationHistoryPage />
               </ProjectRouteHandler>
             }
           />

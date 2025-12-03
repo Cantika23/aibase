@@ -336,7 +336,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         >
           {formattedTime}
-          {!isUser && completionTime !== undefined && completionTime >= 1 && (
+          {!isUser && completionTime !== undefined && (
             <> • {completionTime}s</>
           )}
           {!isUser && aborted && (

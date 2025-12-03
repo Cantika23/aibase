@@ -14,6 +14,7 @@ export interface ConversationInfo {
   createdAt: number;
   lastUpdatedAt: number;
   totalMessages: number;
+  title?: string; // AI-generated conversation title
   tokenUsage: {
     total: TokenUsage;
     history: TokenUsage[];

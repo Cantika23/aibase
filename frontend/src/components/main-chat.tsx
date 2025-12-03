@@ -9,6 +9,7 @@ import { useWSConnection } from "@/lib/ws/ws-connection-manager";
 import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useFileStore } from "@/stores/file-store";
+import { fetchConversationMessages } from "@/lib/conversation-api";
 import { AlertCircle, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,9 @@ export function MainChat({
   // Track thinking indicator start time (server sends this timestamp)
   const thinkingStartTimeRef = useRef<number | null>(null);
 
+  // Track the last loaded conversation ID to avoid re-loading
+  const lastLoadedConvIdRef = useRef<string | null>(null);
+
   // Update thinking indicator seconds every second based on server startTime
   useEffect(() => {
     // Only set interval if thinking indicator exists
@@ -169,6 +173,58 @@ export function MainChat({
     },
     []
   );
+
+  // Load conversation messages when convId changes (for conversation switching)
+  useEffect(() => {
+    const loadConversationMessages = async () => {
+      if (!convId || !currentProject?.id) return;
+
+      // If messages are empty and we had a previously loaded conversation, reset the ref
+      // This handles the case when starting a new conversation
+      if (messages.length === 0 && lastLoadedConvIdRef.current !== null) {
+        console.log("[MainChat] Messages cleared, resetting loaded conversation ref");
+        lastLoadedConvIdRef.current = null;
+      }
+
+      // Skip if we've already loaded this conversation
+      if (lastLoadedConvIdRef.current === convId) {
+        console.log("[MainChat] Conversation already loaded:", convId);
+        return;
+      }
+
+      try {
+        console.log("[MainChat] Attempting to load messages for conversation:", convId);
+        const conversationData = await fetchConversationMessages(convId, currentProject.id);
+
+        if (conversationData.messages && conversationData.messages.length > 0) {
+          // Convert backend messages to frontend format
+          const loadedMessages: Message[] = conversationData.messages.map((msg: any, index: number) => ({
+            id: `msg_${convId}_${index}`,
+            role: msg.role,
+            content: typeof msg.content === "string" ? msg.content : "",
+            createdAt: new Date(),
+            // Add other fields as needed
+          }));
+
+          console.log("[MainChat] Loaded", loadedMessages.length, "messages from backend");
+          setMessages(loadedMessages);
+
+          // Mark this conversation as loaded
+          lastLoadedConvIdRef.current = convId;
+        } else {
+          console.log("[MainChat] No messages found for conversation:", convId);
+          // Mark as loaded even if empty to avoid repeated attempts
+          lastLoadedConvIdRef.current = convId;
+        }
+      } catch (error) {
+        console.error("[MainChat] Error loading conversation messages:", error);
+        // Mark as loaded to avoid repeated failed attempts
+        lastLoadedConvIdRef.current = convId;
+      }
+    };
+
+    loadConversationMessages();
+  }, [convId, currentProject?.id, messages.length, setMessages]);
 
   return (
     <div className={`flex h-screen ${className} relative`}>
