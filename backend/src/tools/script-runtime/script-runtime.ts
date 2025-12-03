@@ -5,6 +5,58 @@ import { createClickHouseFunction } from "./clickhouse";
 import { createTrinoFunction } from "./trino";
 import { createPDFReaderFunction } from "./pdfreader";
 import { createWebSearchFunction } from "./web-search";
+import { createShowChartFunction } from "./show-chart";
+import { createShowTableFunction } from "./show-table";
+
+/**
+ * Context documentation for core script runtime functionality
+ */
+export const context = async () => {
+  return `## SCRIPT TOOL - Execute code with fetch, tools, and context!
+
+Use for: API calls, batch operations, complex workflows, data transformations.
+
+**CRITICAL: Code executes as async function BODY. Write like this:**
+- ✓ CORRECT: \`return { result: data }\`
+- ✓ CORRECT: \`const x = await fetch(url); return x.json()\`
+- ✗ WRONG: \`export const x = ...\` (NO export/import!)
+
+### CORE EXAMPLES
+
+#### 1. FETCH WEATHER:
+\`\`\`json
+{
+  "purpose": "Get current weather in Cirebon",
+  "code": "progress('Fetching...'); const res = await fetch('https://wttr.in/Cirebon?format=j1'); const data = await res.json(); const curr = data.current_condition[0]; return { temp: curr.temp_C + '°C', description: curr.weatherDesc[0].value, humidity: curr.humidity + '%' };"
+}
+\`\`\`
+
+#### 2. GET IP ADDRESS:
+\`\`\`json
+{
+  "purpose": "Get user's public IP address",
+  "code": "progress('Fetching IP...'); const res = await fetch('https://api.ipify.org?format=json'); const data = await res.json(); return { ip: data.ip };"
+}
+\`\`\`
+
+#### 3. BATCH PROCESS FILES:
+\`\`\`json
+{
+  "purpose": "Count exports in TypeScript files",
+  "code": "progress('Listing...'); const files = await file({ action: 'list' }); const tsFiles = files.filter(f => f.name.endsWith('.ts')); let count = 0; for (const f of tsFiles) { progress(\`Reading \${f.name}\`); const content = await file({ action: 'read_file', path: f.path }); count += (content.match(/export /g) || []).length; } return { analyzed: tsFiles.length, totalExports: count };"
+}
+\`\`\`
+
+#### 4. MULTI-TOOL WORKFLOWS:
+\`\`\`json
+{
+  "purpose": "Create todos for files",
+  "code": "const files = await file({ action: 'list' }); progress(\`Found \${files.length} files\`); const texts = files.slice(0, 10).map(f => \`Review: \${f.name}\`); await todo({ action: 'add', texts }); return { created: texts.length };"
+}
+\`\`\`
+
+**Available:** fetch, progress(msg), file(...), todo(...), memory(...), convId, projectId, console`;
+};
 
 /**
  * Context provided to the script execution environment
@@ -38,7 +90,7 @@ export class ScriptRuntime {
       const scope = this.buildScope();
 
       // Execute using AsyncFunction constructor with controlled scope
-      const AsyncFunction = (async function () {}).constructor as any;
+      const AsyncFunction = (async function () { }).constructor as any;
       const argNames = Object.keys(scope);
       const argValues = Object.values(scope);
 
@@ -91,6 +143,12 @@ export class ScriptRuntime {
 
       // Inject web search function
       webSearch: this.createWebSearchFunction(),
+
+      // Inject showChart function
+      showChart: this.createShowChartFunction(),
+
+      // Inject showTable function
+      showTable: this.createShowTableFunction(),
     };
 
     // Inject all registered tools as callable functions
@@ -168,6 +226,20 @@ export class ScriptRuntime {
   private createWebSearchFunction() {
     // Return the web search function from the modular implementation
     return createWebSearchFunction();
+  }
+
+  /**
+   * Get the showChart function
+   */
+  private createShowChartFunction() {
+    return createShowChartFunction(this.context.broadcast);
+  }
+
+  /**
+   * Get the showTable function
+   */
+  private createShowTableFunction() {
+    return createShowTableFunction(this.context.broadcast);
   }
 
   /**

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useProjectStore } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProjectCreateModal } from "./project-create-modal";
+import { ProjectCreateModal } from "@/components/project/project-create-modal";
 import { Folder, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 

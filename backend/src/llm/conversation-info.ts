@@ -113,10 +113,10 @@ export async function updateTokenUsage(
     timestamp: now,
   };
 
-  // Update totals
-  info.tokenUsage.total.promptTokens += usage.promptTokens;
-  info.tokenUsage.total.completionTokens += usage.completionTokens;
-  info.tokenUsage.total.totalTokens += usage.totalTokens;
+  // Update totals (OpenAI returns cumulative counts, so just set the values, don't add)
+  info.tokenUsage.total.promptTokens = usage.promptTokens;
+  info.tokenUsage.total.completionTokens = usage.completionTokens;
+  info.tokenUsage.total.totalTokens = usage.totalTokens;
   info.tokenUsage.total.timestamp = now;
 
   // Add to history

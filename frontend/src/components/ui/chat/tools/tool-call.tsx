@@ -8,6 +8,8 @@ import { GenericToolDetailsDialog } from "@/components/ui/generic-tool-details-d
 import { useUIStore } from "@/stores/ui-store";
 import { MemoryToolGroup } from "./memory-tool-group";
 import { FileToolGroup } from "./file-tool-group";
+import { ChartTool } from "./chart-tool";
+import { TableTool } from "./table-tool";
 import type { ToolInvocation } from "./types";
 
 interface ToolCallProps {
@@ -177,6 +179,16 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
 
           const isScript = invocation.toolName === "script";
           const isFileTool = invocation.toolName === "file";
+          const isChart = invocation.toolName === "show-chart";
+          const isTable = invocation.toolName === "show-table";
+
+          if (isChart) {
+            return <ChartTool key={index} toolInvocation={invocation as any} />;
+          }
+
+          if (isTable) {
+            return <TableTool key={index} toolInvocation={invocation as any} />;
+          }
 
           const handleScriptClick = () => {
             if (isScript) {

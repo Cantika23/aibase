@@ -90,7 +90,7 @@ export function ScriptDetailsDialog({
 
         const highlighted = await codeToHtml(formattedCode, {
           lang: "typescript",
-          theme: "github-dark",
+          theme: "github-light",
           mergeWhitespaces: false,
         });
         setHighlightedCode(highlighted);
@@ -105,7 +105,7 @@ export function ScriptDetailsDialog({
         typeof result === "string" ? result : JSON.stringify(result, null, 2);
       codeToHtml(resultStr, {
         lang: "json",
-        theme: "github-dark",
+        theme: "github-light",
       }).then(setHighlightedResult);
     }
   }, [open, result]);
@@ -271,8 +271,8 @@ export function ScriptDetailsDialog({
                     <h3 className="text-sm font-semibold mb-2 text-red-600 dark:text-red-400">
                       Error
                     </h3>
-                    <div className="flex-1 rounded-md border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/30 p-3 overflow-auto">
-                      <pre className="text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap">
+                    <div className="text-[11px] border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/30 p-3 overflow-auto">
+                      <pre className="text-red-700 dark:text-red-400 whitespace-pre-wrap">
                         {error}
                       </pre>
                     </div>

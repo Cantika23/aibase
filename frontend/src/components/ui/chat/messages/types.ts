@@ -66,18 +66,28 @@ export interface Message {
   toolInvocations?: ToolInvocation[];
   parts?: MessagePart[];
   completionTime?: number; // Time in seconds to complete the message
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }; // Token usage for this message
   isThinking?: boolean; // Temporary thinking indicator
   aborted?: boolean; // Message was aborted/cancelled
 }
 
 export interface ChatMessageProps extends Omit<
   Message,
-  "completionTime" | "isThinking" | "aborted"
+  "completionTime" | "isThinking" | "aborted" | "tokenUsage"
 > {
   showTimeStamp?: boolean;
   animation?: Animation;
   actions?: React.ReactNode;
   completionTime?: number;
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
   isThinking?: boolean;
   aborted?: boolean;
 }

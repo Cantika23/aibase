@@ -1,4 +1,33 @@
 /**
+ * Context documentation for web search functionality
+ */
+export const context = async () => {
+  return `### WEB SEARCH
+
+Use webSearch() to search the web for information.
+
+**Available:** webSearch({ search_query, count?, location?, content_size?, search_recency_filter?, search_domain_filter? })
+
+#### PARAMETERS
+
+- search_query: Query to search for (required)
+- count: Number of results (1-50, default: 10)
+- location: 'cn' for Chinese region, 'us' for non-Chinese region
+- content_size: 'medium' (400-600 words) or 'high' (2500 words)
+- search_recency_filter: 'oneDay', 'oneWeek', 'oneMonth', 'oneYear', 'noLimit'
+- search_domain_filter: Limit to specific domain
+
+#### EXAMPLE
+
+\`\`\`json
+{
+  "purpose": "Search for latest AI developments",
+  "code": "progress('Searching web...'); const results = await webSearch({ search_query: 'latest AI developments 2024', count: 5, search_recency_filter: 'oneMonth' }); return { total: results.total, results: results.results.map(r => ({ title: r.title, url: r.url, summary: r.summary.substring(0, 200) })) };"
+}
+\`\`\``
+};
+
+/**
  * Web search options
  */
 export interface WebSearchOptions {

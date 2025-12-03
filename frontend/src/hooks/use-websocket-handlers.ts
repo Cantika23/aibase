@@ -12,6 +12,8 @@ interface UseWebSocketHandlersProps {
   setIsLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setTodos: (todos: any) => void;
+  setMaxTokens: (maxTokens: number | null) => void;
+  setTokenUsage: (tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null) => void;
   isLoading: boolean;
   thinkingStartTimeRef: React.MutableRefObject<number | null>;
   currentMessageRef: React.MutableRefObject<string | null>;
@@ -28,6 +30,8 @@ export function useWebSocketHandlers({
   setIsLoading,
   setError,
   setTodos,
+  setMaxTokens,
+  setTokenUsage,
   isLoading,
   thinkingStartTimeRef,
   currentMessageRef,
@@ -402,6 +406,12 @@ export function useWebSocketHandlers({
       messageId: string;
       isAccumulated?: boolean;
       completionTime?: number;
+      tokenUsage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+      maxTokens?: number;
     }) => {
       // Only active tab processes completion
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
@@ -410,10 +420,20 @@ export function useWebSocketHandlers({
         contentLength: data.fullText.length,
         isAccumulated: data.isAccumulated,
         completionTime: data.completionTime,
+        tokenUsage: data.tokenUsage,
       });
 
       // Clear thinking start time to stop interval
       thinkingStartTimeRef.current = null;
+
+      // Store maxTokens and tokenUsage if provided by backend
+      if (data.maxTokens !== undefined) {
+        setMaxTokens(data.maxTokens);
+      }
+      if (data.tokenUsage) {
+        setTokenUsage(data.tokenUsage);
+        console.log("[Complete] Updated tokenUsage from llm_complete:", data.tokenUsage);
+      }
 
       // Use completion time from backend
       const completionTimeSeconds = data.completionTime ?? 0;
@@ -472,6 +492,7 @@ export function useWebSocketHandlers({
                   ...msg,
                   content: fullText,
                   completionTime: completionTimeSeconds,
+                  ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
                   ...(toolInvocations && toolInvocations.length > 0 && { toolInvocations }),
                 }
               : msg
@@ -496,6 +517,7 @@ export function useWebSocketHandlers({
           content: fullText,
           createdAt: new Date(),
           completionTime: completionTimeSeconds,
+          ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
           ...(toolInvocations && toolInvocations.length > 0 && { toolInvocations }),
         };
         return [...prev, newMessage];
@@ -537,9 +559,23 @@ export function useWebSocketHandlers({
       // Status update
     };
 
-    const handleHistoryResponse = (data: { messages?: any[]; hasActiveStream?: boolean }) => {
+    const handleHistoryResponse = (data: { messages?: any[]; hasActiveStream?: boolean; maxTokens?: number; tokenUsage?: any }) => {
       console.log("handleHistoryResponse called with:", data);
       console.log("[History] hasActiveStream from backend:", data.hasActiveStream);
+      console.log("[History] tokenUsage from backend:", data.tokenUsage);
+
+      // Set maxTokens if provided
+      if (data.maxTokens !== undefined) {
+        setMaxTokens(data.maxTokens);
+        console.log("[History] Set maxTokens from history response:", data.maxTokens);
+      }
+
+      // Set tokenUsage if provided (from OpenAI API via info.json)
+      if (data.tokenUsage) {
+        setTokenUsage(data.tokenUsage);
+        console.log("[History] Set tokenUsage from history response:", data.tokenUsage);
+      }
+
       if (data.messages && Array.isArray(data.messages)) {
         console.log("Converting messages:", data.messages);
 
@@ -754,20 +790,22 @@ export function useWebSocketHandlers({
                   completionTime: finalCompletionTime,
                 }),
                 ...(msg.aborted && { aborted: true }),
+                ...(msg.tokenUsage && { tokenUsage: msg.tokenUsage }),
               };
 
               // Also keep toolInvocations for backwards compatibility
               if (toolInvocations.length > 0) {
                 message.toolInvocations = toolInvocations;
                 console.log(
-                  `[History] Added assistant message with ${parts.length} parts (${toolInvocations.length} tool invocations)`
+                  `[History] Added assistant message with ${parts.length} parts (${toolInvocations.length} tool invocations), tokenUsage:`, msg.tokenUsage
                 );
               } else {
                 console.log(
-                  `[History] Added assistant message with ${parts.length} parts (content only)`
+                  `[History] Added assistant message with ${parts.length} parts (content only), tokenUsage:`, msg.tokenUsage
                 );
               }
 
+              console.log(`[History] Final message object:`, message);
               serverMessages.push(message);
             }
 
@@ -857,7 +895,15 @@ export function useWebSocketHandlers({
                 console.log(
                   `[History] Keeping streamed version of ${existingMsg.id} (${existingMsg.content.length} chars > ${serverMsg.content.length} chars from history)`
                 );
-                merged[serverMsgIndex] = existingMsg;
+                // Merge tokenUsage from server message into streamed message
+                merged[serverMsgIndex] = {
+                  ...existingMsg,
+                  ...(serverMsg.tokenUsage && { tokenUsage: serverMsg.tokenUsage }),
+                  ...(serverMsg.completionTime && !existingMsg.completionTime && { completionTime: serverMsg.completionTime }),
+                };
+                console.log(
+                  `[History] Merged tokenUsage from server:`, serverMsg.tokenUsage
+                );
               } else {
                 console.log(
                   `[History] Using history version of ${existingMsg.id} (${serverMsg.content.length} chars >= ${existingMsg.content.length} chars from stream)`
@@ -919,9 +965,11 @@ export function useWebSocketHandlers({
         console.log("Processing history data:", data.history);
         console.log("Processing todos data:", data.todos);
         console.log("Processing hasActiveStream:", data.hasActiveStream);
+        console.log("Processing maxTokens:", data.maxTokens);
         handleHistoryResponse({
           messages: data.history || [],
-          hasActiveStream: data.hasActiveStream
+          hasActiveStream: data.hasActiveStream,
+          maxTokens: data.maxTokens
         });
 
         // Update todos state if provided

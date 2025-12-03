@@ -10,19 +10,21 @@ import {
   PageActionButton,
   PageActionGroup,
 } from "@/components/ui/page-action-button";
+import { Button } from "@/components/ui/button";
 import { useConvId } from "@/lib/conv-id";
 import { formatRelativeTime } from "@/lib/time-utils";
 import { useChatStore } from "@/stores/chat-store";
 import { useConversationStore } from "@/stores/conversation-store";
 import { useProjectStore } from "@/stores/project-store";
-import { MessageSquare, Plus } from "lucide-react";
+import { MessageSquare, Plus, Trash2 } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 
 export function ConversationHistoryPage() {
   const navigate = useNavigate();
   const { projectId } = useParams();
-  const { conversations, isLoading, loadConversations } =
+  const { conversations, isLoading, loadConversations, removeConversation } =
     useConversationStore();
   const { currentProject } = useProjectStore();
   const { clearMessages } = useChatStore();
@@ -61,6 +63,29 @@ export function ConversationHistoryPage() {
     navigate(`/projects/${projectId}/chat`);
   };
 
+  const handleDeleteConversation = async (
+    e: React.MouseEvent,
+    convId: string,
+    title: string
+  ) => {
+    e.stopPropagation(); // Prevent card click
+
+    if (
+      !confirm(
+        `Are you sure you want to delete "${title}"? This will permanently delete all messages and files.`
+      )
+    ) {
+      return;
+    }
+
+    if (!projectId) return;
+
+    const success = await removeConversation(convId, projectId);
+    if (success) {
+      toast.success("Conversation deleted successfully");
+    }
+  };
+
   if (isLoading && conversations.length === 0) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -86,7 +111,7 @@ export function ConversationHistoryPage() {
         />
       </PageActionGroup>
 
-      <div className="w-full max-w-3xl space-y-6 h-full flex flex-col">
+      <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col">
         {/* Header */}
         <div className="text-center space-y-2">
           <p className=" text-lg">
@@ -123,6 +148,21 @@ export function ConversationHistoryPage() {
                           </CardDescription>
                         </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) =>
+                          handleDeleteConversation(
+                            e,
+                            conversation.convId,
+                            conversation.title
+                          )
+                        }
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        title="Delete conversation"
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
                     </div>
                   </CardHeader>
                 </Card>

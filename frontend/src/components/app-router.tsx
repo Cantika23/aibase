@@ -1,10 +1,10 @@
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
-import { MainChat } from "./main-chat";
-import { MemoryEditor } from "./memory-editor";
-import { ContextEditor } from "./context-editor";
-import { ConversationHistoryPage } from "./conversation-history";
-import { ProjectSelectorPage } from "./project-selector-page";
-import { ProjectRouteHandler } from "./project-route-handler";
+import { MainChat } from "./pages/main-chat";
+import { MemoryEditor } from "./pages/memory-editor";
+import { ContextEditor } from "./pages/context-editor";
+import { ConversationHistoryPage } from "./pages/conversation-history";
+import { ProjectSelectorPage } from "./pages/project-selector";
+import { ProjectRouteHandler } from "./project/project-route-handler";
 import { Button } from "./ui/button";
 import {
   MessageSquare,

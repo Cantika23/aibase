@@ -1,4 +1,43 @@
 /**
+ * Context documentation for ClickHouse functionality
+ */
+export const context = async () => {
+  return `### CLICKHOUSE QUERIES
+
+Use clickhouse() for ClickHouse database queries.
+
+**IMPORTANT:** Use clickhouse() for ClickHouse databases!
+
+**Available:** clickhouse({ query, serverUrl, database?, username?, password?, format?, timeout?, params? })
+
+#### EXAMPLES
+
+#### 1. CLICKHOUSE QUERY:
+\`\`\`json
+{
+  "purpose": "Query ClickHouse database for event analytics",
+  "code": "progress('Querying ClickHouse...'); const result = await clickhouse({ query: 'SELECT event_type, COUNT(*) as count FROM events WHERE date >= today() - 7 GROUP BY event_type ORDER BY count DESC LIMIT 10', serverUrl: 'http://localhost:8123', database: 'analytics', username: 'default', password: '' }); progress(\`Found \${result.rowCount} event types\`); return { count: result.rowCount, events: result.data };"
+}
+\`\`\`
+
+#### 2. CLICKHOUSE WITH AGGREGATION:
+\`\`\`json
+{
+  "purpose": "Get user activity statistics from ClickHouse",
+  "code": "progress('Analyzing user activity...'); const stats = await clickhouse({ query: 'SELECT toDate(timestamp) as date, COUNT(DISTINCT user_id) as unique_users, COUNT(*) as total_events FROM user_events WHERE timestamp >= now() - INTERVAL 30 DAY GROUP BY date ORDER BY date', serverUrl: 'http://localhost:8123', database: 'analytics' }); return { days: stats.rowCount, dailyStats: stats.data };"
+}
+\`\`\`
+
+#### 3. CLICKHOUSE WITH PARAMETERS:
+\`\`\`json
+{
+  "purpose": "Query ClickHouse with parameterized query",
+  "code": "progress('Querying with parameters...'); const result = await clickhouse({ query: 'SELECT * FROM users WHERE age > {minAge:UInt8} AND country = {country:String} LIMIT {limit:UInt16}', serverUrl: 'http://localhost:8123', database: 'default', params: { minAge: 25, country: 'US', limit: 100 } }); return { users: result.rowCount, data: result.data };"
+}
+\`\`\``
+};
+
+/**
  * ClickHouse query options
  */
 export interface ClickHouseOptions {

@@ -1,4 +1,4 @@
-import { testPostgreSQLConnection } from "../tools/runtime/postgresql";
+import { testPostgreSQLConnection } from "../tools/script-runtime/postgresql";
 import { MemoryTool } from "../tools/definition/memory-tool";
 
 /**

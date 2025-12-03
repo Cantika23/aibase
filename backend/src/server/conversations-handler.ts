@@ -88,6 +88,9 @@ export async function handleGetConversationMessages(
     // Load conversation messages
     const messages = await chatHistoryStorage.loadChatHistory(convId, projectId);
 
+    // Filter out system messages - they should never be sent to client
+    const clientMessages = messages.filter((msg) => msg.role !== "system");
+
     // Get metadata
     const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId);
 
@@ -114,7 +117,7 @@ export async function handleGetConversationMessages(
       data: {
         convId,
         projectId,
-        messages,
+        messages: clientMessages,
         metadata: {
           ...metadata,
           title: title || "New Conversation",

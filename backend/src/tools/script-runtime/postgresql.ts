@@ -1,6 +1,45 @@
 import { SQL } from "bun";
 
 /**
+ * Context documentation for PostgreSQL functionality
+ */
+export const context = async () => {
+  return `### POSTGRESQL QUERIES
+
+Use postgresql() for direct PostgreSQL database queries.
+
+**IMPORTANT:** Use postgresql(), NOT DuckDB for PostgreSQL databases!
+
+**Available:** postgresql({ query, connectionUrl, format?, timeout? })
+
+#### EXAMPLES
+
+#### 1. POSTGRESQL QUERY:
+\`\`\`json
+{
+  "purpose": "Query PostgreSQL database for active users",
+  "code": "progress('Querying PostgreSQL...'); const result = await postgresql({ query: 'SELECT * FROM users WHERE active = true LIMIT 10', connectionUrl: 'postgresql://user:pass@localhost:5432/mydb' }); progress(\`Found \${result.rowCount} users\`); return { count: result.rowCount, users: result.data };"
+}
+\`\`\`
+
+#### 2. POSTGRESQL WITH AGGREGATION:
+\`\`\`json
+{
+  "purpose": "Get order statistics from PostgreSQL",
+  "code": "progress('Analyzing orders...'); const stats = await postgresql({ query: 'SELECT status, COUNT(*) as count, SUM(total) as revenue FROM orders GROUP BY status ORDER BY revenue DESC', connectionUrl: 'postgresql://user:pass@localhost:5432/mydb' }); return { breakdown: stats.data, totalStatuses: stats.rowCount };"
+}
+\`\`\`
+
+#### 3. POSTGRESQL WITH TIMEOUT:
+\`\`\`json
+{
+  "purpose": "Query PostgreSQL with custom timeout",
+  "code": "progress('Querying large table...'); const result = await postgresql({ query: 'SELECT * FROM products WHERE price > 100 ORDER BY price DESC', connectionUrl: 'postgresql://user:pass@localhost:5432/shop', timeout: 60000 }); return { products: result.rowCount, data: result.data };"
+}
+\`\`\``
+};
+
+/**
  * PostgreSQL query options
  */
 export interface PostgreSQLOptions {

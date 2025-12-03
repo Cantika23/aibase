@@ -14,6 +14,16 @@ interface ChatStore {
   // Todos from backend
   todos: any;
 
+  // Max tokens from backend
+  maxTokens: number | null;
+
+  // Token usage from backend (cumulative from OpenAI API)
+  tokenUsage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  } | null;
+
   // Actions for messages
   setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
   addMessage: (message: Message) => void;
@@ -33,6 +43,12 @@ interface ChatStore {
 
   // Actions for todos
   setTodos: (todos: any) => void;
+
+  // Actions for maxTokens
+  setMaxTokens: (maxTokens: number | null) => void;
+
+  // Actions for tokenUsage
+  setTokenUsage: (tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -43,6 +59,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   error: null,
   connectionStatus: "disconnected",
   todos: null,
+  maxTokens: null,
+  tokenUsage: null,
 
   // Message actions
   setMessages: (messages) => set((state) => ({
@@ -71,4 +89,10 @@ export const useChatStore = create<ChatStore>((set) => ({
 
   // Todo actions
   setTodos: (todos) => set({ todos }),
+
+  // MaxTokens actions
+  setMaxTokens: (maxTokens) => set({ maxTokens }),
+
+  // TokenUsage actions
+  setTokenUsage: (tokenUsage) => set({ tokenUsage }),
 }));

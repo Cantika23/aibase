@@ -244,17 +244,25 @@ export class Conversation {
       this.modelParams.max_tokens = options.maxTokens;
     if (options.topP !== undefined) this.modelParams.top_p = options.topP;
 
-    // Initialize history with system prompt
-    // Start with default context and append custom systemPrompt if provided
-    const baseContext = await defaultContext(this.convId, this.projectId);
-    const systemPrompt = options.systemPrompt
-      ? `${baseContext}\n\n${options.systemPrompt}`
-      : baseContext;
+    // Check if initialHistory already contains a system message
+    const hasSystemMessage = options.initialHistory?.some(
+      (msg) => msg.role === "system"
+    );
 
-    this._history.push({
-      role: "system",
-      content: systemPrompt,
-    });
+    // Only add system prompt if initialHistory doesn't already have one
+    if (!hasSystemMessage) {
+      // Initialize history with system prompt
+      // Start with default context and append custom systemPrompt if provided
+      const baseContext = await defaultContext(this.convId, this.projectId);
+      const systemPrompt = options.systemPrompt
+        ? `${baseContext}\n\n${options.systemPrompt}`
+        : baseContext;
+
+      this._history.push({
+        role: "system",
+        content: systemPrompt,
+      });
+    }
 
     // Add initial history if provided
     if (options.initialHistory) {
@@ -515,6 +523,7 @@ export class Conversation {
         // Capture usage information if present
         if (chunk.usage) {
           usage = chunk.usage;
+          console.log(`[Conversation] Captured usage from chunk:`, usage);
         }
 
         if (delta?.content) {
@@ -578,16 +587,24 @@ export class Conversation {
 
     // Store token usage if available
     if (usage) {
+      console.log(`[Conversation] Storing token usage for convId ${this.convId}:`, {
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
+        totalTokens: usage.total_tokens,
+      });
       try {
         await updateTokenUsage(this.convId, this.projectId, {
           promptTokens: usage.prompt_tokens,
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
         });
+        console.log(`[Conversation] Successfully stored token usage for convId ${this.convId}`);
       } catch (error) {
         // Log error but don't fail the conversation
         console.error("Failed to update token usage:", error);
       }
+    } else {
+      console.log(`[Conversation] No usage information available to store for convId ${this.convId}`);
     }
 
     // Add assistant's response to history

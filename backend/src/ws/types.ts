@@ -59,6 +59,17 @@ export interface LLMChunkData {
   isComplete: boolean;
 }
 
+export interface LLMCompleteData {
+  fullText: string;
+  completionTime?: number;
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  maxTokens?: number;
+}
+
 export interface ToolCallData {
   toolCallId: string;
   toolName: string;

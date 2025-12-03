@@ -15,6 +15,7 @@ import { getBuiltinTools } from "../tools";
 import { WSEventEmitter } from "./events";
 import { MessagePersistence } from "./msg-persistance";
 import { detectAndStorePostgreSQLUrl } from "../llm/postgresql-detector";
+import { getConversationInfo } from "../llm/conversation-info";
 import * as fs from "fs/promises";
 import * as path from "path";
 
@@ -23,6 +24,11 @@ interface ExtendedAssistantMessage extends ChatCompletionAssistantMessageParam {
   id?: string;
   completionTime?: number;
   aborted?: boolean;
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 // Use Bun's built-in WebSocket type for compatibility
@@ -643,6 +649,23 @@ export class WSServer extends WSEventEmitter {
         assistantMsgId
       );
 
+      // Get conversation info to retrieve token usage
+      const convInfo = await getConversationInfo(
+        connectionInfo.convId,
+        connectionInfo.projectId
+      );
+      const tokenUsage = convInfo?.tokenUsage?.total;
+
+      console.log(`[Backend Complete] convInfo:`, convInfo);
+      console.log(`[Backend Complete] tokenUsage from convInfo:`, tokenUsage);
+
+      // Get max tokens from environment variable
+      const maxTokens = process.env.OPENAI_MAX_TOKEN
+        ? parseInt(process.env.OPENAI_MAX_TOKEN, 10)
+        : undefined;
+
+      console.log(`[Backend Complete] maxTokens from env:`, maxTokens);
+
       // Send completion message to all connections for this conversation
       const completionMessage = {
         type: "llm_complete" as const,
@@ -650,6 +673,14 @@ export class WSServer extends WSEventEmitter {
         data: {
           fullText: fullResponse,
           completionTime: completionTimeSeconds,
+          tokenUsage: tokenUsage
+            ? {
+                promptTokens: tokenUsage.promptTokens,
+                completionTokens: tokenUsage.completionTokens,
+                totalTokens: tokenUsage.totalTokens,
+              }
+            : undefined,
+          maxTokens,
         },
         metadata: {
           timestamp: Date.now(),
@@ -657,14 +688,15 @@ export class WSServer extends WSEventEmitter {
         },
       };
       console.log(
-        `[Backend Complete] Broadcasting completion message with ${fullResponse.length} chars, completionTime: ${completionTimeSeconds}s`
+        `[Backend Complete] Broadcasting completion message with ${fullResponse.length} chars, completionTime: ${completionTimeSeconds}s, tokens: ${tokenUsage?.totalTokens || "N/A"}, maxTokens: ${maxTokens}`
       );
+      console.log(`[Backend Complete] Full completion message data:`, JSON.stringify(completionMessage.data, null, 2));
       this.broadcastToConv(connectionInfo.convId, completionMessage);
 
       // Save updated conversation history to persistent storage with message IDs
       const currentHistory = conversation.history;
 
-      // Add message IDs and completionTime to the last user and assistant messages
+      // Add message IDs, completionTime, and tokenUsage to the last user and assistant messages
       const historyWithIds = currentHistory.map((msg: any, index: number) => {
         // Check if this is the latest user message (second-to-last) or assistant message (last)
         if (index === currentHistory.length - 2 && msg.role === "user") {
@@ -677,6 +709,11 @@ export class WSServer extends WSEventEmitter {
             ...msg,
             id: assistantMsgId,
             completionTime: completionTimeSeconds,
+            ...(tokenUsage && { tokenUsage: {
+              promptTokens: tokenUsage.promptTokens,
+              completionTokens: tokenUsage.completionTokens,
+              totalTokens: tokenUsage.totalTokens,
+            }}),
           };
         }
         // Keep existing ID or don't add one for system/older messages
@@ -943,6 +980,18 @@ export class WSServer extends WSEventEmitter {
           const hasActiveStream = activeStreams.length > 0;
           console.log(`Backend: hasActiveStream for ${connectionInfo.convId}: ${hasActiveStream} (${activeStreams.length} streams)`);
 
+          // Get max tokens from environment variable
+          const maxTokens = process.env.OPENAI_MAX_TOKEN
+            ? parseInt(process.env.OPENAI_MAX_TOKEN, 10)
+            : undefined;
+
+          // Get conversation info for token usage totals
+          const convInfo = await getConversationInfo(
+            connectionInfo.convId,
+            connectionInfo.projectId
+          );
+          const totalTokenUsage = convInfo?.tokenUsage?.total;
+
           this.sendToWebSocket(ws, {
             type: "control_response",
             id: message.id,
@@ -951,6 +1000,12 @@ export class WSServer extends WSEventEmitter {
               history: clientHistory,
               todos: todos,
               hasActiveStream: hasActiveStream, // Tell frontend if streaming is active
+              maxTokens: maxTokens, // Include max tokens for frontend
+              tokenUsage: totalTokenUsage ? {
+                promptTokens: totalTokenUsage.promptTokens,
+                completionTokens: totalTokenUsage.completionTokens,
+                totalTokens: totalTokenUsage.totalTokens,
+              } : undefined, // Total cumulative token usage from info.json
               type: control.type,
             },
             metadata: { timestamp: Date.now() },
