@@ -74,72 +74,72 @@ export function ProjectSelectorPage() {
         </div>
 
         {/* Projects Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((project) => (
-            <Card
-              key={project.id}
-              className="cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] relative group flex flex-col items-stretch justify-center"
-              onClick={() => handleSelectProject(project.id)}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <Folder className="size-5 text-primary" />
-                    <CardTitle className="text-xl">{project.name}</CardTitle>
+        {projects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map((project) => (
+              <Card
+                key={project.id}
+                className="cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] relative group flex flex-col items-stretch justify-center"
+                onClick={() => handleSelectProject(project.id)}
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Folder className="size-5 text-primary" />
+                      <CardTitle className="text-xl">{project.name}</CardTitle>
+                    </div>
+                    {!project.is_default && projects.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => handleDeleteProject(e, project.id, project.name)}
+                        disabled={deletingProjectId === project.id}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
-                  {!project.isDefault && projects.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => handleDeleteProject(e, project.id, project.name)}
-                      disabled={deletingProjectId === project.id}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
+                  {project.description && (
+                    <CardDescription className="line-clamp-2">
+                      {project.description}
+                    </CardDescription>
                   )}
-                </div>
-                {project.description && (
-                  <CardDescription className="line-clamp-2">
-                    {project.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>
-                    {new Date(project.createdAt).toLocaleDateString()}
-                  </span>
-                  {project.isDefault && (
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      Default
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      {new Date(project.created_at).toLocaleDateString()}
                     </span>
-                  )}
+                    {project.is_default && (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {/* Create New Project Card - Only show when there are projects */}
+            <Card
+              className="cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] border-dashed border-2 flex items-center justify-center min-h-[200px]"
+              onClick={handleCreateProject}
+            >
+              <CardContent className="flex flex-col items-center gap-2 py-8">
+                <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Plus className="size-6 text-primary" />
+                </div>
+                <div className="text-center">
+                  <div className="font-medium">Create New Project</div>
+                  <div className="text-sm text-muted-foreground">
+                    Start a fresh workspace
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-
-          {/* Create New Project Card */}
-          <Card
-            className="cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] border-dashed border-2 flex items-center justify-center min-h-[200px]"
-            onClick={handleCreateProject}
-          >
-            <CardContent className="flex flex-col items-center gap-2 py-8">
-              <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Plus className="size-6 text-primary" />
-              </div>
-              <div className="text-center">
-                <div className="font-medium">Create New Project</div>
-                <div className="text-sm text-muted-foreground">
-                  Start a fresh workspace
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {projects.length === 0 && !isLoading && (
+          </div>
+        ) : !isLoading && (
           <div className="text-center py-12 space-y-4">
             <p className="text-muted-foreground">No projects found</p>
             <Button onClick={handleCreateProject}>

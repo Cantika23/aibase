@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run src/server/index.ts"
+    "start": "bun run src/server/index.ts",
+    "create-root": "bun run scripts/create-root-user.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

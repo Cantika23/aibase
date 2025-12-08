@@ -2,9 +2,6 @@ import { Ban, Code2, Loader2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { cn } from "@/lib/utils";
-import { ScriptDetailsDialog } from "@/components/ui/script-details-dialog";
-import { FileToolDetailsDialog } from "@/components/ui/file-tool-details-dialog";
-import { GenericToolDetailsDialog } from "@/components/ui/generic-tool-details-dialog";
 import { useUIStore } from "@/stores/ui-store";
 import { MemoryToolGroup } from "./memory-tool-group";
 import { FileToolGroup } from "./file-tool-group";
@@ -17,42 +14,16 @@ interface ToolCallProps {
 }
 
 export function ToolCall({ toolInvocations }: ToolCallProps) {
-  const {
-    selectedScript,
-    selectedFileTool,
-    selectedGenericTool,
-    setSelectedScript,
-    setSelectedFileTool,
-    setSelectedGenericTool,
-  } = useUIStore(
-    useShallow((state) => ({
-      selectedScript: state.selectedScript,
-      selectedFileTool: state.selectedFileTool,
-      selectedGenericTool: state.selectedGenericTool,
-      setSelectedScript: state.setSelectedScript,
-      setSelectedFileTool: state.setSelectedFileTool,
-      setSelectedGenericTool: state.setSelectedGenericTool,
-    }))
-  );
+  const { setSelectedScript, setSelectedFileTool, setSelectedGenericTool } =
+    useUIStore(
+      useShallow((state) => ({
+        setSelectedScript: state.setSelectedScript,
+        setSelectedFileTool: state.setSelectedFileTool,
+        setSelectedGenericTool: state.setSelectedGenericTool,
+      }))
+    );
 
   if (!toolInvocations?.length) return null;
-
-  // Collect all progress messages for script tools
-  const scriptProgressMap = new Map<string, string[]>();
-  toolInvocations.forEach((inv) => {
-    if (
-      inv.toolName === "script" &&
-      inv.state === "progress" &&
-      "result" in inv &&
-      inv.result?.message
-    ) {
-      const key = inv.toolCallId || inv.args?.purpose || "script";
-      if (!scriptProgressMap.has(key)) {
-        scriptProgressMap.set(key, []);
-      }
-      scriptProgressMap.get(key)!.push(inv.result.message);
-    }
-  });
 
   // Group adjacent memory and file tool calls
   const groupedInvocations: Array<ToolInvocation | ToolInvocation[]> = [];
@@ -117,41 +88,7 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
   }
 
   return (
-    <>
-      <ScriptDetailsDialog
-        open={!!selectedScript}
-        onOpenChange={(open) => !open && setSelectedScript(null)}
-        purpose={selectedScript?.purpose || ""}
-        code={selectedScript?.code || ""}
-        state={selectedScript?.state || "call"}
-        progressMessages={
-          selectedScript
-            ? scriptProgressMap.get(selectedScript.purpose) || []
-            : []
-        }
-        result={selectedScript?.result}
-        error={selectedScript?.error}
-      />
-      <FileToolDetailsDialog
-        open={!!selectedFileTool}
-        onOpenChange={(open) => !open && setSelectedFileTool(null)}
-        action={selectedFileTool?.action || ""}
-        path={selectedFileTool?.path}
-        newPath={selectedFileTool?.newPath}
-        state={selectedFileTool?.state || "call"}
-        result={selectedFileTool?.result}
-        error={selectedFileTool?.error}
-      />
-      <GenericToolDetailsDialog
-        open={!!selectedGenericTool}
-        onOpenChange={(open) => !open && setSelectedGenericTool(null)}
-        toolName={selectedGenericTool?.toolName || ""}
-        args={selectedGenericTool?.args}
-        state={selectedGenericTool?.state || "call"}
-        result={selectedGenericTool?.result}
-        error={selectedGenericTool?.error}
-      />
-      <div className="flex flex-col gap-1.5 items-start">
+    <div className="flex flex-col gap-1.5 items-start">
         {groupedInvocations.map((invocationOrGroup, index) => {
           // Handle tool groups (memory or file)
           if (Array.isArray(invocationOrGroup)) {
@@ -321,14 +258,14 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
               ) : (
                 <>
                   {invocation.args?.action
-                    .split("_")
+                    ?.split("_")
                     .map((e: string, i: number) => {
                       return (
                         <span className="capitalize ml-1" key={i}>
                           {e}
                         </span>
                       );
-                    }) || "tool"}
+                    }) || <span className="ml-1">executing</span>}
                 </>
               )}
             </span>
@@ -365,10 +302,10 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
                     {toolName}
                   </div>
                   {invocation.result?.code && (
-                    <div className="ml-6 text-purple-600/70 dark:text-purple-400/70 font-mono text-xs line-clamp-2">
+                    <pre className="ml-6 text-purple-600/70 dark:text-purple-400/70 font-mono text-xs line-clamp-2 whitespace-pre-wrap">
                       {invocation.result.code.substring(0, 100)}
                       {invocation.result.code.length > 100 && "..."}
-                    </div>
+                    </pre>
                   )}
                 </div>
               );
@@ -429,7 +366,6 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
               return null;
           }
         })}
-      </div>
-    </>
+    </div>
   );
 }

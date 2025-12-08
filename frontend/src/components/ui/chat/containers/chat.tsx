@@ -12,6 +12,7 @@ import { MessageList } from "@/components/ui/message-list";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import { useFileStore } from "@/stores/file-store";
 import { cn } from "@/lib/utils";
+import { GlobalToolDialogs, type ToolInvocation } from "../tools";
 
 interface ChatPropsBase {
   handleSubmit: (
@@ -178,8 +179,26 @@ export function Chat({
     [onRateResponse]
   );
 
+  // Collect all tool invocations from all messages for GlobalToolDialogs
+  const allToolInvocations: ToolInvocation[] = [];
+  messages.forEach((message) => {
+    if (message.toolInvocations) {
+      allToolInvocations.push(...message.toolInvocations);
+    }
+    if (message.parts) {
+      message.parts.forEach((part) => {
+        if (part.type === "tool-invocation" && part.toolInvocation) {
+          allToolInvocations.push(part.toolInvocation);
+        }
+      });
+    }
+  });
+
   return (
     <ChatContainer className={className}>
+      {/* Global tool dialogs - single instance for entire chat */}
+      <GlobalToolDialogs toolInvocations={allToolInvocations} />
+
       {isEmpty ? (
         <div className="flex flex-1 items-center justify-center">Welcome</div>
       ) : null}

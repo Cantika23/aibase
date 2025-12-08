@@ -50,6 +50,30 @@ import {
   handleGetConversationMessages,
   handleDeleteConversation,
 } from "./conversations-handler";
+import {
+  handleRegister,
+  handleLogin,
+  handleLogout,
+  handleGetCurrentUser,
+  handleChangePassword,
+  handleAdminCreateUser,
+  handleAdminGetUsers,
+  handleAdminDeleteUser,
+} from "./auth-handler";
+import {
+  handleGetTenants,
+  handleGetTenant,
+  handleCreateTenant,
+  handleUpdateTenant,
+  handleDeleteTenant,
+  handleUploadTenantLogo,
+  handleGetTenantLogo,
+  handleDeleteTenantLogo,
+  handleGetTenantUsers,
+  handleCreateTenantUser,
+  handleUpdateTenantUser,
+  handleDeleteTenantUser,
+} from "./tenant-handler";
 
 /**
  * Convenience function to create a WebSocket server
@@ -204,6 +228,102 @@ export class WebSocketServer {
             return handleGetContext(req);
           } else if (req.method === "PUT") {
             return handleUpdateContext(req);
+          }
+        }
+
+        // Auth API endpoints
+        // Registration is disabled - users must be created by admin
+        // if (url.pathname === "/api/auth/register" && req.method === "POST") {
+        //   return handleRegister(req);
+        // }
+
+        if (url.pathname === "/api/auth/login" && req.method === "POST") {
+          return handleLogin(req);
+        }
+
+        if (url.pathname === "/api/auth/logout" && req.method === "POST") {
+          return handleLogout(req);
+        }
+
+        if (url.pathname === "/api/auth/me" && req.method === "GET") {
+          return handleGetCurrentUser(req);
+        }
+
+        if (url.pathname === "/api/auth/change-password" && req.method === "POST") {
+          return handleChangePassword(req);
+        }
+
+        // Admin API endpoints
+        if (url.pathname === "/api/admin/users" && req.method === "POST") {
+          return handleAdminCreateUser(req);
+        }
+
+        if (url.pathname === "/api/admin/users" && req.method === "GET") {
+          return handleAdminGetUsers(req);
+        }
+
+        // Match /api/admin/users/:userId endpoints
+        const adminUserIdMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)$/);
+        if (adminUserIdMatch && req.method === "DELETE") {
+          const userId = adminUserIdMatch[1];
+          return handleAdminDeleteUser(req, userId);
+        }
+
+        // Tenant API endpoints
+        if (url.pathname === "/api/tenants" && req.method === "GET") {
+          return handleGetTenants(req);
+        }
+
+        if (url.pathname === "/api/tenants" && req.method === "POST") {
+          return handleCreateTenant(req);
+        }
+
+        // Match /api/tenants/:tenantId/users/:userId endpoints
+        const tenantUserIdMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)\/users\/([^\/]+)$/);
+        if (tenantUserIdMatch) {
+          const tenantId = tenantUserIdMatch[1];
+          const userId = tenantUserIdMatch[2];
+          if (req.method === "PUT") {
+            return handleUpdateTenantUser(req, tenantId, userId);
+          } else if (req.method === "DELETE") {
+            return handleDeleteTenantUser(req, tenantId, userId);
+          }
+        }
+
+        // Match /api/tenants/:tenantId/users endpoints
+        const tenantUsersMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)\/users$/);
+        if (tenantUsersMatch) {
+          const tenantId = tenantUsersMatch[1];
+          if (req.method === "GET") {
+            return handleGetTenantUsers(req, tenantId);
+          } else if (req.method === "POST") {
+            return handleCreateTenantUser(req, tenantId);
+          }
+        }
+
+        // Match /api/tenants/:tenantId/logo endpoints
+        const tenantLogoMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)\/logo$/);
+        if (tenantLogoMatch) {
+          const tenantId = tenantLogoMatch[1];
+          if (req.method === "POST") {
+            return handleUploadTenantLogo(req, tenantId);
+          } else if (req.method === "GET") {
+            return handleGetTenantLogo(req, tenantId);
+          } else if (req.method === "DELETE") {
+            return handleDeleteTenantLogo(req, tenantId);
+          }
+        }
+
+        // Match /api/tenants/:tenantId endpoints
+        const tenantIdMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)$/);
+        if (tenantIdMatch) {
+          const tenantId = tenantIdMatch[1];
+          if (req.method === "GET") {
+            return handleGetTenant(req, tenantId);
+          } else if (req.method === "PUT") {
+            return handleUpdateTenant(req, tenantId);
+          } else if (req.method === "DELETE") {
+            return handleDeleteTenant(req, tenantId);
           }
         }
 

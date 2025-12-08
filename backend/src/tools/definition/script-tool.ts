@@ -8,6 +8,7 @@ import { context as pdfreaderContext } from "../script-runtime/pdfreader";
 import { context as webSearchContext } from "../script-runtime/web-search";
 import { context as showChartContext } from "../script-runtime/show-chart";
 import { context as showTableContext } from "../script-runtime/show-table";
+import { storeOutput } from "../script-runtime/output-storage";
 
 /**
  * Dynamically merge contexts from all script-runtime files
@@ -71,7 +72,19 @@ Context variables: convId, projectId.`;
       code: {
         type: "string",
         description: `TypeScript code to execute.
-Example:
+
+CRITICAL - Multi-line Code Format:
+- ALWAYS use ACTUAL newline characters, NEVER escape them with \\n
+- When generating multi-line code, put actual line breaks in the string value
+- ✓ CORRECT: Write multi-line strings naturally with real newlines
+- ✗ WRONG: NEVER use \\n, \\t, or any escape sequences between statements
+- ✗ WRONG: NEVER write "line1;\\nline2;" - this will cause syntax errors!
+- Think of it like writing code in a text editor, not escaping for display
+
+Example (single line):
+  return await fetch('https://api.example.com').then(r => r.json());
+
+Example (multi-line):
   progress("Starting batch operation...");
   const files = await file({ action: 'list' });
   for (const f of files) {
@@ -209,6 +222,96 @@ PDF reader examples (extract text from PDF files):
   }
 
   /**
+   * Check if result is too large and truncate if needed
+   */
+  private async handleLargeResult(result: any): Promise<any> {
+    // Get max result size from env (default 50KB)
+    const maxSize = parseInt(process.env.SCRIPT_TOOL_MAX_RESULT_SIZE || "50000", 10);
+
+    // Handle undefined or null results - return as-is
+    if (result === undefined || result === null) {
+      return result;
+    }
+
+    // Serialize result to check size
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(result);
+    } catch (error: any) {
+      // If serialization fails (circular refs, etc), return as-is
+      console.warn(`[ScriptTool] Could not serialize result for size check: ${error.message}`);
+      return result;
+    }
+
+    const size = Buffer.byteLength(serialized, "utf8");
+
+    // If under limit, return as-is
+    if (size <= maxSize) {
+      return result;
+    }
+
+    // Result is too large - store it and return truncated version
+    console.log(`[ScriptTool] Result too large (${size} bytes > ${maxSize} bytes), storing and truncating...`);
+
+    const metadata = await storeOutput(result, this.convId, this.currentToolCallId!);
+
+    // Create truncated summary based on data type
+    let truncatedData: any;
+    let summary: string;
+
+    if (Array.isArray(result)) {
+      // For arrays: show first N items
+      const itemsToShow = Math.floor(maxSize / (size / result.length));
+      truncatedData = result.slice(0, itemsToShow);
+      summary = `[Array truncated: showing ${itemsToShow} of ${result.length} items]`;
+    } else if (typeof result === "string") {
+      // For strings: show beginning
+      const charsToShow = Math.floor(maxSize / 2); // Rough estimate
+      truncatedData = result.substring(0, charsToShow) + "...";
+      summary = `[String truncated: showing ${charsToShow} of ${result.length} characters]`;
+    } else if (typeof result === "object" && result !== null) {
+      // For objects: show structure with sample keys
+      const keys = Object.keys(result);
+      const keysToShow = Math.min(5, keys.length);
+      truncatedData = {};
+      for (let i = 0; i < keysToShow; i++) {
+        const key = keys[i];
+        if (key !== undefined) {
+          truncatedData[key] = (result as Record<string, any>)[key];
+        }
+      }
+      summary = `[Object truncated: showing ${keysToShow} of ${keys.length} keys]`;
+    } else {
+      // For primitives: shouldn't happen but handle it
+      truncatedData = result;
+      summary = "";
+    }
+
+    return {
+      _truncated: true,
+      _outputId: metadata.id,
+      _totalSize: size,
+      _totalSizeFormatted: this.formatBytes(size),
+      _dataType: metadata.dataType,
+      _rowCount: metadata.rowCount,
+      _summary: summary,
+      _message: `Output was too large (${this.formatBytes(size)}) and has been stored. Use peek('${metadata.id}', offset, limit) in a new script to retrieve specific portions of the data.`,
+      data: truncatedData,
+    };
+  }
+
+  /**
+   * Format bytes to human-readable string
+   */
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+  }
+
+  /**
    * Execute TypeScript code in controlled scope
    */
   async execute(args: { purpose: string; code: string }): Promise<any> {
@@ -228,6 +331,14 @@ PDF reader examples (extract text from PDF files):
       },
     });
 
+    // Helper to fix literal escape sequences
+    const fixEscapeSequences = (code: string): string => {
+      return code
+        .replace(/\\n/g, "\n")
+        .replace(/\\t/g, "\t")
+        .replace(/\\r/g, "\r");
+    };
+
     try {
       // Create runtime with injected context
       const runtime = new ScriptRuntime({
@@ -240,13 +351,45 @@ PDF reader examples (extract text from PDF files):
         code: args.code,
       });
 
-      // Execute the script
-      const result = await runtime.execute(args.code);
+      // Try executing as-is first
+      let result: any;
+      try {
+        result = await runtime.execute(args.code);
+      } catch (firstError: any) {
+        // If we get "Invalid escape" error and code has \n, try fixing it
+        if (firstError.message?.includes("Invalid escape") && args.code.includes("\\n")) {
+          console.warn("[ScriptTool] Execution failed with 'Invalid escape' error");
+          console.warn("[ScriptTool] Code contains literal \\n - retrying with escape sequence fix");
+          console.warn("[ScriptTool] Original code (first 200 chars):", args.code.substring(0, 200));
+
+          const fixedCode = fixEscapeSequences(args.code);
+          console.log("[ScriptTool] Fixed code (first 200 chars):", fixedCode.substring(0, 200));
+
+          // Create new runtime with fixed code
+          const retryRuntime = new ScriptRuntime({
+            convId: this.convId,
+            projectId: this.projectId,
+            tools: this.toolsRegistry,
+            broadcast: this.broadcastFn,
+            toolCallId: this.currentToolCallId,
+            purpose: args.purpose,
+            code: fixedCode,
+          });
+
+          result = await retryRuntime.execute(fixedCode);
+        } else {
+          // Re-throw if it's not an escape sequence issue
+          throw firstError;
+        }
+      }
 
       // Check if runtime returned an error object
       if (result && result.error) {
         throw new Error(result.error);
       }
+
+      // Handle large results - store and truncate if needed
+      result = await this.handleLargeResult(result);
 
       // Broadcast complete state
       this.broadcastFn("tool_call", {

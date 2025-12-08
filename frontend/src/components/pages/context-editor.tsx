@@ -10,9 +10,8 @@ import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { useProjectStore } from "@/stores/project-store";
 
-const API_URL =
-  (typeof window !== "undefined" && window.location.origin) ||
-  "http://localhost:5040";
+// Use relative URL to leverage Vite's proxy in development
+const API_URL = "";
 
 export function ContextEditor() {
   const [content, setContent] = useState("");

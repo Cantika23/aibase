@@ -4,8 +4,13 @@ import { MemoryEditor } from "./pages/memory-editor";
 import { ContextEditor } from "./pages/context-editor";
 import { ConversationHistoryPage } from "./pages/conversation-history";
 import { ProjectSelectorPage } from "./pages/project-selector";
+import { UserManagementPage } from "./pages/user-management";
+import { TenantManagementPage } from "./pages/tenant-management";
+import { LoginPage } from "./pages/login";
 import { ProjectRouteHandler } from "./project/project-route-handler";
+import { ProtectedRoute } from "./auth/protected-route";
 import { Button } from "./ui/button";
+import { UserMenu } from "./ui/user-menu";
 import {
   MessageSquare,
   Binary,
@@ -13,12 +18,15 @@ import {
   FileText,
   ArrowLeft,
   MessagesSquare,
+  Users,
+  Building2,
 } from "lucide-react";
 import { Toaster } from "./ui/sonner";
 import { useState, useEffect } from "react";
 import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useConversationStore } from "@/stores/conversation-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { useShallow } from "zustand/react/shallow";
 
 interface AppRouterProps {
@@ -38,6 +46,11 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
 
   const { currentProject } = useProjectStore();
   const { conversations, loadConversations } = useConversationStore();
+  const currentUser = useAuthStore((state) => state.user);
+
+  // Check user roles
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'root';
+  const isRoot = currentUser?.role === 'root';
 
   // Load conversations when project changes
   useEffect(() => {
@@ -48,7 +61,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
 
   // Check if we're on a chat-related route
   const isChatRoute = location.pathname.startsWith("/projects/");
-  const isProjectSelectorRoute = location.pathname === "/";
+  const isLoginRoute = location.pathname === "/login";
 
   return (
     <div className="flex h-screen flex-col">
@@ -140,43 +153,107 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
         </div>
       )}
 
+      {/* Top Right Navigation - Show on all pages except login */}
+      {!isLoginRoute && (
+        <div className="absolute top-0 right-0 m-3 z-10 flex gap-2">
+          {/* Tenants button (root only, not on chat routes) */}
+          {isRoot && !isChatRoute && (
+            <Button
+              variant={location.pathname === "/admin/tenants" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => navigate("/admin/tenants")}
+            >
+              <Building2 />
+              {location.pathname === "/admin/tenants" && <>Tenants</>}
+            </Button>
+          )}
+          {/* Users button (admin and root, not on chat routes) */}
+          {isAdmin && !isChatRoute && (
+            <Button
+              variant={location.pathname === "/admin/users" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => navigate("/admin/users")}
+            >
+              <Users />
+              {location.pathname === "/admin/users" && <>Users</>}
+            </Button>
+          )}
+          <UserMenu />
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         <Routes>
-          <Route path="/" element={<ProjectSelectorPage />} />
+          {/* Public route */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Protected routes */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <ProjectSelectorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/tenants"
+            element={
+              <ProtectedRoute>
+                <TenantManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute>
+                <UserManagementPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/projects/:projectId/chat"
             element={
-              <ProjectRouteHandler>
-                <MainChat
-                  wsUrl={wsUrl}
-                  isTodoPanelVisible={isTodoPanelVisible}
-                />
-              </ProjectRouteHandler>
+              <ProtectedRoute>
+                <ProjectRouteHandler>
+                  <MainChat
+                    wsUrl={wsUrl}
+                    isTodoPanelVisible={isTodoPanelVisible}
+                  />
+                </ProjectRouteHandler>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/projects/:projectId/history"
             element={
-              <ProjectRouteHandler>
-                <ConversationHistoryPage />
-              </ProjectRouteHandler>
+              <ProtectedRoute>
+                <ProjectRouteHandler>
+                  <ConversationHistoryPage />
+                </ProjectRouteHandler>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/projects/:projectId/memory"
             element={
-              <ProjectRouteHandler>
-                <MemoryEditor />
-              </ProjectRouteHandler>
+              <ProtectedRoute>
+                <ProjectRouteHandler>
+                  <MemoryEditor />
+                </ProjectRouteHandler>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/projects/:projectId/context"
             element={
-              <ProjectRouteHandler>
-                <ContextEditor />
-              </ProjectRouteHandler>
+              <ProtectedRoute>
+                <ProjectRouteHandler>
+                  <ContextEditor />
+                </ProjectRouteHandler>
+              </ProtectedRoute>
             }
           />
         </Routes>

@@ -6,8 +6,8 @@ import type {
   MemoryDeleteResponse,
 } from "@/types/memory";
 
-const API_BASE_URL =
-  (typeof window !== "undefined" && window.location.origin) || "http://localhost:5040";
+// Use relative URL to leverage Vite's proxy in development
+const API_BASE_URL = "";
 
 export interface UseMemoryOptions {
   projectId?: string;

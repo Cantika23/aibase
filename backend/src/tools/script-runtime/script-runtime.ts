@@ -7,6 +7,7 @@ import { createPDFReaderFunction } from "./pdfreader";
 import { createWebSearchFunction } from "./web-search";
 import { createShowChartFunction } from "./show-chart";
 import { createShowTableFunction } from "./show-table";
+import { peek, peekInfo } from "./peek-output";
 
 /**
  * Context documentation for core script runtime functionality
@@ -20,6 +21,12 @@ Use for: API calls, batch operations, complex workflows, data transformations.
 - ✓ CORRECT: \`return { result: data }\`
 - ✓ CORRECT: \`const x = await fetch(url); return x.json()\`
 - ✗ WRONG: \`export const x = ...\` (NO export/import!)
+
+**MULTI-LINE CODE:**
+- ALWAYS use actual newline characters in the code string
+- NEVER use \\n escape sequences between statements
+- Write code naturally with real line breaks, like in a text editor
+- Example: Multi-line code should have actual newlines, not \\n characters
 
 ### CORE EXAMPLES
 
@@ -39,23 +46,30 @@ Use for: API calls, batch operations, complex workflows, data transformations.
 }
 \`\`\`
 
-#### 3. BATCH PROCESS FILES:
-\`\`\`json
-{
-  "purpose": "Count exports in TypeScript files",
-  "code": "progress('Listing...'); const files = await file({ action: 'list' }); const tsFiles = files.filter(f => f.name.endsWith('.ts')); let count = 0; for (const f of tsFiles) { progress(\`Reading \${f.name}\`); const content = await file({ action: 'read_file', path: f.path }); count += (content.match(/export /g) || []).length; } return { analyzed: tsFiles.length, totalExports: count };"
+#### 3. BATCH PROCESS FILES (multi-line - use actual newlines!):
+\`\`\`typescript
+progress('Listing...');
+const files = await file({ action: 'list' });
+const tsFiles = files.filter(f => f.name.endsWith('.ts'));
+let count = 0;
+for (const f of tsFiles) {
+  progress(\`Reading \${f.name}\`);
+  const content = await file({ action: 'read_file', path: f.path });
+  count += (content.match(/export /g) || []).length;
 }
+return { analyzed: tsFiles.length, totalExports: count };
 \`\`\`
 
 #### 4. MULTI-TOOL WORKFLOWS:
-\`\`\`json
-{
-  "purpose": "Create todos for files",
-  "code": "const files = await file({ action: 'list' }); progress(\`Found \${files.length} files\`); const texts = files.slice(0, 10).map(f => \`Review: \${f.name}\`); await todo({ action: 'add', texts }); return { created: texts.length };"
-}
+\`\`\`typescript
+const files = await file({ action: 'list' });
+progress(\`Found \${files.length} files\`);
+const texts = files.slice(0, 10).map(f => \`Review: \${f.name}\`);
+await todo({ action: 'add', texts });
+return { created: texts.length };
 \`\`\`
 
-**Available:** fetch, progress(msg), file(...), todo(...), memory(...), convId, projectId, console`;
+**Available:** fetch, progress(msg), file(...), todo(...), memory(...), peek(outputId, offset, limit), peekInfo(outputId), convId, projectId, console`;
 };
 
 /**
@@ -149,6 +163,12 @@ export class ScriptRuntime {
 
       // Inject showTable function
       showTable: this.createShowTableFunction(),
+
+      // Inject peek function for accessing stored large outputs
+      peek: peek,
+
+      // Inject peekInfo function for getting output metadata
+      peekInfo: peekInfo,
     };
 
     // Inject all registered tools as callable functions

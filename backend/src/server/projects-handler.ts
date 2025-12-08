@@ -1,13 +1,31 @@
 import { ProjectStorage } from "../storage/project-storage";
+import { authenticateRequest } from "./auth-handler";
 
 const projectStorage = ProjectStorage.getInstance();
 
+// Initialize project storage
+projectStorage.initialize().catch(console.error);
+
 /**
- * Handle GET /api/projects - Get all projects
+ * Handle GET /api/projects - Get all projects for the current user
  */
 export async function handleGetProjects(req: Request): Promise<Response> {
   try {
-    const projects = await projectStorage.getAll();
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Root users can see all projects, others see only their own + shared
+    let projects;
+    if (auth.user.role === 'root') {
+      projects = projectStorage.getAll();
+    } else {
+      projects = projectStorage.getByUserId(auth.user.id, auth.user.tenant_id);
+    }
 
     return Response.json({
       success: true,
@@ -30,7 +48,15 @@ export async function handleGetProjects(req: Request): Promise<Response> {
  */
 export async function handleGetProject(req: Request, projectId: string): Promise<Response> {
   try {
-    const project = await projectStorage.get(projectId);
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const project = projectStorage.getById(projectId);
 
     if (!project) {
       return Response.json(
@@ -40,6 +66,20 @@ export async function handleGetProject(req: Request, projectId: string): Promise
         },
         { status: 404 }
       );
+    }
+
+    // Check access permissions
+    if (auth.user.role !== 'root') {
+      const hasAccess = projectStorage.userHasAccess(projectId, auth.user.id, auth.user.tenant_id);
+      if (!hasAccess) {
+        return Response.json(
+          {
+            success: false,
+            error: "Access denied",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     return Response.json({
@@ -63,8 +103,16 @@ export async function handleGetProject(req: Request, projectId: string): Promise
  */
 export async function handleCreateProject(req: Request): Promise<Response> {
   try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
-    const { name, description } = body as any;
+    const { name, description, is_shared } = body as any;
 
     if (!name || typeof name !== "string") {
       return Response.json(
@@ -96,7 +144,23 @@ export async function handleCreateProject(req: Request): Promise<Response> {
       );
     }
 
-    const project = await projectStorage.create(name.trim(), description?.trim());
+    if (is_shared !== undefined && typeof is_shared !== "boolean") {
+      return Response.json(
+        {
+          success: false,
+          error: "is_shared must be a boolean",
+        },
+        { status: 400 }
+      );
+    }
+
+    const project = await projectStorage.create({
+      name: name.trim(),
+      description: description?.trim(),
+      user_id: auth.user.id,
+      tenant_id: auth.user.tenant_id,
+      is_shared: is_shared ?? false,
+    });
 
     return Response.json(
       {
@@ -123,10 +187,18 @@ export async function handleCreateProject(req: Request): Promise<Response> {
  */
 export async function handleUpdateProject(req: Request, projectId: string): Promise<Response> {
   try {
-    const body = await req.json();
-    const { name, description } = body as any;
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
 
-    const updates: { name?: string; description?: string } = {};
+    const body = await req.json();
+    const { name, description, is_shared } = body as any;
+
+    const updates: { name?: string; description?: string; is_shared?: boolean } = {};
 
     if (name !== undefined) {
       if (typeof name !== "string") {
@@ -163,7 +235,20 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
       updates.description = description.trim();
     }
 
-    const project = await projectStorage.update(projectId, updates);
+    if (is_shared !== undefined) {
+      if (typeof is_shared !== "boolean") {
+        return Response.json(
+          {
+            success: false,
+            error: "is_shared must be a boolean",
+          },
+          { status: 400 }
+        );
+      }
+      updates.is_shared = is_shared;
+    }
+
+    const project = await projectStorage.update(projectId, auth.user.id, updates);
 
     if (!project) {
       return Response.json(
@@ -182,6 +267,18 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
     });
   } catch (error) {
     console.error("Error updating project:", error);
+
+    // Handle permission errors
+    if (error instanceof Error && error.message.includes('owner')) {
+      return Response.json(
+        {
+          success: false,
+          error: error.message,
+        },
+        { status: 403 }
+      );
+    }
+
     return Response.json(
       {
         success: false,
@@ -197,7 +294,15 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
  */
 export async function handleDeleteProject(req: Request, projectId: string): Promise<Response> {
   try {
-    const deleted = await projectStorage.delete(projectId);
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const deleted = await projectStorage.delete(projectId, auth.user.id);
 
     if (!deleted) {
       return Response.json(
@@ -215,6 +320,18 @@ export async function handleDeleteProject(req: Request, projectId: string): Prom
     });
   } catch (error) {
     console.error("Error deleting project:", error);
+
+    // Handle permission errors
+    if (error instanceof Error && (error.message.includes('owner') || error.message.includes('default'))) {
+      return Response.json(
+        {
+          success: false,
+          error: error.message,
+        },
+        { status: 403 }
+      );
+    }
+
     return Response.json(
       {
         success: false,

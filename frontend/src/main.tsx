@@ -3,9 +3,9 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import { AppRouter } from "./components/app-router";
 
-// Create WebSocket URL that points to the same domain with /api/ws path
-
-const wsUrl = `ws://localhost:5040/api/ws`;
+// Create WebSocket URL dynamically to work with Vite proxy
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const wsUrl = `${protocol}//${window.location.host}/api/ws`;
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>

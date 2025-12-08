@@ -53,20 +53,72 @@ export function ScriptDetailsDialog({
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedResult, setCopiedResult] = useState(false);
+  const [copiedError, setCopiedError] = useState(false);
+  const [resultTruncated, setResultTruncated] = useState(false);
 
-  const copyToClipboard = async (text: string, type: "code" | "result") => {
+  // Max size for display (100KB) - larger results will be truncated
+  const MAX_DISPLAY_SIZE = 100 * 1024;
+
+  const copyToClipboard = async (text: string, type: "code" | "result" | "error") => {
     try {
       await navigator.clipboard.writeText(text);
       if (type === "code") {
         setCopiedCode(true);
         setTimeout(() => setCopiedCode(false), 2000);
-      } else {
+      } else if (type === "result") {
         setCopiedResult(true);
         setTimeout(() => setCopiedResult(false), 2000);
+      } else {
+        setCopiedError(true);
+        setTimeout(() => setCopiedError(false), 2000);
       }
     } catch (err) {
       console.error("Failed to copy:", err);
     }
+  };
+
+  /**
+   * Truncate large data for display to prevent browser freeze
+   */
+  const truncateForDisplay = (data: any): any => {
+    const serialized = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+
+    if (serialized.length <= MAX_DISPLAY_SIZE) {
+      setResultTruncated(false);
+      return data;
+    }
+
+    // Result is too large - truncate it
+    setResultTruncated(true);
+    console.warn(`[ScriptDetailsDialog] Result too large (${serialized.length} chars), truncating for display`);
+
+    if (typeof data === "string") {
+      return serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]";
+    } else if (Array.isArray(data)) {
+      // For arrays, show first N items
+      const itemSize = Math.ceil(serialized.length / data.length);
+      const itemsToShow = Math.floor(MAX_DISPLAY_SIZE / itemSize);
+      return [...data.slice(0, itemsToShow), `... [${data.length - itemsToShow} more items truncated for display]`];
+    } else if (typeof data === "object" && data !== null) {
+      // For objects, show partial
+      const keys = Object.keys(data);
+      const truncatedObj: any = {};
+      let currentSize = 0;
+
+      for (const key of keys) {
+        const valueStr = JSON.stringify(data[key]);
+        if (currentSize + valueStr.length > MAX_DISPLAY_SIZE) {
+          truncatedObj["..."] = `[${keys.length - Object.keys(truncatedObj).length} more keys truncated for display]`;
+          break;
+        }
+        truncatedObj[key] = data[key];
+        currentSize += valueStr.length;
+      }
+
+      return truncatedObj;
+    }
+
+    return serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]";
   };
 
   useEffect(() => {
@@ -100,9 +152,11 @@ export function ScriptDetailsDialog({
 
   useEffect(() => {
     if (open && result) {
-      // Highlight the result
+      // Truncate large results before highlighting to prevent browser freeze
+      const displayData = truncateForDisplay(result);
       const resultStr =
-        typeof result === "string" ? result : JSON.stringify(result, null, 2);
+        typeof displayData === "string" ? displayData : JSON.stringify(displayData, null, 2);
+
       codeToHtml(resultStr, {
         lang: "json",
         theme: "github-light",
@@ -245,6 +299,14 @@ export function ScriptDetailsDialog({
                         )}
                       </Button>
                     </div>
+
+                    {/* Truncation Warning */}
+                    {resultTruncated && (
+                      <div className="mb-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-700 dark:text-amber-400">
+                        ⚠️ Result truncated for display (too large). Use Copy button for full data.
+                      </div>
+                    )}
+
                     <div className="flex-1 flex text-[11px]">
                       {highlightedResult ? (
                         <div
@@ -256,9 +318,12 @@ export function ScriptDetailsDialog({
                       ) : (
                         <pre className="p-4 bg-[#0d1117]  overflow-x-auto">
                           <code>
-                            {typeof result === "string"
-                              ? result
-                              : JSON.stringify(result, null, 2)}
+                            {(() => {
+                              const displayData = truncateForDisplay(result);
+                              return typeof displayData === "string"
+                                ? displayData
+                                : JSON.stringify(displayData, null, 2);
+                            })()}
                           </code>
                         </pre>
                       )}
@@ -268,9 +333,23 @@ export function ScriptDetailsDialog({
 
                 {error && (
                   <>
-                    <h3 className="text-sm font-semibold mb-2 text-red-600 dark:text-red-400">
-                      Error
-                    </h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        Error
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => copyToClipboard(error, "error")}
+                      >
+                        {copiedError ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
                     <div className="text-[11px] border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/30 p-3 overflow-auto">
                       <pre className="text-red-700 dark:text-red-400 whitespace-pre-wrap">
                         {error}

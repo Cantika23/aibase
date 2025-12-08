@@ -12,6 +12,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['esensi.local'],
     port: 5050,
     proxy: {
       "/api": {

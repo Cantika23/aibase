@@ -4,10 +4,13 @@ import { ProjectManager } from "@/lib/project-manager";
 export interface Project {
   id: string;
   name: string;
-  description?: string;
-  createdAt: number;
-  updatedAt: number;
-  isDefault?: boolean;
+  description: string | null;
+  user_id: number;
+  tenant_id: number | null;
+  is_shared: boolean;
+  is_default: boolean;
+  created_at: number;
+  updated_at: number;
 }
 
 interface ProjectStore {
@@ -29,7 +32,7 @@ interface ProjectStore {
 
   // Async actions
   fetchProjects: () => Promise<void>;
-  createProject: (name: string, description?: string) => Promise<Project | null>;
+  createProject: (name: string, description?: string, is_shared?: boolean) => Promise<Project | null>;
   deleteProject: (projectId: string) => Promise<boolean>;
   initializeProject: () => Promise<void>;
 }
@@ -112,7 +115,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
   },
 
-  createProject: async (name, description) => {
+  createProject: async (name, description, is_shared = false) => {
     const state = get();
     state.setIsLoading(true);
     state.setError(null);
@@ -121,7 +124,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, is_shared }),
       });
 
       const data = await response.json();
@@ -195,7 +198,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
 
     // Fall back to default project or first project
-    const defaultProject = projects.find((p) => p.isDefault) || projects[0];
+    const defaultProject = projects.find((p) => p.is_default) || projects[0];
     state.setCurrentProject(defaultProject);
   },
 }));
