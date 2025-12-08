@@ -43,13 +43,24 @@ export class ChatCompaction {
     const infoPath = path.join(process.cwd(), 'data', projectId, convId, 'info.json');
 
     try {
+      // Check if file exists first
+      try {
+        await fs.access(infoPath);
+      } catch {
+        // File doesn't exist yet - no compaction needed
+        return false;
+      }
+
       const infoContent = await fs.readFile(infoPath, 'utf-8');
       const info = JSON.parse(infoContent);
 
       const totalTokens = info.tokenUsage?.total?.totalTokens || 0;
       return totalTokens >= this.config.tokenThreshold;
     } catch (error) {
-      console.error('Error checking compaction threshold:', error);
+      // Only log if it's not a file not found error
+      if ((error as any).code !== 'ENOENT') {
+        console.error('Error checking compaction threshold:', error);
+      }
       return false;
     }
   }
@@ -269,6 +280,19 @@ Key topics: ${this.extractKeyTopics(messages)}
     const infoPath = path.join(process.cwd(), 'data', projectId, convId, 'info.json');
 
     try {
+      // Check if file exists first
+      try {
+        await fs.access(infoPath);
+      } catch {
+        // File doesn't exist yet - return default status
+        return {
+          shouldCompact: false,
+          currentTokens: 0,
+          threshold: this.config.tokenThreshold,
+          utilizationPercent: 0
+        };
+      }
+
       const infoContent = await fs.readFile(infoPath, 'utf-8');
       const info = JSON.parse(infoContent);
 
@@ -282,7 +306,10 @@ Key topics: ${this.extractKeyTopics(messages)}
         utilizationPercent: Math.round(utilizationPercent * 100) / 100
       };
     } catch (error) {
-      console.error('Error getting compaction status:', error);
+      // Only log if it's not a file not found error
+      if ((error as any).code !== 'ENOENT') {
+        console.error('Error getting compaction status:', error);
+      }
       return {
         shouldCompact: false,
         currentTokens: 0,
