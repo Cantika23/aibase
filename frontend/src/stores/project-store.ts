@@ -8,7 +8,6 @@ export interface Project {
   user_id: number;
   tenant_id: number | null;
   is_shared: boolean;
-  is_default: boolean;
   created_at: number;
   updated_at: number;
 }
@@ -197,8 +196,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }
     }
 
-    // Fall back to default project or first project
-    const defaultProject = projects.find((p) => p.is_default) || projects[0];
-    state.setCurrentProject(defaultProject);
+    // Fall back to first project
+    state.setCurrentProject(projects[0]);
   },
 }));

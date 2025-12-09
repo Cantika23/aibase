@@ -14,7 +14,6 @@ export interface Project {
   user_id: number; // Owner of the project
   tenant_id: number | null; // Tenant the project belongs to
   is_shared: boolean; // Whether project is shared within tenant
-  is_default: boolean;
   created_at: number;
   updated_at: number;
 }
@@ -25,7 +24,6 @@ export interface CreateProjectData {
   user_id: number;
   tenant_id?: number | null;
   is_shared?: boolean;
-  is_default?: boolean;
 }
 
 export interface UpdateProjectData {
@@ -71,7 +69,6 @@ export class ProjectStorage {
         user_id INTEGER NOT NULL,
         tenant_id INTEGER,
         is_shared INTEGER NOT NULL DEFAULT 0,
-        is_default INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -83,6 +80,61 @@ export class ProjectStorage {
     this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_tenant_id ON projects(tenant_id)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_is_shared ON projects(is_shared)');
+
+    // Migration: Remove is_default column if it exists
+    try {
+      // Check if column exists
+      const tableInfo = this.db.prepare('PRAGMA table_info(projects)').all() as any[];
+      const hasIsDefaultColumn = tableInfo.some((col: any) => col.name === 'is_default');
+
+      if (hasIsDefaultColumn) {
+        console.log('[ProjectStorage] Migrating database: removing is_default column');
+
+        // SQLite doesn't support DROP COLUMN directly, so we need to recreate the table
+        this.db.run('BEGIN TRANSACTION');
+
+        // Create new table without is_default
+        this.db.run(`
+          CREATE TABLE projects_new (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            user_id INTEGER NOT NULL,
+            tenant_id INTEGER,
+            is_shared INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+          )
+        `);
+
+        // Copy data from old table to new table
+        this.db.run(`
+          INSERT INTO projects_new (id, name, description, user_id, tenant_id, is_shared, created_at, updated_at)
+          SELECT id, name, description, user_id, tenant_id, is_shared, created_at, updated_at
+          FROM projects
+        `);
+
+        // Drop old table
+        this.db.run('DROP TABLE projects');
+
+        // Rename new table to original name
+        this.db.run('ALTER TABLE projects_new RENAME TO projects');
+
+        // Recreate indexes
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_tenant_id ON projects(tenant_id)');
+        this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_is_shared ON projects(is_shared)');
+
+        this.db.run('COMMIT');
+        console.log('[ProjectStorage] Migration completed: is_default column removed');
+      }
+    } catch (error) {
+      console.error('[ProjectStorage] Migration failed:', error);
+      this.db.run('ROLLBACK');
+      throw error;
+    }
 
     console.log('[ProjectStorage] Database initialized at', this.dbPath);
   }
@@ -102,11 +154,10 @@ export class ProjectStorage {
     const now = Date.now();
     const id = this.generateId();
     const is_shared = data.is_shared ?? false;
-    const is_default = data.is_default ?? false;
 
     const stmt = this.db.prepare(`
-      INSERT INTO projects (id, name, description, user_id, tenant_id, is_shared, is_default, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, description, user_id, tenant_id, is_shared, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -116,7 +167,6 @@ export class ProjectStorage {
       data.user_id,
       data.tenant_id ?? null,
       is_shared ? 1 : 0,
-      is_default ? 1 : 0,
       now,
       now
     );
@@ -146,7 +196,6 @@ export class ProjectStorage {
     return {
       ...row,
       is_shared: row.is_shared === 1,
-      is_default: row.is_default === 1,
     };
   }
 
@@ -163,7 +212,7 @@ export class ProjectStorage {
       stmt = this.db.prepare(`
         SELECT * FROM projects
         WHERE (user_id = ? OR (tenant_id = ? AND is_shared = 1))
-        ORDER BY is_default DESC, created_at DESC
+        ORDER BY created_at DESC
       `);
       rows = stmt.all(userId, tenantId) as any[];
     } else {
@@ -171,7 +220,7 @@ export class ProjectStorage {
       stmt = this.db.prepare(`
         SELECT * FROM projects
         WHERE user_id = ?
-        ORDER BY is_default DESC, created_at DESC
+        ORDER BY created_at DESC
       `);
       rows = stmt.all(userId) as any[];
     }
@@ -179,7 +228,6 @@ export class ProjectStorage {
     return rows.map(row => ({
       ...row,
       is_shared: row.is_shared === 1,
-      is_default: row.is_default === 1,
     }));
   }
 
@@ -193,7 +241,6 @@ export class ProjectStorage {
     return rows.map(row => ({
       ...row,
       is_shared: row.is_shared === 1,
-      is_default: row.is_default === 1,
     }));
   }
 
@@ -271,11 +318,6 @@ export class ProjectStorage {
       throw new Error('Only the project owner can delete the project');
     }
 
-    // Don't allow deleting the default project
-    if (project.is_default) {
-      throw new Error('Cannot delete the default project');
-    }
-
     const stmt = this.db.prepare('DELETE FROM projects WHERE id = ?');
     const result = stmt.run(id);
 
@@ -290,26 +332,6 @@ export class ProjectStorage {
     }
 
     return result.changes > 0;
-  }
-
-  /**
-   * Get user's default project
-   */
-  getDefaultByUserId(userId: number): Project | null {
-    const stmt = this.db.prepare(`
-      SELECT * FROM projects
-      WHERE user_id = ? AND is_default = 1
-      LIMIT 1
-    `);
-    const row = stmt.get(userId) as any;
-
-    if (!row) return null;
-
-    return {
-      ...row,
-      is_shared: row.is_shared === 1,
-      is_default: row.is_default === 1,
-    };
   }
 
   /**

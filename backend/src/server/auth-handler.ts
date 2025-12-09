@@ -3,7 +3,6 @@
  */
 
 import { AuthService } from "../services/auth-service";
-import { ensureUserDefaultProject } from "../services/project-service";
 
 const authService = AuthService.getInstance();
 
@@ -99,9 +98,6 @@ export async function handleLogin(req: Request): Promise<Response> {
       emailOrUsername: body.emailOrUsername,
       password: body.password,
     });
-
-    // Ensure user has a default project
-    await ensureUserDefaultProject(result.user.id, result.user.tenant_id);
 
     // Set session token in cookie
     const headers = new Headers();

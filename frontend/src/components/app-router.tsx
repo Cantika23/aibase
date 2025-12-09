@@ -49,8 +49,8 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
   const currentUser = useAuthStore((state) => state.user);
 
   // Check user roles
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'root';
-  const isRoot = currentUser?.role === 'root';
+  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "root";
+  const isRoot = currentUser?.role === "root";
 
   // Load conversations when project changes
   useEffect(() => {
@@ -105,9 +105,8 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               title="Conversation History"
             >
               <MessagesSquare />
-              {location.pathname === `/projects/${currentProject.id}/history` && (
-                <>History</>
-              )}
+              {location.pathname ===
+                `/projects/${currentProject.id}/history` && <>History</>}
             </Button>
           )}
           <Button
@@ -159,7 +158,9 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
           {/* Tenants button (root only, not on chat routes) */}
           {isRoot && !isChatRoute && (
             <Button
-              variant={location.pathname === "/admin/tenants" ? "default" : "ghost"}
+              variant={
+                location.pathname === "/admin/tenants" ? "default" : "ghost"
+              }
               size="sm"
               onClick={() => navigate("/admin/tenants")}
             >
@@ -170,7 +171,9 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
           {/* Users button (admin and root, not on chat routes) */}
           {isAdmin && !isChatRoute && (
             <Button
-              variant={location.pathname === "/admin/users" ? "default" : "ghost"}
+              variant={
+                location.pathname === "/admin/users" ? "default" : "ghost"
+              }
               size="sm"
               onClick={() => navigate("/admin/users")}
             >
@@ -178,7 +181,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               {location.pathname === "/admin/users" && <>Users</>}
             </Button>
           )}
-          <UserMenu />
+          {!isChatRoute && <UserMenu />}
         </div>
       )}
 

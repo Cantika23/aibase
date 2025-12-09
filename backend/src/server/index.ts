@@ -348,7 +348,7 @@ export class WebSocketServer {
         if (process.env.NODE_ENV === "production") {
           try {
             const staticPath = url.pathname === "/" ? "/index.html" : url.pathname;
-            const filePath = `../frontend/dist${staticPath}`;
+            const filePath = `./frontend/dist${staticPath}`;
             const file = Bun.file(filePath);
 
             if (await file.exists()) {
@@ -356,7 +356,7 @@ export class WebSocketServer {
             }
 
             // Fallback to index.html for client-side routing (SPA)
-            const indexFile = Bun.file("../frontend/dist/index.html");
+            const indexFile = Bun.file("./frontend/dist/index.html");
             if (await indexFile.exists()) {
               return new Response(indexFile);
             }

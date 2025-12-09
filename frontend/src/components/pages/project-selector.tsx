@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProjectStore } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { ProjectCreateModal } from "@/components/project/project-create-modal";
 import { Folder, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,9 +18,18 @@ import { toast } from "sonner";
 export function ProjectSelectorPage() {
   const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(
+    null
+  );
 
-  const { projects, currentProject, selectProject, deleteProject, isLoading, initializeProject } = useProjectStore();
+  const {
+    projects,
+    currentProject,
+    selectProject,
+    deleteProject,
+    isLoading,
+    initializeProject,
+  } = useProjectStore();
 
   useEffect(() => {
     initializeProject();
@@ -25,10 +40,18 @@ export function ProjectSelectorPage() {
     navigate(`/projects/${projectId}/chat`);
   };
 
-  const handleDeleteProject = async (e: React.MouseEvent, projectId: string, projectName: string) => {
+  const handleDeleteProject = async (
+    e: React.MouseEvent,
+    projectId: string,
+    projectName: string
+  ) => {
     e.stopPropagation();
 
-    if (!confirm(`Are you sure you want to delete "${projectName}"? This will permanently delete all conversations and files in this project.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${projectName}"? This will permanently delete all conversations and files in this project.`
+      )
+    ) {
       return;
     }
 
@@ -67,7 +90,9 @@ export function ProjectSelectorPage() {
       <div className="w-full max-w-4xl space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Select a Project</h1>
+          <h1 className="text-4xl font-bold tracking-tight">
+            Select a Project
+          </h1>
           <p className="text-muted-foreground text-lg">
             Choose a project to start chatting, or create a new one
           </p>
@@ -88,36 +113,30 @@ export function ProjectSelectorPage() {
                       <Folder className="size-5 text-primary" />
                       <CardTitle className="text-xl">{project.name}</CardTitle>
                     </div>
-                    {!project.is_default && projects.length > 1 && (
+                    {projects.length > 1 && (
                       <Button
                         variant="ghost"
                         size="icon-sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => handleDeleteProject(e, project.id, project.name)}
+                        onClick={(e) =>
+                          handleDeleteProject(e, project.id, project.name)
+                        }
                         disabled={deletingProjectId === project.id}
                       >
                         <Trash2 className="size-4 text-destructive" />
                       </Button>
                     )}
                   </div>
-                  {project.description && (
+                  {project.description?.trim() && (
                     <CardDescription className="line-clamp-2">
                       {project.description}
                     </CardDescription>
                   )}
-                </CardHeader>
-                <CardContent>
+
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                      {new Date(project.created_at).toLocaleDateString()}
-                    </span>
-                    {project.is_default && (
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                        Default
-                      </span>
-                    )}
+                    {new Date(project.created_at).toLocaleDateString()}
                   </div>
-                </CardContent>
+                </CardHeader>
               </Card>
             ))}
 
@@ -139,14 +158,16 @@ export function ProjectSelectorPage() {
               </CardContent>
             </Card>
           </div>
-        ) : !isLoading && (
-          <div className="text-center py-12 space-y-4">
-            <p className="text-muted-foreground">No projects found</p>
-            <Button onClick={handleCreateProject}>
-              <Plus className="size-4 mr-2" />
-              Create Your First Project
-            </Button>
-          </div>
+        ) : (
+          !isLoading && (
+            <div className="text-center py-12 space-y-4">
+              <p className="text-muted-foreground">No projects found</p>
+              <Button onClick={handleCreateProject}>
+                <Plus className="size-4 mr-2" />
+                Create Your First Project
+              </Button>
+            </div>
+          )
         )}
       </div>
 
