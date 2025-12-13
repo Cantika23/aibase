@@ -1,4 +1,3 @@
-import { PDFParse } from "pdf-parse";
 import * as fs from "fs/promises";
 import * as path from "path";
 
@@ -137,6 +136,9 @@ export function createPDFReaderFunction(cwd?: string) {
       } else {
         dataBuffer = options.buffer!;
       }
+
+      // Dynamically import pdf-parse to avoid loading pdfjs-dist at startup
+      const { PDFParse } = await import("pdf-parse");
 
       // Create PDFParse instance with the buffer data
       const pdfParser = new PDFParse({

@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Chat, type Message } from "@/components/ui/chat";
+import { Chat } from "@/components/ui/chat";
 import { TodoPanel } from "@/components/status/todo-panel";
 import { CompactionStatus } from "@/components/status/compaction-status";
 import { TokenStatus } from "@/components/status/token-status";
@@ -10,10 +10,8 @@ import { useWSConnection } from "@/lib/ws/ws-connection-manager";
 import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useFileStore } from "@/stores/file-store";
-import { fetchConversationMessages } from "@/lib/conversation-api";
 import { AlertCircle, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
-import { Button } from "@/components/ui/button";
 import { PageActionButton, PageActionGroup } from "@/components/ui/page-action-button";
 import { useWebSocketHandlers } from "@/hooks/use-websocket-handlers";
 import { useMessageSubmission } from "@/hooks/use-message-submission";
@@ -37,7 +35,6 @@ export function MainChat({
     isLoading,
     error,
     todos,
-    maxTokens,
     setMessages,
     setInput,
     setIsLoading,
@@ -52,7 +49,6 @@ export function MainChat({
       isLoading: state.isLoading,
       error: state.error,
       todos: state.todos,
-      maxTokens: state.maxTokens,
       setMessages: state.setMessages,
       setInput: state.setInput,
       setIsLoading: state.setIsLoading,
@@ -97,9 +93,6 @@ export function MainChat({
 
   // Track thinking indicator start time (server sends this timestamp)
   const thinkingStartTimeRef = useRef<number | null>(null);
-
-  // Track the last loaded conversation ID to avoid re-loading
-  const lastLoadedConvIdRef = useRef<string | null>(null);
 
   // Update thinking indicator seconds every second based on server startTime
   useEffect(() => {
@@ -156,7 +149,7 @@ export function MainChat({
   });
 
   // Use message submission hook
-  const { handleSubmit, abort, append, handleNewConversation } =
+  const { handleSubmit, abort, handleNewConversation } =
     useMessageSubmission({
       wsClient,
       projectId: currentProject?.id,
@@ -269,7 +262,6 @@ export function MainChat({
         <div className="mt-[60px] ml-3.5">
           <TodoPanel
             todos={todos}
-            isLoading={isLoading && !todos?.items?.length}
             isVisible={isTodoPanelVisible}
           />
         </div>
@@ -319,7 +311,6 @@ export function MainChat({
           isGenerating={isLoading}
           stop={abort}
           setMessages={setMessages}
-          append={append}
           className="h-full"
           uploadProgress={uploadProgress}
         />

@@ -31,4 +31,15 @@ Thumbs.db
 *.tmp
 .cache/
 */debug
-backend/data
+
+# Data directory (project root)
+data/
+
+# Binary executables
+bins/*/bin/
+bins/bun/
+
+# Start binaries (built from bins/start/)
+start.linux
+start.macos
+start.win.exe

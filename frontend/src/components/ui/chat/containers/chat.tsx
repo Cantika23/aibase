@@ -34,9 +34,7 @@ interface ChatPropsBase {
   uploadProgress?: number | null;
 }
 
-interface ChatProps extends ChatPropsBase {
-  append: (message: { role: "user"; content: string }) => void;
-}
+interface ChatProps extends ChatPropsBase {}
 
 export function Chat({
   messages,
@@ -45,14 +43,12 @@ export function Chat({
   handleInputChange,
   stop,
   isGenerating,
-  append,
   className,
   onRateResponse,
   setMessages,
   transcribeAudio,
   uploadProgress,
 }: ChatProps) {
-  const lastMessage = messages.at(-1);
   const isEmpty = messages.length === 0;
 
   const messagesRef = useRef(messages);
@@ -214,7 +210,6 @@ export function Chat({
 
       <ChatForm
         className="mt-auto mx-auto w-full md:max-w-[650px]"
-        isPending={isGenerating}
         handleSubmit={handleSubmit}
         uploadProgress={uploadProgress}
       >
@@ -296,7 +291,6 @@ ChatContainer.displayName = "ChatContainer";
 
 interface ChatFormProps {
   className?: string;
-  isPending: boolean;
   handleSubmit: (
     event?: { preventDefault?: () => void },
     options?: { experimental_attachments?: FileList }
@@ -309,7 +303,7 @@ interface ChatFormProps {
 }
 
 export const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(
-  ({ children, handleSubmit, isPending, className }, ref) => {
+  ({ children, handleSubmit, className }, ref) => {
     const { files, setFiles, clearFiles } = useFileStore(
       useShallow((state) => ({
         files: state.files,

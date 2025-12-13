@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { CheckCircle2, Circle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface TodoItem {
@@ -18,11 +18,10 @@ interface TodoList {
 
 interface TodoPanelProps {
   todos: TodoList | null;
-  isLoading?: boolean;
   isVisible?: boolean;
 }
 
-export function TodoPanel({ todos, isLoading = false, isVisible = true }: TodoPanelProps) {
+export function TodoPanel({ todos, isVisible = true }: TodoPanelProps) {
   if (!todos || todos.items.length === 0) {
     return null;
   }

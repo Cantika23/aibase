@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "./dialog";
 import { Loader2, Copy, Check } from "lucide-react";
 import { Badge } from "./badge";
@@ -163,23 +162,6 @@ export function ScriptDetailsDialog({
       }).then(setHighlightedResult);
     }
   }, [open, result]);
-
-  const getStateColor = () => {
-    switch (state) {
-      case "call":
-        return "text-blue-600 dark:text-blue-400";
-      case "executing":
-        return "text-purple-600 dark:text-purple-400";
-      case "progress":
-        return "text-amber-600 dark:text-amber-400";
-      case "result":
-        return "text-green-600 dark:text-green-400";
-      case "error":
-        return "text-red-600 dark:text-red-400";
-      default:
-        return "";
-    }
-  };
 
   const getStateLabel = () => {
     switch (state) {

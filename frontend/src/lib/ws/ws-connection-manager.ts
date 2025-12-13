@@ -102,7 +102,7 @@ export class WSConnectionManager {
    */
   disconnectAll(): void {
     console.log(`WSConnectionManager: Disconnecting all ${this.connections.size} connections`);
-    for (const [key, connectionInfo] of this.connections) {
+    for (const [, connectionInfo] of this.connections) {
       connectionInfo.client.disconnect();
     }
     this.connections.clear();
@@ -159,7 +159,7 @@ export class WSConnectionManager {
 /**
  * React hook for using WebSocket connection manager
  */
-import { useCallback, useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 
 export function useWSConnection(options: WSClientOptions) {
   const clientRef = useRef<WSClient | null>(null);

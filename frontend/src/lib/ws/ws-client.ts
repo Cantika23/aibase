@@ -10,7 +10,6 @@ import type {
   ConnectionStats,
   UserMessageData,
   ControlMessage,
-  MessageType,
   ToolCallData,
   ToolResultData,
 } from "../types/model";
@@ -20,7 +19,7 @@ import { ConvIdManager } from "../conv-id";
 
 export class WSClient extends WSEventEmitter {
   private ws: WebSocket | null = null;
-  private options: Required<WSClientOptions>;
+  private options: Required<Omit<WSClientOptions, 'projectId'>> & Pick<WSClientOptions, 'projectId'>;
   private state: ConnectionState = {
     status: "disconnected",
     messageCount: 0,
@@ -461,27 +460,6 @@ export class WSClient extends WSEventEmitter {
       // Queue message for when connection is restored
       this.messageQueue.push(message);
     }
-  }
-
-  private async sendMessageAndWaitForResponse(
-    message: WSMessage,
-    _responseType: MessageType
-  ): Promise<any> {
-    return new Promise((resolve, reject) => {
-      // Add timeout to prevent hanging
-      const timeout = setTimeout(() => {
-        this.pendingMessages.delete(message.id);
-        reject(new Error("Message response timeout"));
-      }, 60000); // 60 second timeout
-
-      this.pendingMessages.set(message.id, {
-        resolve,
-        reject,
-        timeout,
-      });
-
-      this.send(message);
-    });
   }
 
   private flushMessageQueue(): void {

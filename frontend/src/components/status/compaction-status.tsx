@@ -17,7 +17,6 @@ interface CompactionStatusProps {
 export function CompactionStatus({ wsClient }: CompactionStatusProps) {
   const [status, setStatus] = useState<CompactionStatusData | null>(null);
   const [isCompacting, setIsCompacting] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<number>(0);
 
   // Request status from server
   const requestStatus = () => {
@@ -53,7 +52,6 @@ export function CompactionStatus({ wsClient }: CompactionStatusProps) {
           threshold: message.data.threshold,
           utilizationPercent: message.data.utilizationPercent,
         });
-        setLastUpdate(Date.now());
       } else if (
         message.type === "control_response" &&
         message.data.type === "compact_chat"

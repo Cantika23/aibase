@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { flushSync } from "react-dom";
 import type { Message } from "@/components/ui/chat";
 import { activeTabManager } from "@/lib/ws/active-tab-manager";

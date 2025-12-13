@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useTenantStore, type Tenant } from "@/stores/tenant-store";
-import { Badge } from "./badge";
 import { Button } from "./button";
 import { Trash2, Building2, Globe, Edit, Users } from "lucide-react";
 

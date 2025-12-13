@@ -41,7 +41,7 @@ interface TenantStore {
   deleteLogo: (token: string, tenantId: number) => Promise<boolean>;
 }
 
-export const useTenantStore = create<TenantStore>((set, get) => ({
+export const useTenantStore = create<TenantStore>((set, _get) => ({
   // Initial state
   tenants: [],
   isLoading: false,

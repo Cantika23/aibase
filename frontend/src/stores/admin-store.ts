@@ -45,7 +45,7 @@ interface AdminStore {
   deleteTenantUser: (token: string, tenantId: number, userId: number) => Promise<boolean>;
 }
 
-export const useAdminStore = create<AdminStore>((set, get) => ({
+export const useAdminStore = create<AdminStore>((set, _get) => ({
   // Initial state
   users: [],
   isLoading: false,

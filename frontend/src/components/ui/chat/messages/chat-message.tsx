@@ -27,7 +27,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   toolInvocations,
   parts,
   completionTime,
-  thinkingDuration,
   isThinking,
   aborted,
 }) => {

@@ -1,0 +1,8 @@
+# Compiled executable
+aibase-start
+aibase-start-*
+*.exe
+
+# Downloaded binaries
+bun/
+*/bin/
