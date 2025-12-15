@@ -45,17 +45,17 @@ func main() {
 	}
 
 	// Setup paths
-	binsDir := filepath.Join(projectRoot, "bins")
-	bunBinPath := filepath.Join(binsDir, "bun")
-	dataDir := filepath.Join(projectRoot, "data", "bins")
+	dataDir := filepath.Join(projectRoot, "data")
+	bunBinPath := filepath.Join(dataDir, "bun")
+	qdrantBinDir := filepath.Join(dataDir, "qdrant")
 
 	// Create necessary directories
 	if err := os.MkdirAll(bunBinPath, 0755); err != nil {
 		color.Red("Error creating bun directory: %v\n", err)
 		os.Exit(1)
 	}
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		color.Red("Error creating data directory: %v\n", err)
+	if err := os.MkdirAll(qdrantBinDir, 0755); err != nil {
+		color.Red("Error creating qdrant directory: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -90,7 +90,7 @@ func main() {
 	// Step 4: Download service binaries (Qdrant)
 	currentStep++
 	showProgress(currentStep, totalSteps, "Checking service binaries...")
-	qdrantBinary, err := ensureServiceBinaries(binsDir)
+	qdrantBinary, err := ensureServiceBinaries(qdrantBinDir)
 	if err != nil {
 		fmt.Println()
 		color.Red("Error ensuring service binaries: %v\n", err)

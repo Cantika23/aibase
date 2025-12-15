@@ -151,9 +151,9 @@ func findBunExecutable(bunBinPath string) (string, error) {
 }
 
 // ensureServiceBinaries ensures all service binaries are downloaded
-func ensureServiceBinaries(binsDir string) (string, error) {
+func ensureServiceBinaries(qdrantDir string) (string, error) {
 	// Ensure Qdrant
-	qdrantPath, err := ensureQdrant(binsDir)
+	qdrantPath, err := ensureQdrant(qdrantDir)
 	if err != nil {
 		return "", err
 	}
@@ -162,7 +162,7 @@ func ensureServiceBinaries(binsDir string) (string, error) {
 }
 
 // ensureQdrant downloads Qdrant if it doesn't exist
-func ensureQdrant(binsDir string) (string, error) {
+func ensureQdrant(qdrantDir string) (string, error) {
 	platform := getCurrentPlatform()
 
 	// Determine executable name
@@ -179,7 +179,7 @@ func ensureQdrant(binsDir string) (string, error) {
 		platformStr = "darwin-arm64"
 	}
 
-	qdrantBinPath := filepath.Join(binsDir, "qdrant", "bin", platformStr, execName)
+	qdrantBinPath := filepath.Join(qdrantDir, "bin", platformStr, execName)
 
 	// Check if already exists
 	if _, err := os.Stat(qdrantBinPath); err == nil {

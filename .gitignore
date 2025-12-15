@@ -32,12 +32,8 @@ Thumbs.db
 .cache/
 */debug
 
-# Data directory (project root)
+# Data directory (all runtime data and downloaded binaries)
 data/
-
-# Binary executables
-bins/*/bin/
-bins/bun/
 
 # Start binaries (built from bins/start/)
 start.linux
