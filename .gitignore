@@ -34,8 +34,3 @@ Thumbs.db
 
 # Data directory (all runtime data and downloaded binaries)
 data/
-
-# Start binaries (built from bins/start/)
-start.linux
-start.macos
-start.win.exe
