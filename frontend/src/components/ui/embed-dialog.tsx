@@ -247,7 +247,7 @@ export function EmbedDialog({ open, onOpenChange, projectId }: EmbedDialogProps)
                   <Label>Embed Code</Label>
                   <Button
                     onClick={handleCopy}
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     className="h-8"
                   >
@@ -264,13 +264,14 @@ export function EmbedDialog({ open, onOpenChange, projectId }: EmbedDialogProps)
                     )}
                   </Button>
                 </div>
-                <div className="relative">
-                  <pre className="rounded-md bg-muted p-4 text-sm overflow-x-auto">
-                    <code>{embedCode}</code>
-                  </pre>
-                </div>
+                <textarea
+                  readOnly
+                  value={embedCode}
+                  onClick={(e) => e.currentTarget.select()}
+                  className="w-full min-h-[180px] rounded-md border border-input bg-muted px-3 py-2 text-xs font-mono resize-y"
+                />
                 <p className="text-xs text-muted-foreground">
-                  Copy and paste this code into your website to embed the chat.
+                  Click the code to select all, then copy and paste into your website.
                 </p>
               </div>
             </>
