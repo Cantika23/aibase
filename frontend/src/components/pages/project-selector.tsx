@@ -133,19 +133,17 @@ export function ProjectSelectorPage() {
                       >
                         <Pencil className="size-4" />
                       </Button>
-                      {projects.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) =>
-                            handleDeleteProject(e, project.id, project.name)
-                          }
-                          disabled={deletingProjectId === project.id}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) =>
+                          handleDeleteProject(e, project.id, project.name)
+                        }
+                        disabled={deletingProjectId === project.id}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
                     </div>
                   </div>
                   {project.description?.trim() && (
