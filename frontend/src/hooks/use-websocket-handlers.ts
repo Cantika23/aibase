@@ -482,11 +482,22 @@ export function useWebSocketHandlers({
             `[Complete] Streamed content length: ${existingMessage.content.length}, Backend fullText length: ${fullText.length}`
           );
 
-          // Get the latest tool invocations
-          const toolInvocations =
-            currentToolInvocationsRef.current.size > 0
-              ? Array.from(currentToolInvocationsRef.current.values())
-              : existingMessage.toolInvocations;
+          // Preserve existing toolInvocations first, then merge with any new ones
+          const existingToolInvocations = existingMessage.toolInvocations || [];
+          const newToolInvocations = currentToolInvocationsRef.current.size > 0
+            ? Array.from(currentToolInvocationsRef.current.values())
+            : [];
+
+          // Merge: create a map of existing tools, update/add new ones
+          const toolInvocationsMap = new Map();
+          existingToolInvocations.forEach((inv: any) => {
+            toolInvocationsMap.set(inv.toolCallId, inv);
+          });
+          newToolInvocations.forEach((inv: any) => {
+            toolInvocationsMap.set(inv.toolCallId, inv);
+          });
+
+          const mergedToolInvocations = Array.from(toolInvocationsMap.values());
 
           return prev.map((msg, idx) =>
             idx === messageIndex
@@ -496,7 +507,7 @@ export function useWebSocketHandlers({
                   completionTime: completionTimeSeconds,
                   ...(data.thinkingDuration !== undefined && { thinkingDuration: data.thinkingDuration }),
                   ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
-                  ...(toolInvocations && toolInvocations.length > 0 && { toolInvocations }),
+                  ...(mergedToolInvocations.length > 0 && { toolInvocations: mergedToolInvocations }),
                 }
               : msg
           );

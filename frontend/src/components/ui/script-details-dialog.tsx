@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { codeToHtml } from "shiki";
 import { format } from "prettier/standalone";
 import prettierPluginTypeScript from "prettier/plugins/typescript";
@@ -53,7 +53,6 @@ export function ScriptDetailsDialog({
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedResult, setCopiedResult] = useState(false);
   const [copiedError, setCopiedError] = useState(false);
-  const [resultTruncated, setResultTruncated] = useState(false);
 
   // Max size for display (100KB) - larger results will be truncated
   const MAX_DISPLAY_SIZE = 100 * 1024;
@@ -78,26 +77,31 @@ export function ScriptDetailsDialog({
 
   /**
    * Truncate large data for display to prevent browser freeze
+   * Returns { data: truncatedData, isTruncated: boolean }
    */
-  const truncateForDisplay = (data: any): any => {
+  const truncateForDisplay = (data: any): { data: any; isTruncated: boolean } => {
     const serialized = typeof data === "string" ? data : JSON.stringify(data, null, 2);
 
     if (serialized.length <= MAX_DISPLAY_SIZE) {
-      setResultTruncated(false);
-      return data;
+      return { data, isTruncated: false };
     }
 
     // Result is too large - truncate it
-    setResultTruncated(true);
     console.warn(`[ScriptDetailsDialog] Result too large (${serialized.length} chars), truncating for display`);
 
     if (typeof data === "string") {
-      return serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]";
+      return {
+        data: serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]",
+        isTruncated: true
+      };
     } else if (Array.isArray(data)) {
       // For arrays, show first N items
       const itemSize = Math.ceil(serialized.length / data.length);
       const itemsToShow = Math.floor(MAX_DISPLAY_SIZE / itemSize);
-      return [...data.slice(0, itemsToShow), `... [${data.length - itemsToShow} more items truncated for display]`];
+      return {
+        data: [...data.slice(0, itemsToShow), `... [${data.length - itemsToShow} more items truncated for display]`],
+        isTruncated: true
+      };
     } else if (typeof data === "object" && data !== null) {
       // For objects, show partial
       const keys = Object.keys(data);
@@ -114,11 +118,20 @@ export function ScriptDetailsDialog({
         currentSize += valueStr.length;
       }
 
-      return truncatedObj;
+      return { data: truncatedObj, isTruncated: true };
     }
 
-    return serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]";
+    return {
+      data: serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]",
+      isTruncated: true
+    };
   };
+
+  // Compute truncated result display data (memoized to avoid infinite re-renders)
+  const { data: displayResult, isTruncated: resultTruncated } = useMemo(() => {
+    if (!result) return { data: null, isTruncated: false };
+    return truncateForDisplay(result);
+  }, [result]);
 
   useEffect(() => {
     if (open && code) {
@@ -152,7 +165,7 @@ export function ScriptDetailsDialog({
   useEffect(() => {
     if (open && result) {
       // Truncate large results before highlighting to prevent browser freeze
-      const displayData = truncateForDisplay(result);
+      const { data: displayData } = truncateForDisplay(result);
       const resultStr =
         typeof displayData === "string" ? displayData : JSON.stringify(displayData, null, 2);
 
@@ -300,12 +313,9 @@ export function ScriptDetailsDialog({
                       ) : (
                         <pre className="p-4 bg-[#0d1117]  overflow-x-auto">
                           <code>
-                            {(() => {
-                              const displayData = truncateForDisplay(result);
-                              return typeof displayData === "string"
-                                ? displayData
-                                : JSON.stringify(displayData, null, 2);
-                            })()}
+                            {typeof displayResult === "string"
+                              ? displayResult
+                              : JSON.stringify(displayResult, null, 2)}
                           </code>
                         </pre>
                       )}

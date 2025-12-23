@@ -11,7 +11,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useFileStore } from "@/stores/file-store";
 import { AlertCircle, Plus } from "lucide-react";
-import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { PageActionButton, PageActionGroup } from "@/components/ui/page-action-button";
 import { useWebSocketHandlers } from "@/hooks/use-websocket-handlers";
 import { useMessageSubmission } from "@/hooks/use-message-submission";
@@ -98,12 +98,13 @@ export function MainChat({
   // Track thinking indicator start time (server sends this timestamp)
   const thinkingStartTimeRef = useRef<number | null>(null);
 
+  // Memoize whether we have a thinking message to avoid unnecessary effect re-runs
+  const hasThinkingMessage = useMemo(() => messages.some((m) => m.isThinking), [messages]);
+
   // Update thinking indicator seconds every second based on server startTime
   useEffect(() => {
     // Only set interval if thinking indicator exists
-    const hasThinking = messages.some((m) => m.isThinking);
-
-    if (!hasThinking) {
+    if (!hasThinkingMessage) {
       return;
     }
 
@@ -131,7 +132,7 @@ export function MainChat({
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [messages.some((m) => m.isThinking), setMessages]);
+  }, [hasThinkingMessage, setMessages]);
 
   // Set up WebSocket event handlers
   useWebSocketHandlers({
