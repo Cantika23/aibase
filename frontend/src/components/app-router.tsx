@@ -264,6 +264,8 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               </ProtectedRoute>
             }
           />
+          {/* Catch-all route - redirect to root */}
+          <Route path="*" element={<ProtectedRoute><ProjectSelectorPage /></ProtectedRoute>} />
         </Routes>
       </div>
 

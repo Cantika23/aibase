@@ -131,10 +131,13 @@ func main() {
 	// Backend runs from project root so data/ is accessible
 	backendLogsPath := filepath.Join(dataDir, "backend", "logs")
 	os.MkdirAll(backendLogsPath, 0755)
+
+	// Load .env file from project root for backend environment variables
+	envFile := filepath.Join(projectRoot, ".env")
 	backendEnv := []string{
 		"NODE_ENV=production",
 	}
-	orch.AddProcess("backend", projectRoot, bunExecutable, []string{"backend/src/server/index.ts"}, backendEnv, backendLogsPath)
+	orch.AddProcess("backend", projectRoot, bunExecutable, []string{"--env-file=" + envFile, "run", "backend/src/server/index.ts"}, backendEnv, backendLogsPath)
 
 	// Start all processes
 	if err := orch.Start(); err != nil {
@@ -211,9 +214,21 @@ func buildFrontend(projectRoot, bunExecutable string) error {
 		}
 	}
 
-	// Build frontend for production
+	// Load .env file to get PUBLIC_BASE_PATH
+	envMap, err := loadEnvFile(filepath.Join(projectRoot, ".env"))
+	if err != nil {
+		// If .env doesn't exist or can't be read, continue without it
+		envMap = make(map[string]string)
+	}
+
+	// Build frontend for production with environment variables
 	cmd := exec.Command(bunExecutable, "run", "build")
 	cmd.Dir = frontendDir
+
+	// Set up environment with .env variables for the build
+	// Inherit parent process environment and add our custom variables
+	cmd.Env = append(os.Environ(), envToSlice(envMap)...)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("frontend build failed: %w\n%s", err, string(output))
@@ -342,4 +357,45 @@ func getProjectRoot() (string, error) {
 	}
 
 	return projectRoot, nil
+}
+
+// loadEnvFile loads a .env file and returns a map of key-value pairs
+func loadEnvFile(envPath string) (map[string]string, error) {
+	envMap := make(map[string]string)
+
+	// Read the .env file
+	content, err := os.ReadFile(envPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse each line
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse KEY=VALUE
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			envMap[key] = value
+		}
+	}
+
+	return envMap, nil
+}
+
+// envToSlice converts a map to a slice of KEY=VALUE strings
+func envToSlice(envMap map[string]string) []string {
+	envSlice := make([]string, 0, len(envMap))
+	for key, value := range envMap {
+		envSlice = append(envSlice, fmt.Sprintf("%s=%s", key, value))
+	}
+	return envSlice
 }

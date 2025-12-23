@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -10,6 +10,13 @@ import { AlertCircle } from "lucide-react";
 export function LoginPage() {
   const auth = useAuth();
   const navigate = useNavigate();
+
+  // Redirect authenticated users away from login page
+  useEffect(() => {
+    if (auth.isAuthenticated && !auth.isLoading) {
+      navigate("/", { replace: true });
+    }
+  }, [auth.isAuthenticated, auth.isLoading, navigate]);
 
   // Form state
   const [emailOrUsername, setEmailOrUsername] = useState("");

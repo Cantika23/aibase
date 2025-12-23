@@ -85,6 +85,42 @@ import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware
 import { ProjectStorage } from "../storage/project-storage";
 
 /**
+ * Normalize base path to ensure it starts with / and doesn't end with /
+ */
+function normalizeBasePath(basePath: string): string {
+  if (!basePath || basePath === "/") return "";
+  const normalized = basePath.trim();
+  if (!normalized.startsWith("/")) {
+    return `/${normalized}`;
+  }
+  if (normalized.endsWith("/")) {
+    return normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
+/**
+ * Get base path from environment variable
+ */
+function getBasePath(): string {
+  const basePath = process.env.PUBLIC_BASE_PATH || "";
+  return normalizeBasePath(basePath);
+}
+
+/**
+ * Strip base path from pathname and return the relative path
+ */
+function stripBasePath(pathname: string): string {
+  const basePath = getBasePath();
+  if (!basePath) return pathname;
+  if (pathname.startsWith(basePath)) {
+    const relative = pathname.slice(basePath.length);
+    return relative || "/";
+  }
+  return pathname;
+}
+
+/**
  * Convenience function to create a WebSocket server
  */
 export function createWSServer(options?: WSServerOptions): WSServer {
@@ -146,9 +182,20 @@ export class WebSocketServer {
       development: this.options.development,
       fetch: async (req, server) => {
         const url = new URL(req.url);
+        const basePath = getBasePath();
+
+        // Redirect root to base path if base path is set
+        if (basePath && url.pathname === "/") {
+          return Response.redirect(`${url.origin}${basePath}/`, 307);
+        }
+
+        // Strip base path from pathname for route matching
+        // Also track if the original pathname started with the base path
+        const pathname = stripBasePath(url.pathname);
+        const hasBasePath = basePath === "" || url.pathname.startsWith(basePath);
 
         // Handle public embed WebSocket upgrade requests
-        if (url.pathname.startsWith("/api/embed/ws")) {
+        if (pathname.startsWith("/api/embed/ws")) {
           // Rate limit embed WebSocket connections
           const clientIp = getClientIp(req);
           if (!embedWsRateLimiter.checkLimit(clientIp, 10)) {
@@ -186,7 +233,7 @@ export class WebSocketServer {
         }
 
         // Handle WebSocket upgrade requests
-        if (url.pathname.startsWith("/api/ws")) {
+        if (pathname.startsWith("/api/ws")) {
           // Extract conversation ID and project ID from URL before upgrading
           const convId = url.searchParams.get("convId");
           const projectId = url.searchParams.get("projectId");
@@ -202,17 +249,17 @@ export class WebSocketServer {
         }
 
         // Handle file upload (POST /api/upload?convId=xxx)
-        if (url.pathname === "/api/upload" && req.method === "POST") {
+        if (pathname === "/api/upload" && req.method === "POST") {
           return handleFileUpload(req);
         }
 
         // Handle file download (GET /api/files/{convId}/{fileName})
-        if (url.pathname.startsWith("/api/files/") && req.method === "GET") {
+        if (pathname.startsWith("/api/files/") && req.method === "GET") {
           return handleFileDownload(req);
         }
 
         // Memory API endpoints
-        if (url.pathname === "/api/memory") {
+        if (pathname === "/api/memory") {
           if (req.method === "GET") {
             return handleGetMemory(req);
           } else if (req.method === "POST") {
@@ -223,16 +270,16 @@ export class WebSocketServer {
         }
 
         // Projects API endpoints
-        if (url.pathname === "/api/projects" && req.method === "GET") {
+        if (pathname === "/api/projects" && req.method === "GET") {
           return handleGetProjects(req);
         }
 
-        if (url.pathname === "/api/projects" && req.method === "POST") {
+        if (pathname === "/api/projects" && req.method === "POST") {
           return handleCreateProject(req);
         }
 
         // Match /api/projects/:id endpoints
-        const projectIdMatch = url.pathname.match(/^\/api\/projects\/([^\/]+)$/);
+        const projectIdMatch = pathname.match(/^\/api\/projects\/([^\/]+)$/);
         if (projectIdMatch) {
           const projectId = projectIdMatch[1];
           if (req.method === "GET") {
@@ -245,32 +292,32 @@ export class WebSocketServer {
         }
 
         // Embed management API endpoints (authenticated)
-        const embedEnableMatch = url.pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/enable$/);
+        const embedEnableMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/enable$/);
         if (embedEnableMatch && req.method === "POST") {
           const projectId = embedEnableMatch[1];
           return handleEnableEmbed(req, projectId);
         }
 
-        const embedDisableMatch = url.pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/disable$/);
+        const embedDisableMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/disable$/);
         if (embedDisableMatch && req.method === "POST") {
           const projectId = embedDisableMatch[1];
           return handleDisableEmbed(req, projectId);
         }
 
-        const embedRegenerateMatch = url.pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/regenerate$/);
+        const embedRegenerateMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/regenerate$/);
         if (embedRegenerateMatch && req.method === "POST") {
           const projectId = embedRegenerateMatch[1];
           return handleRegenerateEmbedToken(req, projectId);
         }
 
-        const embedCssMatch = url.pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/css$/);
+        const embedCssMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/css$/);
         if (embedCssMatch && req.method === "POST") {
           const projectId = embedCssMatch[1];
           return handleUpdateEmbedCss(req, projectId);
         }
 
         // Public embed info endpoint (no auth required)
-        if (url.pathname === "/api/embed/info" && req.method === "GET") {
+        if (pathname === "/api/embed/info" && req.method === "GET") {
           // Rate limit embed info requests
           const clientIp = getClientIp(req);
           if (!embedRateLimiter.checkLimit(clientIp, 20)) {
@@ -280,32 +327,32 @@ export class WebSocketServer {
         }
 
         // Conversations API endpoints
-        if (url.pathname === "/api/conversations" && req.method === "GET") {
+        if (pathname === "/api/conversations" && req.method === "GET") {
           return handleGetConversations(req);
         }
 
         // Match /api/conversations/:convId/messages endpoints
-        const convMessagesMatch = url.pathname.match(/^\/api\/conversations\/([^\/]+)\/messages$/);
+        const convMessagesMatch = pathname.match(/^\/api\/conversations\/([^\/]+)\/messages$/);
         if (convMessagesMatch && req.method === "GET") {
           const convId = convMessagesMatch[1];
           return handleGetConversationMessages(req, convId);
         }
 
         // Match /api/conversations/:convId endpoints
-        const convIdMatch = url.pathname.match(/^\/api\/conversations\/([^\/]+)$/);
+        const convIdMatch = pathname.match(/^\/api\/conversations\/([^\/]+)$/);
         if (convIdMatch && req.method === "DELETE") {
           const convId = convIdMatch[1];
           return handleDeleteConversation(req, convId);
         }
 
         // Context API endpoints
-        if (url.pathname === "/api/context/default") {
+        if (pathname === "/api/context/default") {
           if (req.method === "GET") {
             return handleGetDefaultContext(req);
           }
         }
 
-        if (url.pathname === "/api/context") {
+        if (pathname === "/api/context") {
           if (req.method === "GET") {
             return handleGetContext(req);
           } else if (req.method === "PUT") {
@@ -315,53 +362,53 @@ export class WebSocketServer {
 
         // Auth API endpoints
         // Registration is disabled - users must be created by admin
-        // if (url.pathname === "/api/auth/register" && req.method === "POST") {
+        // if (pathname === "/api/auth/register" && req.method === "POST") {
         //   return handleRegister(req);
         // }
 
-        if (url.pathname === "/api/auth/login" && req.method === "POST") {
+        if (pathname === "/api/auth/login" && req.method === "POST") {
           return handleLogin(req);
         }
 
-        if (url.pathname === "/api/auth/logout" && req.method === "POST") {
+        if (pathname === "/api/auth/logout" && req.method === "POST") {
           return handleLogout(req);
         }
 
-        if (url.pathname === "/api/auth/me" && req.method === "GET") {
+        if (pathname === "/api/auth/me" && req.method === "GET") {
           return handleGetCurrentUser(req);
         }
 
-        if (url.pathname === "/api/auth/change-password" && req.method === "POST") {
+        if (pathname === "/api/auth/change-password" && req.method === "POST") {
           return handleChangePassword(req);
         }
 
         // Admin API endpoints
-        if (url.pathname === "/api/admin/users" && req.method === "POST") {
+        if (pathname === "/api/admin/users" && req.method === "POST") {
           return handleAdminCreateUser(req);
         }
 
-        if (url.pathname === "/api/admin/users" && req.method === "GET") {
+        if (pathname === "/api/admin/users" && req.method === "GET") {
           return handleAdminGetUsers(req);
         }
 
         // Match /api/admin/users/:userId endpoints
-        const adminUserIdMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)$/);
+        const adminUserIdMatch = pathname.match(/^\/api\/admin\/users\/([^\/]+)$/);
         if (adminUserIdMatch && req.method === "DELETE") {
           const userId = adminUserIdMatch[1];
           return handleAdminDeleteUser(req, userId);
         }
 
         // Tenant API endpoints
-        if (url.pathname === "/api/tenants" && req.method === "GET") {
+        if (pathname === "/api/tenants" && req.method === "GET") {
           return handleGetTenants(req);
         }
 
-        if (url.pathname === "/api/tenants" && req.method === "POST") {
+        if (pathname === "/api/tenants" && req.method === "POST") {
           return handleCreateTenant(req);
         }
 
         // Match /api/tenants/:tenantId/users/:userId endpoints
-        const tenantUserIdMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)\/users\/([^\/]+)$/);
+        const tenantUserIdMatch = pathname.match(/^\/api\/tenants\/([^\/]+)\/users\/([^\/]+)$/);
         if (tenantUserIdMatch) {
           const tenantId = tenantUserIdMatch[1];
           const userId = tenantUserIdMatch[2];
@@ -373,7 +420,7 @@ export class WebSocketServer {
         }
 
         // Match /api/tenants/:tenantId/users endpoints
-        const tenantUsersMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)\/users$/);
+        const tenantUsersMatch = pathname.match(/^\/api\/tenants\/([^\/]+)\/users$/);
         if (tenantUsersMatch) {
           const tenantId = tenantUsersMatch[1];
           if (req.method === "GET") {
@@ -384,7 +431,7 @@ export class WebSocketServer {
         }
 
         // Match /api/tenants/:tenantId/logo endpoints
-        const tenantLogoMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)\/logo$/);
+        const tenantLogoMatch = pathname.match(/^\/api\/tenants\/([^\/]+)\/logo$/);
         if (tenantLogoMatch) {
           const tenantId = tenantLogoMatch[1];
           if (req.method === "POST") {
@@ -397,7 +444,7 @@ export class WebSocketServer {
         }
 
         // Match /api/tenants/:tenantId endpoints
-        const tenantIdMatch = url.pathname.match(/^\/api\/tenants\/([^\/]+)$/);
+        const tenantIdMatch = pathname.match(/^\/api\/tenants\/([^\/]+)$/);
         if (tenantIdMatch) {
           const tenantId = tenantIdMatch[1];
           if (req.method === "GET") {
@@ -410,7 +457,7 @@ export class WebSocketServer {
         }
 
         // Health check endpoint
-        if (url.pathname === "/health") {
+        if (pathname === "/health") {
           return Response.json({
             status: "healthy",
             timestamp: Date.now(),
@@ -421,15 +468,16 @@ export class WebSocketServer {
 
         // Handle custom routes
         for (const [path, handler] of Object.entries(this.options.routes)) {
-          if (url.pathname === path) {
+          if (pathname === path) {
             return handler(req);
           }
         }
 
         // Serve static files in production
-        if (process.env.NODE_ENV === "production") {
+        // Only serve frontend content if the URL has the correct base path
+        if (process.env.NODE_ENV === "production" && hasBasePath) {
           try {
-            const staticPath = url.pathname === "/" ? "/index.html" : url.pathname;
+            const staticPath = pathname === "/" ? "/index.html" : pathname;
             const filePath = `./frontend/dist${staticPath}`;
             const file = Bun.file(filePath);
 
@@ -448,7 +496,9 @@ export class WebSocketServer {
         }
 
         // Development mode - show server info
-        if (url.pathname === "/") {
+        if (pathname === "/" && hasBasePath) {
+          const wsPath = `${basePath}/api/ws`;
+          const healthPath = `${basePath}/health`;
           return new Response(
             `
             <!DOCTYPE html>
@@ -459,8 +509,8 @@ export class WebSocketServer {
               </head>
               <body>
                 <h1>WebSocket Server Running</h1>
-                <p>WebSocket endpoint: <code>ws://${this.options.hostname}:${this.options.port}/api/ws</code></p>
-                <p>Health check: <a href="/health">/health</a></p>
+                <p>WebSocket endpoint: <code>ws://${this.options.hostname}:${this.options.port}${wsPath}</code></p>
+                <p>Health check: <a href="${healthPath}">${healthPath}</a></p>
               </body>
             </html>
           `,

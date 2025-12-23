@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { buildApiUrl } from "@/lib/base-path";
 
-// Use relative URL to leverage Vite's proxy in development
-const API_BASE_URL = "";
+// Use buildApiUrl to support base path
+const API_BASE_URL = buildApiUrl("");
 
 export type UserRole = 'root' | 'admin' | 'user';
 

@@ -53,7 +53,7 @@ func getBunDownloadURL(platform Platform) (string, error) {
 
 // getQdrantDownloadURL returns the Qdrant download URL for the current platform
 func getQdrantDownloadURL(platform Platform) (string, error) {
-	version := "v1.7.4"
+	version := "v1.11.0"
 
 	var urlTemplate string
 
