@@ -65,15 +65,20 @@ export async function fetchConversationMessages(
 
 /**
  * Delete a conversation
+ * Uses POST with X-HTTP-Method-Override header to work around reverse proxies
+ * that don't forward DELETE methods (like api-sepp7.bpk.go.id)
  */
 export async function deleteConversation(
   convId: string,
   projectId: string
 ): Promise<void> {
   const response = await fetch(
-    `/api/conversations/${convId}?projectId=${projectId}`,
+    `${API_BASE_URL}/api/conversations/${convId}?projectId=${projectId}`,
     {
-      method: "DELETE",
+      method: "POST",
+      headers: {
+        "X-HTTP-Method-Override": "DELETE",
+      },
     }
   );
   const data = await response.json();

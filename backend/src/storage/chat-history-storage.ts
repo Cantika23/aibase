@@ -255,17 +255,14 @@ export class ChatHistoryStorage {
       const entries = await fs.readdir(projectDir, { withFileTypes: true });
       const convDirs = entries.filter(entry => entry.isDirectory());
 
-      const conversations: ChatHistoryMetadata[] = [];
-
-      // Get metadata for each conversation
-      for (const convDir of convDirs) {
+      // Get metadata for each conversation in parallel
+      const metadataPromises = convDirs.map(async (convDir) => {
         const convId = convDir.name;
-        const metadata = await this.getChatHistoryMetadata(convId, projectId);
+        return await this.getChatHistoryMetadata(convId, projectId);
+      });
 
-        if (metadata) {
-          conversations.push(metadata);
-        }
-      }
+      const metadataResults = await Promise.all(metadataPromises);
+      const conversations = metadataResults.filter((m): m is ChatHistoryMetadata => m !== null);
 
       // Sort by lastUpdatedAt descending (most recent first)
       conversations.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);

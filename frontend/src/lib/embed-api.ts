@@ -18,6 +18,7 @@ interface EmbedInfo {
   name: string;
   description: string | null;
   customCss: string | null;
+  welcomeMessage: string | null;
 }
 
 interface EmbedTokenResponse {
@@ -124,8 +125,9 @@ export function generateIframeCode(
   width: string = "400px",
   height: string = "600px"
 ): string {
+  const basePath = buildApiUrl("");
   const baseUrl = window.location.origin;
-  const embedUrl = `${baseUrl}/embed?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}`;
+  const embedUrl = `${baseUrl}${basePath}/embed?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}`;
 
   return `<iframe
   src="${embedUrl}"
@@ -147,8 +149,9 @@ export function generateJavaScriptCode(
   width: string = "400px",
   height: string = "600px"
 ): string {
+  const basePath = buildApiUrl("");
   const baseUrl = window.location.origin;
-  const embedUrl = `${baseUrl}/embed?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}`;
+  const embedUrl = `${baseUrl}${basePath}/embed?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}`;
 
   return `<div id="aibase-chat"></div>
 <script>

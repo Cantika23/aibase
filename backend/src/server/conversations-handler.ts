@@ -28,18 +28,12 @@ export async function handleGetConversations(req: Request): Promise<Response> {
     // Get all conversation metadata
     const conversations = await chatHistoryStorage.listAllConversations(projectId);
 
-    // Enrich with titles
+    // Enrich with cached titles only - don't generate on list to avoid slow LLM calls
     const enrichedConversations = await Promise.all(
       conversations.map(async (conv) => {
-        let title = await getConversationTitle(conv.convId, conv.projectId);
-
-        // If no title exists, try to generate one
-        if (!title) {
-          const messages = await chatHistoryStorage.loadChatHistory(conv.convId, conv.projectId);
-          if (messages.length > 0) {
-            title = await generateConversationTitle(messages, conv.convId, conv.projectId);
-          }
-        }
+        // Only get title if it already exists (cached in info.json)
+        // Don't generate titles here to avoid blocking with LLM calls
+        const title = await getConversationTitle(conv.convId, conv.projectId);
 
         return {
           ...conv,

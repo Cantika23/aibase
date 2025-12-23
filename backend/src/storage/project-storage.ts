@@ -17,6 +17,7 @@ export interface Project {
   is_embeddable: boolean; // Whether project can be embedded publicly
   embed_token: string | null; // Secret token for embed verification
   custom_embed_css: string | null; // Custom CSS for embedded chat
+  welcome_message: string | null; // Custom welcome message for embedded chat
   created_at: number;
   updated_at: number;
 }
@@ -90,8 +91,9 @@ export class ProjectStorage {
       const hasEmbeddableColumn = tableInfo.some((col: any) => col.name === 'is_embeddable');
       const hasEmbedTokenColumn = tableInfo.some((col: any) => col.name === 'embed_token');
       const hasCustomEmbedCssColumn = tableInfo.some((col: any) => col.name === 'custom_embed_css');
+      const hasWelcomeMessageColumn = tableInfo.some((col: any) => col.name === 'welcome_message');
 
-      if (!hasEmbeddableColumn || !hasEmbedTokenColumn || !hasCustomEmbedCssColumn) {
+      if (!hasEmbeddableColumn || !hasEmbedTokenColumn || !hasCustomEmbedCssColumn || !hasWelcomeMessageColumn) {
         console.log('[ProjectStorage] Migrating database: adding embed fields');
         this.db.run('BEGIN TRANSACTION');
 
@@ -105,6 +107,10 @@ export class ProjectStorage {
 
         if (!hasCustomEmbedCssColumn) {
           this.db.run('ALTER TABLE projects ADD COLUMN custom_embed_css TEXT NULL');
+        }
+
+        if (!hasWelcomeMessageColumn) {
+          this.db.run('ALTER TABLE projects ADD COLUMN welcome_message TEXT NULL');
         }
 
         // Create index for embed_token lookups
@@ -496,6 +502,32 @@ export class ProjectStorage {
 
     stmt.run(customCss, Date.now(), projectId);
     console.log('[ProjectStorage] Updated embed CSS for project:', projectId);
+  }
+
+  /**
+   * Update welcome message for a project
+   */
+  async updateWelcomeMessage(projectId: string, userId: number, welcomeMessage: string | null): Promise<void> {
+    const project = this.getById(projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    // Only owner can update welcome message
+    if (project.user_id !== userId) {
+      throw new Error('Only the project owner can update welcome message');
+    }
+
+    if (!project.is_embeddable) {
+      throw new Error('Embedding is not enabled for this project');
+    }
+
+    const stmt = this.db.prepare(`
+      UPDATE projects SET welcome_message = ?, updated_at = ? WHERE id = ?
+    `);
+
+    stmt.run(welcomeMessage, Date.now(), projectId);
+    console.log('[ProjectStorage] Updated welcome message for project:', projectId);
   }
 
   /**

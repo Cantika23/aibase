@@ -80,6 +80,8 @@ import {
   handleDisableEmbed,
   handleRegenerateEmbedToken,
   handleUpdateEmbedCss,
+  handleUpdateWelcomeMessage,
+  handleGetEmbedStatus,
 } from "./embed-handler";
 import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware/rate-limiter";
 import { ProjectStorage } from "../storage/project-storage";
@@ -312,10 +314,22 @@ export class WebSocketServer {
           return handleRegenerateEmbedToken(req, projectId);
         }
 
+
+        const embedStatusMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/status$/);
+        if (embedStatusMatch && req.method === "GET") {
+          const projectId = embedStatusMatch[1];
+          return handleGetEmbedStatus(req, projectId);
+        }
         const embedCssMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/css$/);
         if (embedCssMatch && req.method === "POST") {
           const projectId = embedCssMatch[1];
           return handleUpdateEmbedCss(req, projectId);
+        }
+
+        const embedWelcomeMessageMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/welcome-message$/);
+        if (embedWelcomeMessageMatch && req.method === "POST") {
+          const projectId = embedWelcomeMessageMatch[1];
+          return handleUpdateWelcomeMessage(req, projectId);
         }
 
         // Public embed info endpoint (no auth required)
@@ -342,9 +356,14 @@ export class WebSocketServer {
 
         // Match /api/conversations/:convId endpoints
         const convIdMatch = pathname.match(/^\/api\/conversations\/([^\/]+)$/);
-        if (convIdMatch && req.method === "DELETE") {
+        if (convIdMatch) {
           const convId = convIdMatch[1];
-          return handleDeleteConversation(req, convId);
+          // Support both DELETE and POST with X-HTTP-Method-Override header
+          // (for reverse proxies that don't forward DELETE methods)
+          if (req.method === "DELETE" ||
+              (req.method === "POST" && req.headers.get("X-HTTP-Method-Override") === "DELETE")) {
+            return handleDeleteConversation(req, convId);
+          }
         }
 
         // Context API endpoints

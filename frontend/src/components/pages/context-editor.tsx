@@ -8,9 +8,9 @@ import { toast } from "sonner";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { useProjectStore } from "@/stores/project-store";
+import { buildApiUrl } from "@/lib/base-path";
 
-// Use relative URL to leverage Vite's proxy in development
-const API_URL = "";
+const API_URL = buildApiUrl("");
 
 export function ContextEditor() {
   const [content, setContent] = useState("");

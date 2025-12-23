@@ -32,6 +32,7 @@ interface ChatPropsBase {
   setMessages?: (messages: any[]) => void;
   transcribeAudio?: (blob: Blob) => Promise<string>;
   uploadProgress?: number | null;
+  welcomeMessage?: string | null;
 }
 
 interface ChatProps extends ChatPropsBase {}
@@ -48,6 +49,7 @@ export function Chat({
   setMessages,
   transcribeAudio,
   uploadProgress,
+  welcomeMessage,
 }: ChatProps) {
   const isEmpty = messages.length === 0;
 
@@ -196,7 +198,9 @@ export function Chat({
       <GlobalToolDialogs toolInvocations={allToolInvocations} />
 
       {isEmpty ? (
-        <div className="flex flex-1 items-center justify-center">Welcome</div>
+        <div className="flex flex-1 items-center justify-center">
+          {welcomeMessage || "Welcome"}
+        </div>
       ) : null}
 
       {messages.length > 0 ? (

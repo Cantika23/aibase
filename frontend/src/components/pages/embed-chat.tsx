@@ -8,12 +8,16 @@ import { MainChat } from "./main-chat";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getEmbedInfo } from "@/lib/embed-api";
+import { buildWsUrl } from "@/lib/base-path";
 
 export function EmbedChatPage() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
   const embedToken = searchParams.get("embedToken");
-  const [customCss, setCustomCss] = useState<string | null>(null);
+  const [embedInfo, setEmbedInfo] = useState<{
+    customCss: string | null;
+    welcomeMessage: string | null;
+  }>({ customCss: null, welcomeMessage: null });
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(true);
 
@@ -27,9 +31,12 @@ export function EmbedChatPage() {
       }
 
       try {
-        // Validate embed token and get embed info (including custom CSS)
-        const embedInfo = await getEmbedInfo(projectId, embedToken);
-        setCustomCss(embedInfo.customCss);
+        // Validate embed token and get embed info (including custom CSS and welcome message)
+        const info = await getEmbedInfo(projectId, embedToken);
+        setEmbedInfo({
+          customCss: info.customCss,
+          welcomeMessage: info.welcomeMessage,
+        });
         setIsValidating(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to validate embed configuration");
@@ -42,11 +49,11 @@ export function EmbedChatPage() {
 
   // Inject custom CSS
   useEffect(() => {
-    if (!customCss) return;
+    if (!embedInfo.customCss) return;
 
     try {
       // Basic sanitization: remove script tags and javascript: URLs
-      const sanitizedCss = customCss
+      const sanitizedCss = embedInfo.customCss
         .replace(/<script[^>]*>.*?<\/script>/gi, '')
         .replace(/javascript:/gi, '')
         .replace(/on\w+\s*=/gi, '');
@@ -70,11 +77,11 @@ export function EmbedChatPage() {
     } catch (error) {
       console.error('[Embed] Failed to inject custom CSS:', error);
     }
-  }, [customCss]);
+  }, [embedInfo.customCss]);
 
   // Build public WebSocket URL
-  const wsUrl = typeof window !== 'undefined'
-    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/embed/ws?projectId=${encodeURIComponent(projectId || '')}&embedToken=${encodeURIComponent(embedToken || '')}`
+  const wsUrl = typeof window !== 'undefined' && projectId && embedToken
+    ? buildWsUrl(`/api/embed/ws?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}`)
     : '';
 
   if (isValidating) {
@@ -113,6 +120,7 @@ export function EmbedChatPage() {
         className="embed-chat"
         isTodoPanelVisible={false}
         isEmbedMode={true}
+        welcomeMessage={embedInfo.welcomeMessage}
       />
     </div>
   );

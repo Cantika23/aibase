@@ -22,6 +22,7 @@ interface ShadcnChatInterfaceProps {
   className?: string;
   isTodoPanelVisible?: boolean;
   isEmbedMode?: boolean;
+  welcomeMessage?: string | null;
 }
 
 export function MainChat({
@@ -29,6 +30,7 @@ export function MainChat({
   className,
   isTodoPanelVisible = true,
   isEmbedMode = false,
+  welcomeMessage = null,
 }: ShadcnChatInterfaceProps) {
   // Zustand stores (reactive state only)
   const {
@@ -254,12 +256,10 @@ export function MainChat({
         </PageActionGroup>
       )}
 
-      {/* Token Status - Bottom right corner (hide in embed mode) */}
-      {!isEmbedMode && (
-        <div className="absolute bottom-2 right-2 z-10">
-          <TokenStatus convId={convId} />
-        </div>
-      )}
+      {/* Token Status - Bottom right corner */}
+      <div className="absolute bottom-2 right-2 z-10">
+        <TokenStatus convId={convId} />
+      </div>
 
       {/* Todo Panel - Sticky on left */}
       {(todos?.items?.length > 0 || isLoading) && (
@@ -317,6 +317,7 @@ export function MainChat({
           setMessages={setMessages}
           className="h-full"
           uploadProgress={uploadProgress}
+          welcomeMessage={welcomeMessage}
         />
       </div>
     </div>

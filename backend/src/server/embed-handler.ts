@@ -50,6 +50,7 @@ export async function handleGetEmbedInfo(req: Request): Promise<Response> {
         name: project.name,
         description: project.description,
         customCss: project.custom_embed_css,
+        welcomeMessage: project.welcome_message,
       },
     });
   } catch (error) {
@@ -199,6 +200,91 @@ export async function handleUpdateEmbedCss(req: Request, projectId: string): Pro
         error: error instanceof Error ? error.message : "Failed to update embed CSS",
       },
       { status: error instanceof Error && error.message.includes("owner") ? 403 : 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/projects/:id/embed/welcome-message
+ * Update welcome message for embedded chat (authenticated)
+ */
+export async function handleUpdateWelcomeMessage(req: Request, projectId: string): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    const welcomeMessage = body.welcomeMessage || null;
+
+    // Limit welcome message size to 500 characters
+    if (welcomeMessage && welcomeMessage.length > 500) {
+      return Response.json(
+        { success: false, error: "Welcome message exceeds 500 character limit" },
+        { status: 400 }
+      );
+    }
+
+    await projectStorage.updateWelcomeMessage(projectId, auth.user.id, welcomeMessage);
+
+    return Response.json({
+      success: true,
+      data: { message: "Welcome message updated successfully" },
+    });
+  } catch (error) {
+    console.error("Error updating welcome message:", error);
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update welcome message",
+      },
+      { status: error instanceof Error && error.message.includes("owner") ? 403 : 500 }
+    );
+  }
+}
+
+/**
+ * Handle GET /api/projects/:id/embed/status
+ * Get embed status for a project (authenticated)
+ */
+export async function handleGetEmbedStatus(req: Request, projectId: string): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const project = projectStorage.getById(projectId);
+
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      data: {
+        isEmbeddable: project.is_embeddable,
+        embedToken: project.embed_token,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting embed status:", error);
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to get embed status",
+      },
+      { status: 500 }
     );
   }
 }

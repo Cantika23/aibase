@@ -8,11 +8,11 @@ import { UserManagementPage } from "./pages/user-management";
 import { TenantManagementPage } from "./pages/tenant-management";
 import { LoginPage } from "./pages/login";
 import { EmbedChatPage } from "./pages/embed-chat";
+import { EmbedSettings } from "./pages/embed-settings";
 import { ProjectRouteHandler } from "./project/project-route-handler";
 import { ProtectedRoute } from "./auth/protected-route";
 import { Button } from "./ui/button";
 import { UserMenu } from "./ui/user-menu";
-import { EmbedButton } from "./ui/embed-button";
 import {
   MessageSquare,
   Binary,
@@ -22,6 +22,7 @@ import {
   MessagesSquare,
   Users,
   Building2,
+  Code,
 } from "lucide-react";
 import { Toaster } from "./ui/sonner";
 import { useState, useEffect } from "react";
@@ -140,7 +141,20 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               <>Context</>
             )}
           </Button>
-          <EmbedButton projectId={currentProject.id} />
+          <Button
+            variant={
+              location.pathname === `/projects/${currentProject.id}/embed`
+                ? "default"
+                : "ghost"
+            }
+            size="sm"
+            onClick={() => navigate(`/projects/${currentProject.id}/embed`)}
+          >
+            <Code />
+            {location.pathname === `/projects/${currentProject.id}/embed` && (
+              <>Embed</>
+            )}
+          </Button>
           {location.pathname === `/projects/${currentProject.id}/chat` &&
             todos?.items?.length > 0 && (
               <Button
@@ -260,6 +274,16 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               <ProtectedRoute>
                 <ProjectRouteHandler>
                   <ContextEditor />
+                </ProjectRouteHandler>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:projectId/embed"
+            element={
+              <ProtectedRoute>
+                <ProjectRouteHandler>
+                  <EmbedSettings />
                 </ProjectRouteHandler>
               </ProtectedRoute>
             }
