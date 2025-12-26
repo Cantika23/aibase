@@ -9,6 +9,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getEmbedInfo } from "@/lib/embed-api";
 import { buildWsUrl } from "@/lib/base-path";
+import { useEmbedConvId } from "@/lib/embed-conv-id";
+import { useChatStore } from "@/stores/chat-store";
 
 export function EmbedChatPage() {
   const [searchParams] = useSearchParams();
@@ -20,6 +22,20 @@ export function EmbedChatPage() {
   }>({ customCss: null, welcomeMessage: null });
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(true);
+
+  // Use embed-specific conversation ID management (URL hash based)
+  const { convId, setConvId, generateNewConvId, ensureHashUpdated } = useEmbedConvId();
+
+  // Get messages from chat store to detect when first message is sent
+  const messages = useChatStore((state) => state.messages);
+
+  // Update URL hash with conversation ID after first message
+  useEffect(() => {
+    // Only update hash after the first user message is sent
+    if (messages.length > 0) {
+      ensureHashUpdated();
+    }
+  }, [messages.length, ensureHashUpdated]);
 
   // Validate embed parameters and fetch custom CSS
   useEffect(() => {
@@ -121,6 +137,8 @@ export function EmbedChatPage() {
         isTodoPanelVisible={false}
         isEmbedMode={true}
         welcomeMessage={embedInfo.welcomeMessage}
+        embedConvId={convId}
+        embedGenerateNewConvId={generateNewConvId}
       />
     </div>
   );

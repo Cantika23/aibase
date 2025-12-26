@@ -23,6 +23,9 @@ interface ShadcnChatInterfaceProps {
   isTodoPanelVisible?: boolean;
   isEmbedMode?: boolean;
   welcomeMessage?: string | null;
+  // Optional: Override conversation ID management for embed mode
+  embedConvId?: string;
+  embedGenerateNewConvId?: () => string;
 }
 
 export function MainChat({
@@ -31,6 +34,8 @@ export function MainChat({
   isTodoPanelVisible = true,
   isEmbedMode = false,
   welcomeMessage = null,
+  embedConvId,
+  embedGenerateNewConvId,
 }: ShadcnChatInterfaceProps) {
   // Zustand stores (reactive state only)
   const {
@@ -73,8 +78,10 @@ export function MainChat({
   // Get current project
   const { currentProject } = useProjectStore();
 
-  // Use the client ID management hook
-  const { convId, generateNewConvId } = useConvId();
+  // Use the client ID management hook (or use embed mode overrides)
+  const defaultConvIdHook = useConvId();
+  const convId = embedConvId ?? defaultConvIdHook.convId;
+  const generateNewConvId = embedGenerateNewConvId ?? defaultConvIdHook.generateNewConvId;
 
   // Use WebSocket connection manager - this ensures only one connection even with Strict Mode
   const wsClient = useWSConnection({
