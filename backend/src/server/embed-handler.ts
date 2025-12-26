@@ -165,6 +165,47 @@ export async function handleRegenerateEmbedToken(req: Request, projectId: string
 }
 
 /**
+ * Handle GET /api/projects/:id/embed/css
+ * Get custom CSS for embedded chat (authenticated)
+ */
+export async function handleGetEmbedCss(req: Request, projectId: string): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const project = projectStorage.getById(projectId);
+
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      data: {
+        customCss: project.custom_embed_css || "",
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error getting embed CSS");
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to get embed CSS",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * Handle POST /api/projects/:id/embed/css
  * Update custom CSS for embedded chat (authenticated)
  */

@@ -79,6 +79,7 @@ import {
   handleEnableEmbed,
   handleDisableEmbed,
   handleRegenerateEmbedToken,
+  handleGetEmbedCss,
   handleUpdateEmbedCss,
   handleUpdateWelcomeMessage,
   handleGetEmbedStatus,
@@ -321,7 +322,12 @@ export class WebSocketServer {
           const projectId = embedStatusMatch[1];
           return handleGetEmbedStatus(req, projectId);
         }
+
         const embedCssMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/css$/);
+        if (embedCssMatch && req.method === "GET") {
+          const projectId = embedCssMatch[1];
+          return handleGetEmbedCss(req, projectId);
+        }
         if (embedCssMatch && req.method === "POST") {
           const projectId = embedCssMatch[1];
           return handleUpdateEmbedCss(req, projectId);
