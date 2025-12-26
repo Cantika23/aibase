@@ -28,7 +28,6 @@ const transport = isDevelopment
         ignore: 'pid,hostname',
         singleLine: false,
         destination: logFile,
-        mkdir: true,
       },
     }
   : {
@@ -38,7 +37,6 @@ const transport = isDevelopment
           target: 'pino/file',
           options: {
             destination: errorLogFile,
-            mkdir: true,
           },
         },
         {
@@ -46,7 +44,6 @@ const transport = isDevelopment
           target: 'pino/file',
           options: {
             destination: logFile,
-            mkdir: true,
           },
         },
       ],
