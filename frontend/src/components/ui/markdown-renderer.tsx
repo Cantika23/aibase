@@ -147,7 +147,21 @@ const COMPONENTS = {
   h4: withClass("h4", "font-semibold text-base"),
   h5: withClass("h5", "font-medium"),
   strong: withClass("strong", "font-semibold"),
-  a: withClass("a", "text-primary underline underline-offset-2"),
+  a: ({ node, ...props }: any) => (
+    <a
+      className="text-primary underline underline-offset-2"
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+    />
+  ),
+  img: ({ node, ...props }: any) => (
+    <img
+      className="max-w-full h-auto rounded-md"
+      loading="lazy"
+      {...props}
+    />
+  ),
   blockquote: withClass("blockquote", "border-l-2 border-primary pl-4"),
   code: ({
     children,
@@ -199,7 +213,9 @@ function withClass<T extends keyof React.JSX.IntrinsicElements>(
   classes: string
 ) {
   const Component = (props: React.ComponentPropsWithoutRef<T>) => {
-    return React.createElement(Tag, { ...props, className: classes })
+    // Exclude react-markdown specific props that shouldn't be passed to DOM elements
+    const { node, ...domProps } = props as any
+    return React.createElement(Tag, { ...domProps, className: classes })
   }
   Component.displayName = Tag as string
   return Component
