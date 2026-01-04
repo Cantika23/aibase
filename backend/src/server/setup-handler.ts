@@ -279,18 +279,29 @@ async function verifyLicenseKeyWithFallback(req: Request, bodyKey?: string): Pro
 async function getRootUser(): Promise<any> {
   try {
     await authService.initialize();
-    const users = await authService.getAllUsers();
 
-    // If no users exist, return null (initial setup scenario)
-    if (!users || users.length === 0) {
+    // Try to get any user to check if users exist
+    try {
+      // When using license key, we need to bypass permission checks
+      // Directly query the database to check if users exist
+      const db = authService.getDatabase();
+      const users = db.query("SELECT * FROM users").all() as any[];
+
+      // If no users exist, return null (initial setup scenario)
+      if (!users || users.length === 0) {
+        return null;
+      }
+
+      const rootUser = users.find((u: any) => u.role === "root");
+      if (!rootUser) {
+        throw new Error("Root user not found");
+      }
+      return rootUser;
+    } catch (dbError) {
+      // If we can't query the DB directly, return null
+      logger.warn({ error: dbError }, "Could not query users directly, returning null root user");
       return null;
     }
-
-    const rootUser = users.find((u: any) => u.role === "root");
-    if (!rootUser) {
-      throw new Error("Root user not found");
-    }
-    return rootUser;
   } catch (error) {
     logger.error({ error }, "Error getting root user");
     throw new Error("Failed to get root user");
@@ -312,8 +323,21 @@ export async function handleGetUsers(req: Request): Promise<Response> {
     }
 
     await authService.initialize();
-    const users = await authService.getAllUsers();
-    return Response.json({ success: true, users });
+
+    // Try to get users directly from database to bypass permission checks
+    try {
+      const db = authService.getDatabase();
+      const users = db.query("SELECT id, username, email, role FROM users").all() as any[];
+      return Response.json({ success: true, users });
+    } catch (dbError) {
+      // Fall back to normal method if available
+      const rootUser = await getRootUser();
+      if (!rootUser) {
+        return Response.json({ success: true, users: [] });
+      }
+      const users = await authService.getAllUsers(rootUser.id);
+      return Response.json({ success: true, users });
+    }
   } catch (error) {
     logger.error({ error }, "Error getting users");
     return Response.json({ success: false, error: "Internal server error" }, { status: 500 });
@@ -365,11 +389,12 @@ export async function handleCreateUser(req: Request): Promise<Response> {
 
         // Update the role if specified (default register creates 'user' role)
         if (role && role !== "user") {
-          // Get the created user to update their role
-          const users = await authService.getAllUsers();
+          // Get the created user from database to update their role
+          const db = authService.getDatabase();
+          const users = db.query("SELECT * FROM users").all() as any[];
           const newUser = users.find((u: any) => u.username === username);
           if (newUser) {
-            await authService.updateUser(newUser.id, { role });
+            db.query("UPDATE users SET role = ? WHERE id = ?").run(role, newUser.id);
           }
         }
 
