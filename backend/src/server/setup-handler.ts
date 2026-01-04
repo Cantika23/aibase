@@ -578,12 +578,10 @@ export async function handleGetTenants(req: Request): Promise<Response> {
       return Response.json({ success: false, error: "Invalid license key" }, { status: 401 });
     }
 
-    await authService.initialize();
     await tenantStorage.initialize();
 
-    // Query tenants directly from database
-    const db = authService.getDatabase();
-    const tenants = db.query("SELECT id, name, domain, created_at, updated_at FROM tenants").all() as any[];
+    // Get all tenants from storage
+    const tenants = tenantStorage.getAll();
 
     // Add has_logo field by checking if logo file exists
     const tenantsWithLogo = tenants.map((tenant: any) => ({
