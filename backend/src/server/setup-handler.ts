@@ -578,6 +578,7 @@ export async function handleGetTenants(req: Request): Promise<Response> {
       return Response.json({ success: false, error: "Invalid license key" }, { status: 401 });
     }
 
+    await authService.initialize();
     await tenantStorage.initialize();
 
     // Query tenants directly from database
@@ -686,6 +687,7 @@ export async function handleDeleteTenant(req: Request, tenantId: string): Promis
       return Response.json({ success: false, error: "Invalid tenant ID" }, { status: 400 });
     }
 
+    await authService.initialize();
     await tenantStorage.initialize();
 
     // Check if tenant has users
