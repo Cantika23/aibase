@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -65,6 +66,9 @@ const clearLicenseCookie = () => {
 };
 
 export function AdminSetupPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
   const [licenseKey, setLicenseKey] = useState("");
   const [isVerified, setIsVerified] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -75,9 +79,35 @@ export function AdminSetupPage() {
   const [setup, setSetup] = useState<SetupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("setup");
-  const [tenantView, setTenantView] = useState<TenantView>("list");
+
+  // Get initial state from URL
+  const activeTab = (searchParams.get("tab") as Tab) || "setup";
+  const tenantView = (searchParams.get("view") as TenantView) || "list";
+  const selectedTenantId = searchParams.get("tenant");
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+
+  // Set active tab and update URL
+  const setActiveTab = (tab: Tab) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", tab);
+    params.delete("view");
+    params.delete("tenant");
+    navigate(`/admin-setup?${params.toString()}`, { replace: true });
+  };
+
+  // Set selected tenant and update URL
+  const setSelectedTenantWithURL = (tenant: Tenant | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (tenant) {
+      params.set("tenant", tenant.id.toString());
+      params.set("view", "detail");
+    } else {
+      params.delete("tenant");
+      params.set("view", "list");
+    }
+    navigate(`/admin-setup?${params.toString()}`, { replace: true });
+    setSelectedTenant(tenant);
+  };
 
   // User management state
   const [users, setUsers] = useState<User[]>([]);
@@ -132,16 +162,28 @@ export function AdminSetupPage() {
   };
 
   const handleTenantClick = (tenant: Tenant) => {
-    setSelectedTenant(tenant);
-    setTenantView("detail");
+    setSelectedTenantWithURL(tenant);
     loadUsersForTenant(tenant.id);
   };
 
   const handleBackToTenants = () => {
-    setSelectedTenant(null);
-    setTenantView("list");
+    setSelectedTenantWithURL(null);
     setUsers([]);
   };
+
+  // Sync selected tenant with URL
+  useEffect(() => {
+    if (selectedTenantId && tenants.length > 0) {
+      const tenant = tenants.find(t => t.id === parseInt(selectedTenantId));
+      if (tenant && tenant !== selectedTenant) {
+        setSelectedTenant(tenant);
+        loadUsersForTenant(tenant.id);
+      }
+    } else if (!selectedTenantId && selectedTenant) {
+      setSelectedTenant(null);
+      setUsers([]);
+    }
+  }, [selectedTenantId, tenants]);
 
   // Load current setup and check for license cookie on mount
   useEffect(() => {
@@ -631,11 +673,7 @@ export function AdminSetupPage() {
             App Settings
           </button>
           <button
-            onClick={() => {
-              setActiveTab("tenants");
-              setTenantView("list");
-              setSelectedTenant(null);
-            }}
+            onClick={() => setActiveTab("tenants")}
             className={`px-4 py-2 font-medium transition-colors ${
               activeTab === "tenants"
                 ? "border-b-2 border-primary text-primary"
@@ -719,7 +757,7 @@ export function AdminSetupPage() {
 
         {/* Tenants Tab */}
         {activeTab === "tenants" && (
-          <div className="space-y-6">
+          <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
             {/* Tenant Detail View */}
             {tenantView === "detail" && selectedTenant && (
               <div className="space-y-6">
