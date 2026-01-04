@@ -335,8 +335,7 @@ export function AdminSetupPage() {
               <AlertCircle />
               <AlertTitle>License Key Required</AlertTitle>
               <AlertDescription>
-                Enter your OPENAI_API_KEY environment variable as the license key
-                to access admin setup.
+                Enter your license key to access admin setup and manage your application.
               </AlertDescription>
             </Alert>
 
@@ -346,14 +345,14 @@ export function AdminSetupPage() {
                 <Input
                   id="licenseKey"
                   type="password"
-                  placeholder="Enter your OPENAI_API_KEY"
+                  placeholder="Enter your license key"
                   value={licenseKey}
                   onChange={(e) => setLicenseKey(e.target.value)}
                   required
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
-                  This is the value of OPENAI_API_KEY from your .env file
+                  Contact your administrator if you don't have a license key
                 </p>
               </div>
 
