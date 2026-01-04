@@ -182,7 +182,7 @@ export function ConversationHistoryPage() {
 
       <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col">
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 pt-16 sm:pt-6">
           <p className=" text-lg">
             {currentProject?.name || "Select a conversation to continue"}
           </p>
