@@ -3,9 +3,12 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import { AppRouter } from "./components/app-router";
 import { getBasePath, buildWsUrl } from "./lib/base-path";
+import { getAppName } from "./lib/setup";
 
-// Set document title from environment variable
-document.title = import.meta.env.APP_NAME || "AI-BASE";
+// Set document title from setup config or environment variable
+getAppName().then((appName) => {
+  document.title = appName;
+});
 
 // Get base path for React Router
 const basePath = getBasePath();

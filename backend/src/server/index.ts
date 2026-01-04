@@ -84,6 +84,13 @@ import {
   handleUpdateWelcomeMessage,
   handleGetEmbedStatus,
 } from "./embed-handler";
+import {
+  handleVerifyLicense,
+  handleGetSetup,
+  handleUpdateSetup,
+  handleGetLogo,
+  handleGetPublicSetup,
+} from "./setup-handler";
 import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware/rate-limiter";
 import { ProjectStorage } from "../storage/project-storage";
 import { logger } from "../utils/logger";
@@ -485,6 +492,32 @@ export class WebSocketServer {
           } else if (req.method === "DELETE") {
             return handleDeleteTenant(req, tenantId);
           }
+        }
+
+        // Admin Setup API endpoints (no auth required, uses license key)
+        if (pathname === "/api/setup" && req.method === "GET") {
+          return handleGetPublicSetup(req);
+        }
+
+        if (pathname === "/api/setup/logo" && req.method === "GET") {
+          return handleGetLogo(req);
+        }
+
+        if (pathname === "/api/admin/setup/verify-license" && req.method === "POST") {
+          return handleVerifyLicense(req);
+        }
+
+        if (pathname === "/api/admin/setup" && req.method === "GET") {
+          return handleGetSetup(req);
+        }
+
+        if (pathname === "/api/admin/setup" && req.method === "POST") {
+          return handleUpdateSetup(req);
+        }
+
+        // Serve logo file
+        if (pathname === "/api/admin/setup/logo" && req.method === "GET") {
+          return handleGetLogo(req);
         }
 
         // Health check endpoint

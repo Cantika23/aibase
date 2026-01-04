@@ -7,6 +7,7 @@ import { ProjectSelectorPage } from "./pages/project-selector";
 import { UserManagementPage } from "./pages/user-management";
 import { TenantManagementPage } from "./pages/tenant-management";
 import { LoginPage } from "./pages/login";
+import { AdminSetupPage } from "./pages/admin-setup";
 import { EmbedChatPage } from "./pages/embed-chat";
 import { EmbedSettings } from "./pages/embed-settings";
 import { ProjectRouteHandler } from "./project/project-route-handler";
@@ -208,6 +209,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin-setup" element={<AdminSetupPage />} />
           <Route path="/embed" element={<EmbedChatPage />} />
 
           {/* Protected routes */}

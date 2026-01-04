@@ -6,6 +6,7 @@ import { Label } from "../ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { AlertCircle } from "lucide-react";
+import { getAppName, getLogoUrl } from "@/lib/setup";
 
 export function LoginPage() {
   const auth = useAuth();
@@ -21,14 +22,15 @@ export function LoginPage() {
   // Form state
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [logoAvailable, setLogoAvailable] = useState(false);
+  const [appName, setAppName] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
-  // Check if logo is available
+  // Load setup configuration
   useEffect(() => {
-    const img = new Image();
-    img.src = "/logo.png";
-    img.onload = () => setLogoAvailable(true);
-    img.onerror = () => setLogoAvailable(false);
+    Promise.all([getAppName(), getLogoUrl()]).then(([name, logo]) => {
+      setAppName(name);
+      setLogoUrl(logo);
+    });
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -44,15 +46,19 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-md space-y-8 p-8">
         <div className="text-center">
-          {logoAvailable && (
+          {logoUrl && (
             <img
-              src="/logo.png"
-              alt={import.meta.env.APP_NAME || "AI-BASE"}
+              src={logoUrl}
+              alt={appName}
               className="mx-auto mb-4 h-16 w-auto"
+              onError={() => {
+                // Fallback to removing logo if it fails to load
+                setLogoUrl(null);
+              }}
             />
           )}
           <h1 className="text-4xl font-bold tracking-tight">
-            {import.meta.env.APP_NAME || "AI-BASE"}
+            {appName}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Sign in to access your projects
