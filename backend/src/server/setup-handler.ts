@@ -278,7 +278,14 @@ async function verifyLicenseKeyWithFallback(req: Request, bodyKey?: string): Pro
  */
 async function getRootUser(): Promise<any> {
   try {
+    await authService.initialize();
     const users = await authService.getAllUsers();
+
+    // If no users exist, return null (initial setup scenario)
+    if (!users || users.length === 0) {
+      return null;
+    }
+
     const rootUser = users.find((u: any) => u.role === "root");
     if (!rootUser) {
       throw new Error("Root user not found");
@@ -346,6 +353,38 @@ export async function handleCreateUser(req: Request): Promise<Response> {
     await authService.initialize();
     const rootUser = await getRootUser();
 
+    // If no users exist yet, create the first user directly
+    if (!rootUser) {
+      try {
+        // Register the first user directly without requiring a parent user
+        const result = await authService.register({
+          email,
+          username,
+          password,
+        });
+
+        // Update the role if specified (default register creates 'user' role)
+        if (role && role !== "user") {
+          // Get the created user to update their role
+          const users = await authService.getAllUsers();
+          const newUser = users.find((u: any) => u.username === username);
+          if (newUser) {
+            await authService.updateUser(newUser.id, { role });
+          }
+        }
+
+        logger.info({ username, email, role }, "First user created via admin-setup");
+        return Response.json({ success: true, user: result.user }, { status: 201 });
+      } catch (registerError: any) {
+        logger.error({ error: registerError }, "Error creating first user");
+        return Response.json(
+          { success: false, error: registerError.message || "Failed to create user" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Normal user creation with root user as parent
     const newUser = await authService.createUser(rootUser.id, {
       email,
       username,
@@ -395,8 +434,8 @@ export async function handleUpdateUser(req: Request, userId: string): Promise<Re
       return Response.json({ success: false, error: "Invalid user ID" }, { status: 400 });
     }
 
-    // Prevent modifying yourself
-    if (rootUser.id === userIdNum) {
+    // Prevent modifying yourself (if root user exists)
+    if (rootUser && rootUser.id === userIdNum) {
       return Response.json(
         { success: false, error: "Cannot modify your own account via admin-setup" },
         { status: 400 }
@@ -450,8 +489,8 @@ export async function handleDeleteUser(req: Request, userId: string): Promise<Re
       return Response.json({ success: false, error: "Invalid user ID" }, { status: 400 });
     }
 
-    // Prevent deleting yourself
-    if (rootUser.id === userIdNum) {
+    // Prevent deleting yourself (if root user exists)
+    if (rootUser && rootUser.id === userIdNum) {
       return Response.json(
         { success: false, error: "Cannot delete your own account via admin-setup" },
         { status: 400 }
