@@ -42,6 +42,7 @@ export type MessageType =
   | "pong"
   | "status"
   | "todo_update"
+  | "conversation_title_update"
   | "notification";
 
 export interface UserMessageData {
