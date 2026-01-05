@@ -17,15 +17,12 @@ import { Button } from "./ui/button";
 import { UserMenu } from "./ui/user-menu";
 import {
   MessageSquare,
-  Binary,
   ListTodo,
-  FileText,
   ArrowLeft,
   MessagesSquare,
   Users,
   Building2,
   Code,
-  Files,
   Brain,
   ScrollText,
   FolderTree,
