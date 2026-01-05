@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
-import { Power, PowerOff, RefreshCw, Copy, Check } from "lucide-react";
+import { RefreshCw, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 const API_BASE_URL = buildApiUrl("");
@@ -22,7 +22,6 @@ const API_BASE_URL = buildApiUrl("");
 export function EmbedSettings() {
   const { currentProject } = useProjectStore();
 
-  const [isEmbedEnabled, setIsEmbedEnabled] = useState(false);
   const [embedToken, setEmbedToken] = useState<string | null>(null);
   const [customCss, setCustomCss] = useState("");
   const [welcomeMessage, setWelcomeMessage] = useState("");
@@ -54,11 +53,11 @@ export function EmbedSettings() {
 
   // Load welcome message
   const loadWelcomeMessage = useCallback(async () => {
-    if (!currentProject || !embedToken) return;
+    if (!currentProject) return;
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/embed/info?projectId=${currentProject.id}&embedToken=${embedToken}`
+        `${API_BASE_URL}/api/embed/info?projectId=${currentProject.id}&embedToken=${currentProject.id}`
       );
       const data = await response.json();
 
@@ -68,7 +67,7 @@ export function EmbedSettings() {
     } catch (err) {
       console.error("Failed to load welcome message:", err);
     }
-  }, [currentProject, embedToken]);
+  }, [currentProject]);
 
   // Load embed settings when project changes
   const loadEmbedSettings = useCallback(async () => {
@@ -78,27 +77,12 @@ export function EmbedSettings() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/projects/${currentProject.id}/embed/status`
-      );
-      const data = await response.json();
+      // Use project ID as embed token
+      const token = currentProject.id;
+      setEmbedToken(token);
 
-      if (!data.success) {
-        throw new Error(data.error || "Failed to load embed settings");
-      }
-
-      setIsEmbedEnabled(data.data.isEmbeddable || false);
-      setEmbedToken(data.data.embedToken || null);
-
-      // Load custom CSS
-      if (data.data.isEmbeddable) {
-        await loadCustomCss();
-      }
-
-      // Load welcome message if embed token exists
-      if (data.data.embedToken) {
-        await loadWelcomeMessage();
-      }
+      await loadCustomCss();
+      await loadWelcomeMessage();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load embed settings";
       setError(errorMessage);
@@ -113,76 +97,6 @@ export function EmbedSettings() {
       loadEmbedSettings();
     }
   }, [currentProject, loadEmbedSettings]);
-
-  // Also reload welcome message when embedToken changes
-  useEffect(() => {
-    if (embedToken) {
-      loadWelcomeMessage();
-    }
-  }, [embedToken, loadWelcomeMessage]);
-
-  const handleEnableEmbed = async () => {
-    if (!currentProject) return;
-
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/projects/${currentProject.id}/embed/enable`,
-        { method: "POST" }
-      );
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to enable embedding");
-      }
-
-      setIsEmbedEnabled(true);
-      setEmbedToken(data.data.embedToken);
-      toast.success("Embedding enabled successfully");
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to enable embedding";
-      setError(errorMessage);
-      toast.error("Failed to enable embedding", {
-        description: errorMessage,
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDisableEmbed = async () => {
-    if (!currentProject) return;
-
-    setIsSaving(true);
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/projects/${currentProject.id}/embed/disable`,
-        { method: "POST" }
-      );
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to disable embedding");
-      }
-
-      setIsEmbedEnabled(false);
-      setEmbedToken(null);
-      setCustomCss("");
-      setWelcomeMessage("");
-      toast.success("Embedding disabled successfully");
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to disable embedding";
-      setError(errorMessage);
-      toast.error("Failed to disable embedding", {
-        description: errorMessage,
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleSaveCustomCss = async () => {
     if (!currentProject) return;
@@ -248,37 +162,6 @@ export function EmbedSettings() {
     }
   };
 
-  const handleRegenerateToken = async () => {
-    if (!currentProject || !confirm("Regenerating the token will invalidate all existing embed codes. Continue?")) {
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/projects/${currentProject.id}/embed/regenerate`,
-        { method: "POST" }
-      );
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to regenerate token");
-      }
-
-      setEmbedToken(data.data.embedToken);
-      toast.success("Embed token regenerated successfully");
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to regenerate token";
-      setError(errorMessage);
-      toast.error("Failed to regenerate token", {
-        description: errorMessage,
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const generateIframeCode = (): string => {
     if (!currentProject || !embedToken) return "";
     const basePath = buildApiUrl("");
@@ -316,7 +199,7 @@ export function EmbedSettings() {
 <\/script>`;
   };
 
-  const embedCode = isEmbedEnabled && embedToken
+  const embedCode = embedToken
     ? codeType === "iframe"
       ? generateIframeCode()
       : generateJavaScriptCode()
@@ -356,22 +239,6 @@ export function EmbedSettings() {
           isLoading={isLoading}
           spinIcon={true}
         />
-        {isEmbedEnabled ? (
-          <PageActionButton
-            icon={PowerOff}
-            label="Disable Embed"
-            onClick={handleDisableEmbed}
-            variant="destructive"
-            isLoading={isSaving}
-          />
-        ) : (
-          <PageActionButton
-            icon={Power}
-            label="Enable Embed"
-            onClick={handleEnableEmbed}
-            isLoading={isSaving}
-          />
-        )}
       </PageActionGroup>
 
       {error && (
@@ -384,15 +251,6 @@ export function EmbedSettings() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
           <p className="text-muted-foreground ml-4">Loading embed settings...</p>
-        </div>
-      ) : !isEmbedEnabled ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center max-w-md">
-            <p className="text-muted-foreground mb-4">
-              Embedding is currently disabled for this project. Enable it to generate embed
-              codes and customize the embedded chat.
-            </p>
-          </div>
         </div>
       ) : (
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
@@ -529,20 +387,6 @@ export function EmbedSettings() {
                   )}
                 </Button>
               </div>
-            </div>
-
-            {/* Regenerate Token */}
-            <div className="pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={handleRegenerateToken}
-                disabled={isSaving}
-              >
-                Regenerate Embed Token
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                ⚠️ Regenerating the token will invalidate all existing embed codes.
-              </p>
             </div>
           </div>
         </div>

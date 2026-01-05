@@ -200,8 +200,8 @@ export class ProjectStorage {
     const is_shared = data.is_shared ?? false;
 
     const stmt = this.db.prepare(`
-      INSERT INTO projects (id, name, description, user_id, tenant_id, is_shared, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, description, user_id, tenant_id, is_shared, is_embeddable, embed_token, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
     `);
 
     stmt.run(
@@ -211,6 +211,7 @@ export class ProjectStorage {
       data.user_id,
       data.tenant_id ?? null,
       is_shared ? 1 : 0,
+      id, // Use project ID as embed token
       now,
       now
     );
@@ -397,61 +398,8 @@ export class ProjectStorage {
   }
 
   /**
-   * Generate a secure random embed token
-   */
-  private generateEmbedToken(): string {
-    const randomBytes = crypto.getRandomValues(new Uint8Array(32));
-    return Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  /**
-   * Enable embedding for a project
-   */
-  async enableEmbed(projectId: string, userId: number): Promise<string> {
-    const project = this.getById(projectId);
-    if (!project) {
-      throw new Error('Project not found');
-    }
-
-    // Only owner can enable embedding
-    if (project.user_id !== userId) {
-      throw new Error('Only the project owner can enable embedding');
-    }
-
-    const embedToken = this.generateEmbedToken();
-    const stmt = this.db.prepare(`
-      UPDATE projects SET is_embeddable = 1, embed_token = ?, updated_at = ? WHERE id = ?
-    `);
-
-    stmt.run(embedToken, Date.now(), projectId);
-    console.log('[ProjectStorage] Enabled embedding for project:', projectId);
-    return embedToken;
-  }
-
-  /**
-   * Disable embedding for a project
-   */
-  async disableEmbed(projectId: string, userId: number): Promise<void> {
-    const project = this.getById(projectId);
-    if (!project) {
-      throw new Error('Project not found');
-    }
-
-    // Only owner can disable embedding
-    if (project.user_id !== userId) {
-      throw new Error('Only the project owner can disable embedding');
-    }
-
-    const stmt = this.db.prepare(`
-      UPDATE projects SET is_embeddable = 0, embed_token = NULL, updated_at = ? WHERE id = ?
-    `);
-
-    stmt.run(Date.now(), projectId);
-    console.log('[ProjectStorage] Disabled embedding for project:', projectId);
-  }
-
-  /**
    * Regenerate embed token for a project
+   * Note: We use the project ID as the embed token, so this just returns the project ID
    */
   async regenerateEmbedToken(projectId: string, userId: number): Promise<string> {
     const project = this.getById(projectId);
@@ -464,18 +412,9 @@ export class ProjectStorage {
       throw new Error('Only the project owner can regenerate the embed token');
     }
 
-    if (!project.is_embeddable) {
-      throw new Error('Embedding is not enabled for this project');
-    }
-
-    const embedToken = this.generateEmbedToken();
-    const stmt = this.db.prepare(`
-      UPDATE projects SET embed_token = ?, updated_at = ? WHERE id = ?
-    `);
-
-    stmt.run(embedToken, Date.now(), projectId);
-    console.log('[ProjectStorage] Regenerated embed token for project:', projectId);
-    return embedToken;
+    // Just return the project ID since we use it as the embed token
+    console.log('[ProjectStorage] Embed token is the project ID for:', projectId);
+    return projectId;
   }
 
   /**
@@ -490,10 +429,6 @@ export class ProjectStorage {
     // Only owner can update embed CSS
     if (project.user_id !== userId) {
       throw new Error('Only the project owner can update embed CSS');
-    }
-
-    if (!project.is_embeddable) {
-      throw new Error('Embedding is not enabled for this project');
     }
 
     const stmt = this.db.prepare(`
@@ -516,10 +451,6 @@ export class ProjectStorage {
     // Only owner can update welcome message
     if (project.user_id !== userId) {
       throw new Error('Only the project owner can update welcome message');
-    }
-
-    if (!project.is_embeddable) {
-      throw new Error('Embedding is not enabled for this project');
     }
 
     const stmt = this.db.prepare(`

@@ -118,10 +118,20 @@ export function ProjectSelectorPage() {
                 onClick={() => handleSelectProject(project.id)}
               >
                 <CardHeader>
-                  <div className="flex items-start justify-between">
+                  <div className="flex flex-col items-start justify-between">
                     <div className="flex items-center gap-2">
-                      <Folder className="size-5 text-primary" />
                       <CardTitle className="text-xl">{project.name}</CardTitle>
+                    </div>
+                  </div>
+                  {project.description?.trim() && (
+                    <CardDescription className="line-clamp-2">
+                      {project.description}
+                    </CardDescription>
+                  )}
+
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <div>
+                      {new Date(project.created_at).toLocaleDateString()}
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
@@ -145,15 +155,6 @@ export function ProjectSelectorPage() {
                         <Trash2 className="size-4 text-destructive" />
                       </Button>
                     </div>
-                  </div>
-                  {project.description?.trim() && (
-                    <CardDescription className="line-clamp-2">
-                      {project.description}
-                    </CardDescription>
-                  )}
-
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    {new Date(project.created_at).toLocaleDateString()}
                   </div>
                 </CardHeader>
               </Card>

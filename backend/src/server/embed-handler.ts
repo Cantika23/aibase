@@ -37,10 +37,10 @@ export async function handleGetEmbedInfo(req: Request): Promise<Response> {
       );
     }
 
-    // Verify embedding is enabled and token matches
-    if (!project.is_embeddable || project.embed_token !== embedToken) {
+    // Verify token matches
+    if (project.embed_token !== embedToken) {
       return Response.json(
-        { success: false, error: "Invalid embed configuration" },
+        { success: false, error: "Invalid embed token" },
         { status: 403 }
       );
     }
@@ -64,70 +64,6 @@ export async function handleGetEmbedInfo(req: Request): Promise<Response> {
         error: error instanceof Error ? error.message : "Failed to get embed info",
       },
       { status: 500 }
-    );
-  }
-}
-
-/**
- * Handle POST /api/projects/:id/embed/enable
- * Enable embedding for a project (authenticated)
- */
-export async function handleEnableEmbed(req: Request, projectId: string): Promise<Response> {
-  try {
-    const auth = await authenticateRequest(req);
-    if (!auth) {
-      return Response.json(
-        { success: false, error: "Not authenticated" },
-        { status: 401 }
-      );
-    }
-
-    const embedToken = await projectStorage.enableEmbed(projectId, auth.user.id);
-
-    return Response.json({
-      success: true,
-      data: { embedToken },
-    });
-  } catch (error) {
-    logger.error({ error }, "Error enabling embed");
-    return Response.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to enable embedding",
-      },
-      { status: error instanceof Error && error.message.includes("owner") ? 403 : 500 }
-    );
-  }
-}
-
-/**
- * Handle POST /api/projects/:id/embed/disable
- * Disable embedding for a project (authenticated)
- */
-export async function handleDisableEmbed(req: Request, projectId: string): Promise<Response> {
-  try {
-    const auth = await authenticateRequest(req);
-    if (!auth) {
-      return Response.json(
-        { success: false, error: "Not authenticated" },
-        { status: 401 }
-      );
-    }
-
-    await projectStorage.disableEmbed(projectId, auth.user.id);
-
-    return Response.json({
-      success: true,
-      data: { message: "Embedding disabled successfully" },
-    });
-  } catch (error) {
-    logger.error({ error }, "Error disabling embed");
-    return Response.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to disable embedding",
-      },
-      { status: error instanceof Error && error.message.includes("owner") ? 403 : 500 }
     );
   }
 }

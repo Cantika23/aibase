@@ -81,8 +81,6 @@ import {
 } from "./tenant-handler";
 import {
   handleGetEmbedInfo,
-  handleEnableEmbed,
-  handleDisableEmbed,
   handleRegenerateEmbedToken,
   handleGetEmbedCss,
   handleUpdateEmbedCss,
@@ -333,18 +331,6 @@ export class WebSocketServer {
         }
 
         // Embed management API endpoints (authenticated)
-        const embedEnableMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/enable$/);
-        if (embedEnableMatch && req.method === "POST") {
-          const projectId = embedEnableMatch[1];
-          return handleEnableEmbed(req, projectId);
-        }
-
-        const embedDisableMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/disable$/);
-        if (embedDisableMatch && req.method === "POST") {
-          const projectId = embedDisableMatch[1];
-          return handleDisableEmbed(req, projectId);
-        }
-
         const embedRegenerateMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/embed\/regenerate$/);
         if (embedRegenerateMatch && req.method === "POST") {
           const projectId = embedRegenerateMatch[1];
