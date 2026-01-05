@@ -122,7 +122,7 @@ export function FilesManagerPage() {
     <div className="flex h-screen items-center justify-center p-4">
       <div className="w-full select-none max-w-4xl space-y-6 h-full flex flex-col">
         {/* Header */}
-        <div className="text-center space-y-2 pt-16 sm:pt-6">
+        <div className="text-center space-y-2 pt-12 sm:pt-4">
           <p className="text-lg">
             {currentProject?.name || "Project Files"}
           </p>

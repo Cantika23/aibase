@@ -26,6 +26,9 @@ import {
   Building2,
   Code,
   Files,
+  Brain,
+  ScrollText,
+  FolderTree,
 } from "lucide-react";
 import { Toaster } from "./ui/sonner";
 import { useState, useEffect } from "react";
@@ -125,7 +128,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
             size="sm"
             onClick={() => navigate(`/projects/${currentProject.id}/memory`)}
           >
-            <Binary />
+            <Brain />
             {location.pathname === `/projects/${currentProject.id}/memory` && (
               <span className="hidden sm:inline">Memory</span>
             )}
@@ -139,7 +142,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
             size="sm"
             onClick={() => navigate(`/projects/${currentProject.id}/context`)}
           >
-            <FileText />
+            <ScrollText />
             {location.pathname === `/projects/${currentProject.id}/context` && (
               <span className="hidden sm:inline">Context</span>
             )}
@@ -153,7 +156,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
             size="sm"
             onClick={() => navigate(`/projects/${currentProject.id}/files`)}
           >
-            <Files />
+            <FolderTree />
             {location.pathname === `/projects/${currentProject.id}/files` && (
               <span className="hidden sm:inline">Files</span>
             )}
