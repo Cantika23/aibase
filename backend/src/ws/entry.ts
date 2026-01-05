@@ -716,6 +716,7 @@ export class WSServer extends WSEventEmitter {
                 promptTokens: tokenUsage.promptTokens,
                 completionTokens: tokenUsage.completionTokens,
                 totalTokens: tokenUsage.totalTokens,
+                messageCount: convInfo?.totalMessages || 0,
               }
             : undefined,
           maxTokens,
@@ -1063,6 +1064,7 @@ export class WSServer extends WSEventEmitter {
                 promptTokens: totalTokenUsage.promptTokens,
                 completionTokens: totalTokenUsage.completionTokens,
                 totalTokens: totalTokenUsage.totalTokens,
+                messageCount: convInfo?.totalMessages || 0,
               } : undefined, // Total cumulative token usage from info.json
               type: control.type,
             },

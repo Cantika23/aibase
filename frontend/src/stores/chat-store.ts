@@ -22,6 +22,7 @@ interface ChatStore {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    messageCount: number;
   } | null;
 
   // Actions for messages
@@ -48,7 +49,7 @@ interface ChatStore {
   setMaxTokens: (maxTokens: number | null) => void;
 
   // Actions for tokenUsage
-  setTokenUsage: (tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null) => void;
+  setTokenUsage: (tokenUsage: { promptTokens: number; completionTokens: number; totalTokens: number; messageCount: number } | null) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({

@@ -22,7 +22,7 @@ export function TokenStatus({ convId }: TokenStatusProps) {
     totalTokens: tokenUsage?.totalTokens || 0,
     promptTokens: tokenUsage?.promptTokens || 0,
     completionTokens: tokenUsage?.completionTokens || 0,
-    messageCount: tokenUsage ? 1 : 0, // We have token stats or we don't
+    messageCount: tokenUsage?.messageCount || 0,
   };
 
   const utilizationPercent = (tokenStats.totalTokens / maxTokens) * 100;
