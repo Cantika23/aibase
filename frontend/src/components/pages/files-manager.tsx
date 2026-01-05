@@ -121,15 +121,6 @@ export function FilesManagerPage() {
   return (
     <div className="flex h-screen items-center justify-center p-4">
       <div className="w-full select-none max-w-4xl space-y-6 h-full flex flex-col">
-        {/* Header */}
-        <div className="text-center space-y-2 pt-12 sm:pt-4">
-          <p className="text-lg">
-            {currentProject?.name || "Project Files"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {files.length} {files.length === 1 ? "file" : "files"} uploaded
-          </p>
-        </div>
 
         {/* Files List */}
         {files.length > 0 ? (

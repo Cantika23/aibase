@@ -5,6 +5,7 @@
 interface SetupConfig {
   appName: string | null;
   hasLogo: boolean;
+  hasFavicon: boolean;
 }
 
 let setupCache: SetupConfig | null = null;
@@ -67,6 +68,19 @@ export async function getLogoUrl(): Promise<string | null> {
 
   if (setup?.hasLogo) {
     return "/api/setup/logo";
+  }
+
+  return null;
+}
+
+/**
+ * Get favicon URL if available
+ */
+export async function getFaviconUrl(): Promise<string | null> {
+  const setup = await fetchSetupConfig();
+
+  if (setup?.hasFavicon) {
+    return "/api/setup/favicon";
   }
 
   return null;

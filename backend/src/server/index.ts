@@ -93,6 +93,7 @@ import {
   handleGetSetup,
   handleUpdateSetup,
   handleGetLogo,
+  handleGetFavicon,
   handleGetPublicSetup,
   handleGetUsers,
   handleCreateUser,
@@ -404,7 +405,7 @@ export class WebSocketServer {
           // Support both DELETE and POST with X-HTTP-Method-Override header
           // (for reverse proxies that don't forward DELETE methods)
           if (req.method === "DELETE" ||
-              (req.method === "POST" && req.headers.get("X-HTTP-Method-Override") === "DELETE")) {
+            (req.method === "POST" && req.headers.get("X-HTTP-Method-Override") === "DELETE")) {
             return handleDeleteConversation(req, convId);
           }
         }
@@ -527,6 +528,10 @@ export class WebSocketServer {
 
         if (pathname === "/api/setup/logo" && req.method === "GET") {
           return handleGetLogo(req);
+        }
+
+        if (pathname === "/api/setup/favicon" && req.method === "GET") {
+          return handleGetFavicon(req);
         }
 
         if (pathname === "/api/admin/setup/verify-license" && req.method === "POST") {

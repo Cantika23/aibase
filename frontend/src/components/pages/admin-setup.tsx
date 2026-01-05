@@ -21,6 +21,7 @@ import { toast } from "sonner";
 interface SetupData {
   appName: string;
   hasLogo: boolean;
+  hasFavicon?: boolean;
   updatedAt: number;
 }
 
@@ -71,6 +72,8 @@ export function AdminSetupPage() {
   const [appName, setAppName] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [setup, setSetup] = useState<SetupData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -281,6 +284,19 @@ export function AdminSetupPage() {
     }
   };
 
+  const handleFaviconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFaviconFile(file);
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFaviconPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -294,6 +310,9 @@ export function AdminSetupPage() {
       }
       if (logoFile) {
         formData.append("logo", logoFile);
+      }
+      if (faviconFile) {
+        formData.append("favicon", faviconFile);
       }
 
       const response = await fetch("/api/admin/setup", {
@@ -650,21 +669,19 @@ export function AdminSetupPage() {
         <div className="flex gap-2 border-b">
           <button
             onClick={() => setActiveTab("setup")}
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === "setup"
+            className={`px-4 py-2 font-medium transition-colors ${activeTab === "setup"
                 ? "border-b-2 border-primary text-primary"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             App Settings
           </button>
           <button
             onClick={() => setActiveTab("tenants")}
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === "tenants"
+            className={`px-4 py-2 font-medium transition-colors ${activeTab === "tenants"
                 ? "border-b-2 border-primary text-primary"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             Tenant & User Management
           </button>
@@ -725,6 +742,38 @@ export function AdminSetupPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Upload a logo image (PNG, JPG, etc.) - will be saved to /data/logo.png
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="favicon">Application Favicon</Label>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Input
+                      id="favicon"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFaviconChange}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                  {faviconPreview && (
+                    <div className="relative h-16 w-16 border rounded-md overflow-hidden">
+                      <img
+                        src={faviconPreview}
+                        alt="Favicon preview"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  {(setup?.hasFavicon || faviconPreview) && !faviconPreview && (
+                    <div className="h-16 w-16 border rounded-md flex items-center justify-center bg-muted">
+                      <Upload className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload a favicon image (PNG, ICO, etc.) - will be saved to /data/favicon.png
                 </p>
               </div>
 
@@ -896,13 +945,12 @@ export function AdminSetupPage() {
                             <td className="px-4 py-3 text-sm">{user.email}</td>
                             <td className="px-4 py-3 text-sm">
                               <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${
-                                  user.role === "root"
+                                className={`px-2 py-1 rounded text-xs font-medium ${user.role === "root"
                                     ? "bg-purple-100 text-purple-800"
                                     : user.role === "admin"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-gray-100 text-gray-800"
+                                  }`}
                               >
                                 {user.role}
                               </span>

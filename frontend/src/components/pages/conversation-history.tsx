@@ -209,13 +209,6 @@ export function ConversationHistoryPage() {
       </PageActionGroup>
 
       <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col">
-        {/* Header */}
-        <div className="text-center space-y-2 pt-16 sm:pt-6">
-          <p className=" text-lg">
-            {currentProject?.name || "Select a conversation to continue"}
-          </p>
-        </div>
-
         {/* Conversations List */}
         {conversations.length > 0 ? (
           <div className="overflow-auto relative flex-1">
