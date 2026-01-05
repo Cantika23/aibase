@@ -397,4 +397,12 @@ export class AuthService {
     // Delete user
     return await this.userStorage.delete(userId);
   }
+
+  /**
+   * Create a session for a specific user ID (internal use only)
+   * Used for embed authentication where identity is verified via other means
+   */
+  async createSessionForUser(userId: number): Promise<Session> {
+    return await this.sessionStorage.create(userId);
+  }
 }

@@ -15,6 +15,12 @@ export interface Project {
   is_embeddable: boolean;
   embed_token: string | null;
   custom_embed_css: string | null;
+  welcome_message: string | null;
+  show_history: boolean;
+  show_files: boolean;
+  show_context: boolean;
+  show_memory: boolean;
+  use_client_uid: boolean;
   created_at: number;
   updated_at: number;
 }

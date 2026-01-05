@@ -3,7 +3,7 @@
  * Handles multipart/form-data file uploads
  */
 
-import { FileStorage } from '../storage/file-storage';
+import { FileStorage, FileScope } from '../storage/file-storage';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('Upload');
@@ -15,6 +15,7 @@ export interface UploadedFileInfo {
   type: string;
   url: string;
   uploadedAt: number;
+  scope: FileScope;
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -54,6 +55,10 @@ export async function handleFileUpload(req: Request): Promise<Response> {
       );
     }
 
+    // Get scope from form data, default to 'user'
+    const scopeParam = formData.get('scope');
+    const scope: FileScope = (scopeParam === 'public' || scopeParam === 'user') ? scopeParam : 'user';
+
     const fileStorage = FileStorage.getInstance();
     const uploadedFiles: UploadedFileInfo[] = [];
 
@@ -76,20 +81,22 @@ export async function handleFileUpload(req: Request): Promise<Response> {
       logger.info({
         file: file.name,
         size: file.size,
-        type: file.type
+        type: file.type,
+        scope
       }, 'Processing file');
 
       // Convert File to Buffer
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // Save file
+      // Save file with scope
       const storedFile = await fileStorage.saveFile(
         convId,
         file.name,
         buffer,
         file.type,
-        projectId
+        projectId,
+        scope
       );
 
       // Generate unique ID for the file reference
@@ -102,9 +109,10 @@ export async function handleFileUpload(req: Request): Promise<Response> {
         type: storedFile.type,
         url: `/api/files/${projectId}/${convId}/${storedFile.name}`,
         uploadedAt: storedFile.uploadedAt,
+        scope: storedFile.scope,
       });
 
-      logger.info({ path: storedFile.path }, 'File saved');
+      logger.info({ path: storedFile.path, scope }, 'File saved');
     }
 
     return Response.json({
@@ -145,7 +153,10 @@ export async function handleFileDownload(req: Request): Promise<Response> {
     const ext = fileName.split('.').pop()?.toLowerCase();
     const contentType = getContentType(ext);
 
-    return new Response(fileBuffer, {
+    // Convert Buffer to Uint8Array for Response
+    const uint8Array = new Uint8Array(fileBuffer);
+
+    return new Response(uint8Array, {
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': `inline; filename="${fileName}"`,

@@ -19,7 +19,13 @@ import { ConvIdManager } from "../conv-id";
 
 export class WSClient extends WSEventEmitter {
   private ws: WebSocket | null = null;
-  private options: Required<Omit<WSClientOptions, 'projectId' | 'convId'>> & Pick<WSClientOptions, 'projectId' | 'convId'>;
+  private options: WSClientOptions & {
+    reconnectAttempts: number;
+    reconnectDelay: number;
+    heartbeatInterval: number;
+    timeout: number;
+    protocols: string[];
+  };
   private state: ConnectionState = {
     status: "disconnected",
     messageCount: 0,
@@ -80,6 +86,11 @@ export class WSClient extends WSEventEmitter {
     // Add projectId if provided
     if (this.options.projectId) {
       url.searchParams.set("projectId", this.options.projectId);
+    }
+
+    // Add token if provided (Authentication)
+    if (this.options.token) {
+      url.searchParams.set("token", this.options.token);
     }
 
     const finalUrl = url.toString();
@@ -322,7 +333,7 @@ export class WSClient extends WSEventEmitter {
   private async handleMessage(message: WSMessage): Promise<void> {
     // Check if this is a pending message that needs resolution
     const isPendingMessage = message.type && this.pendingMessages.has(message.id) &&
-        (message.type === "control_response" || message.type === "error");
+      (message.type === "control_response" || message.type === "error");
 
     // Resolve pending messages first (but not llm_complete - we want it to emit)
     if (isPendingMessage) {

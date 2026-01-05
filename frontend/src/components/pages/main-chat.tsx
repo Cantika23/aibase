@@ -26,6 +26,10 @@ interface ShadcnChatInterfaceProps {
   // Optional: Override conversation ID management for embed mode
   embedConvId?: string;
   embedGenerateNewConvId?: () => string;
+  // Embed specific auth props
+  uid?: string;
+  embedToken?: string;
+  projectId?: string;
 }
 
 export function MainChat({
@@ -36,6 +40,9 @@ export function MainChat({
   welcomeMessage = null,
   embedConvId,
   embedGenerateNewConvId,
+  uid,
+  embedToken,
+  projectId,
 }: ShadcnChatInterfaceProps) {
   // Zustand stores (reactive state only)
   const {
@@ -90,7 +97,9 @@ export function MainChat({
   // Use WebSocket connection manager - this ensures only one connection even with Strict Mode
   const wsClient = useWSConnection({
     url: wsUrl,
-    projectId: currentProject?.id, // Include project ID in WebSocket connection
+    projectId: projectId ?? currentProject?.id, // Use prop if provided (embed mode), else store
+    uid, // Pass uid for embed auth
+    embedToken, // Pass embedToken for embed auth
     convId: embedConvId, // Pass embed convId if in embed mode
     reconnectAttempts: 5,
     reconnectDelay: 1000,

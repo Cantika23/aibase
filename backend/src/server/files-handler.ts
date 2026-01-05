@@ -2,7 +2,7 @@
  * Handler for file management API endpoints
  */
 
-import { FileStorage } from "../storage/file-storage";
+import { FileStorage, FileScope } from "../storage/file-storage";
 import { ChatHistoryStorage } from "../storage/chat-history-storage";
 import { createLogger } from "../utils/logger";
 import * as fs from 'fs/promises';
@@ -21,6 +21,7 @@ export interface FileWithConversation {
   convId: string;
   conversationTitle?: string;
   url: string;
+  scope: FileScope;
 }
 
 /**
@@ -55,6 +56,7 @@ export async function handleGetProjectFiles(req: Request): Promise<Response> {
         uploadedAt: file.uploadedAt,
         convId: conv.convId,
         url: `/api/files/${projectId}/${conv.convId}/${file.name}`,
+        scope: file.scope,
       }));
     });
 
@@ -111,6 +113,7 @@ export async function handleGetConversationFiles(
       uploadedAt: file.uploadedAt,
       convId,
       url: `/api/files/${projectId}/${convId}/${file.name}`,
+      scope: file.scope,
     }));
 
     return Response.json({

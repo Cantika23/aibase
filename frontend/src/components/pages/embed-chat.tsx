@@ -16,10 +16,13 @@ export function EmbedChatPage() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
   const embedToken = searchParams.get("embedToken");
+  const uid = searchParams.get("uid") || undefined;
+
   const [embedInfo, setEmbedInfo] = useState<{
     customCss: string | null;
     welcomeMessage: string | null;
-  }>({ customCss: null, welcomeMessage: null });
+    useClientUid: boolean;
+  }>({ customCss: null, welcomeMessage: null, useClientUid: false });
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(true);
 
@@ -52,6 +55,7 @@ export function EmbedChatPage() {
         setEmbedInfo({
           customCss: info.customCss,
           welcomeMessage: info.welcomeMessage,
+          useClientUid: info.useClientUid,
         });
         setIsValidating(false);
       } catch (err) {
@@ -129,6 +133,11 @@ export function EmbedChatPage() {
     );
   }
 
+  // If uid is present AND enabled in config, derive convId from it to ensure persistence
+  // Otherwise use the hash-based/generated convId
+  const effectiveUid = embedInfo.useClientUid ? uid : undefined;
+  const finalConvId = effectiveUid ? `embed_user_${effectiveUid}` : convId;
+
   return (
     <div className="h-screen w-screen embed-mode">
       <MainChat
@@ -137,8 +146,11 @@ export function EmbedChatPage() {
         isTodoPanelVisible={false}
         isEmbedMode={true}
         welcomeMessage={embedInfo.welcomeMessage}
-        embedConvId={convId}
+        embedConvId={finalConvId}
         embedGenerateNewConvId={generateNewConvId}
+        uid={effectiveUid}
+        embedToken={embedToken || undefined}
+        projectId={projectId || undefined}
       />
     </div>
   );

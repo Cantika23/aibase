@@ -2,6 +2,12 @@ import { Tool } from "../../llm/conversation";
 import * as fs from "fs/promises";
 import * as path from "path";
 
+type FileScope = 'user' | 'public';
+
+interface FileMeta {
+  scope: FileScope;
+}
+
 /**
  * Context for the File tool
  */
@@ -12,10 +18,17 @@ All file paths are relative to the conversation's files directory.
 
 **Available actions:** list, info, delete, rename, uploadUrl
 
+**File Scopes:**
+- user: Only visible to the user who uploaded (default)
+- public: Visible to all users in the conversation
+
 ### Examples:
 \`\`\`typescript
 // List all files in current conversation
 await file({ action: 'list' });
+
+// List only public files
+await file({ action: 'list', scope: 'public' });
 
 // Get file information
 await file({ action: 'info', path: 'document.pdf' });
@@ -59,6 +72,11 @@ export class FileTool extends Tool {
         type: "string",
         description: "URL to download file from (required only for uploadUrl action)",
       },
+      scope: {
+        type: "string",
+        enum: ["user", "public"],
+        description: "Filter files by scope (optional, only applies to list action). If not specified, returns all files regardless of scope.",
+      },
     },
     required: ["action"],
   };
@@ -85,6 +103,81 @@ export class FileTool extends Tool {
    */
   private getBaseDir(): string {
     return path.join(process.cwd(), "data", this.projectId);
+  }
+
+  /**
+   * Get metadata file path for a file
+   */
+  private getMetaFilePath(filePath: string): string {
+    const dir = path.dirname(filePath);
+    const fileName = path.basename(filePath);
+    return path.join(dir, `.${fileName}.meta.md`);
+  }
+
+  /**
+   * Load metadata for a file from frontmatter format
+   */
+  private async loadFileMeta(filePath: string): Promise<FileMeta> {
+    const metaPath = this.getMetaFilePath(filePath);
+
+    try {
+      const content = await fs.readFile(metaPath, 'utf-8');
+
+      // Parse frontmatter between --- delimiters
+      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      if (!frontmatterMatch) {
+        return { scope: 'user' };
+      }
+
+      const frontmatter = frontmatterMatch[1];
+      const meta: any = {};
+
+      // Parse YAML-style key: value pairs
+      for (const line of frontmatter.split('\n')) {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+          const key = line.slice(0, colonIndex).trim();
+          let value = line.slice(colonIndex + 1).trim();
+
+          // Remove quotes from string values
+          if ((value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+          }
+
+          // Parse numbers and booleans
+          if (value === 'true') value = true;
+          else if (value === 'false') value = false;
+          else if (!isNaN(Number(value))) value = Number(value);
+
+          meta[key] = value;
+        }
+      }
+
+      return meta.scope ? meta : { scope: 'user', ...meta };
+    } catch (error: any) {
+      // Metadata file doesn't exist, assume default scope
+      return { scope: 'user' };
+    }
+  }
+
+  /**
+   * Save metadata for a file in frontmatter format
+   */
+  private async saveFileMeta(filePath: string, meta: FileMeta): Promise<void> {
+    const metaPath = this.getMetaFilePath(filePath);
+
+    // Build frontmatter content
+    const frontmatter = Object.entries(meta)
+      .map(([key, value]) => `${key}: ${typeof value === 'string' ? `"${value}"` : value}`)
+      .join('\n');
+
+    const content = `---
+${frontmatter}
+---
+`;
+
+    await fs.writeFile(metaPath, content, 'utf-8');
   }
 
   /**
@@ -123,11 +216,12 @@ export class FileTool extends Tool {
     path?: string;
     newPath?: string;
     url?: string;
+    scope?: FileScope;
   }): Promise<string> {
     try {
       switch (args.action) {
         case "list":
-          return await this.listFiles(args.path);
+          return await this.listFiles(args.path, args.scope);
         case "info":
           if (!args.path) {
             throw new Error("path is required for info action");
@@ -162,12 +256,12 @@ export class FileTool extends Tool {
     }
   }
 
-  private async listFiles(dirPath?: string): Promise<string> {
+  private async listFiles(dirPath?: string, scope?: FileScope): Promise<string> {
     const baseDir = this.getBaseDir();
 
     // If no path provided, list all files in all */files/* directories
     if (!dirPath) {
-      return await this.listAllProjectFiles();
+      return await this.listAllProjectFiles(scope);
     }
 
     // If path provided, list files in that specific directory
@@ -179,17 +273,39 @@ export class FileTool extends Tool {
     }
 
     const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
-    const files = entries.map((entry) => ({
-      name: entry.name,
-      type: entry.isDirectory() ? "directory" : "file",
-      path: path.relative(baseDir, path.join(resolvedPath, entry.name)),
-    }));
+    const files: any[] = [];
+
+    for (const entry of entries) {
+      // Skip metadata files
+      if (entry.name.startsWith('.')) {
+        continue;
+      }
+
+      const fullPath = path.join(resolvedPath, entry.name);
+
+      // If it's a regular file (not directory), load its metadata
+      if (!entry.isDirectory()) {
+        const meta = await this.loadFileMeta(fullPath);
+
+        // Filter by scope if specified
+        if (scope && meta.scope !== scope) {
+          continue;
+        }
+      }
+
+      files.push({
+        name: entry.name,
+        type: entry.isDirectory() ? "directory" : "file",
+        path: path.relative(baseDir, fullPath),
+      });
+    }
 
     return JSON.stringify(
       {
         directory: path.relative(baseDir, resolvedPath),
         baseDirectory: baseDir,
         count: files.length,
+        scope: scope || "all",
         entries: files,
       },
       null,
@@ -197,7 +313,7 @@ export class FileTool extends Tool {
     );
   }
 
-  private async listAllProjectFiles(): Promise<string> {
+  private async listAllProjectFiles(scope?: FileScope): Promise<string> {
     const baseDir = this.getBaseDir();
     await fs.mkdir(baseDir, { recursive: true });
 
@@ -220,7 +336,7 @@ export class FileTool extends Tool {
 
           if (stats.isDirectory()) {
             // Recursively list all files in this conversation's files directory
-            const files = await this.listFilesRecursive(filesDir, baseDir);
+            const files = await this.listFilesRecursive(filesDir, baseDir, scope);
             allFiles.push(...files);
           }
         } catch (error) {
@@ -233,6 +349,7 @@ export class FileTool extends Tool {
         {
           baseDirectory: baseDir,
           totalFiles: allFiles.length,
+          scope: scope || "all",
           files: allFiles,
         },
         null,
@@ -243,20 +360,32 @@ export class FileTool extends Tool {
     }
   }
 
-  private async listFilesRecursive(dirPath: string, baseDir: string): Promise<any[]> {
+  private async listFilesRecursive(dirPath: string, baseDir: string, scope?: FileScope): Promise<any[]> {
     const files: any[] = [];
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
     for (const entry of entries) {
+      // Skip metadata files
+      if (entry.name.startsWith('.')) {
+        continue;
+      }
+
       const fullPath = path.join(dirPath, entry.name);
       const relativePath = path.relative(baseDir, fullPath);
 
       if (entry.isDirectory()) {
         // Recursively list files in subdirectories
-        const subFiles = await this.listFilesRecursive(fullPath, baseDir);
+        const subFiles = await this.listFilesRecursive(fullPath, baseDir, scope);
         files.push(...subFiles);
       } else {
         const stats = await fs.stat(fullPath);
+        const meta = await this.loadFileMeta(fullPath);
+
+        // Filter by scope if specified
+        if (scope && meta.scope !== scope) {
+          continue;
+        }
+
         files.push({
           name: entry.name,
           path: relativePath,
@@ -264,6 +393,7 @@ export class FileTool extends Tool {
           size: stats.size,
           sizeHuman: this.formatBytes(stats.size),
           modified: stats.mtime.toISOString(),
+          scope: meta.scope,
         });
       }
     }
@@ -276,6 +406,9 @@ export class FileTool extends Tool {
     const baseDir = this.getBaseDir();
     const stats = await fs.stat(resolvedPath);
 
+    // Load metadata for scope info
+    const meta = await this.loadFileMeta(resolvedPath);
+
     return JSON.stringify(
       {
         path: path.relative(baseDir, resolvedPath),
@@ -287,6 +420,7 @@ export class FileTool extends Tool {
         modified: stats.mtime.toISOString(),
         accessed: stats.atime.toISOString(),
         permissions: stats.mode.toString(8).slice(-3),
+        scope: meta.scope,
       },
       null,
       2
@@ -308,6 +442,15 @@ export class FileTool extends Tool {
       });
     } else {
       await fs.unlink(resolvedPath);
+
+      // Also delete metadata file
+      const metaPath = this.getMetaFilePath(resolvedPath);
+      try {
+        await fs.unlink(metaPath);
+      } catch (error) {
+        // Metadata file might not exist, ignore
+      }
+
       return JSON.stringify({
         success: true,
         message: `File deleted: ${relativePath}`,
@@ -322,6 +465,16 @@ export class FileTool extends Tool {
     const baseDir = this.getBaseDir();
 
     await fs.rename(resolvedOldPath, resolvedNewPath);
+
+    // Also rename metadata file if it exists
+    const oldMetaPath = this.getMetaFilePath(resolvedOldPath);
+    const newMetaPath = this.getMetaFilePath(resolvedNewPath);
+
+    try {
+      await fs.rename(oldMetaPath, newMetaPath);
+    } catch (error) {
+      // Metadata file might not exist, ignore
+    }
 
     const relativeOldPath = path.relative(baseDir, resolvedOldPath);
     const relativeNewPath = path.relative(baseDir, resolvedNewPath);
@@ -356,6 +509,9 @@ export class FileTool extends Tool {
     // Write to file
     await fs.writeFile(resolvedPath, nodeBuffer);
 
+    // Save metadata with default 'user' scope
+    await this.saveFileMeta(resolvedPath, { scope: 'user' });
+
     // Get file stats
     const stats = await fs.stat(resolvedPath);
 
@@ -368,6 +524,7 @@ export class FileTool extends Tool {
       size: stats.size,
       sizeHuman: this.formatBytes(stats.size),
       created: stats.birthtime.toISOString(),
+      scope: 'user',
     });
   }
 

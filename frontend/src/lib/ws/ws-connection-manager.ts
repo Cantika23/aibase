@@ -6,6 +6,7 @@
 
 import { WSClient } from "./ws-client";
 import type { WSClientOptions } from "../types/model";
+import { authenticateEmbedUser } from "../embed-api";
 
 // Export WSClient for use in other modules
 export type { WSClient };
@@ -20,7 +21,7 @@ export class WSConnectionManager {
   private static instance: WSConnectionManager;
   private connections = new Map<string, ConnectionInfo>();
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): WSConnectionManager {
     if (!WSConnectionManager.instance) {
@@ -33,7 +34,7 @@ export class WSConnectionManager {
    * Get or create a WebSocket client for the given options
    * Reuses existing connections when possible
    */
-  getClient(options: WSClientOptions): WSClient {
+  async getClient(options: WSClientOptions): Promise<WSClient> {
     const connectionKey = this.generateConnectionKey(options);
 
     let connectionInfo = this.connections.get(connectionKey);
@@ -47,7 +48,22 @@ export class WSConnectionManager {
 
     // Create new connection
     console.log(`WSConnectionManager: Creating new WebSocket connection for key: ${connectionKey}`);
-    const client = new WSClient(options);
+
+    // Check if we need to authenticate first (for embed with uid)
+    const connectionOptions = { ...options };
+    if (options.uid && options.projectId && options.embedToken) {
+      try {
+        console.log(`WSConnectionManager: Authenticating embed user ${options.uid}`);
+        const authData = await authenticateEmbedUser(options.projectId, options.embedToken, options.uid);
+        connectionOptions.token = authData.token;
+        console.log(`WSConnectionManager: Embed authentication successful, token received`);
+      } catch (error) {
+        console.error(`WSConnectionManager: Embed authentication failed:`, error);
+        throw error;
+      }
+    }
+
+    const client = new WSClient(connectionOptions);
 
     connectionInfo = {
       client,
@@ -62,6 +78,8 @@ export class WSConnectionManager {
     client.on("disconnected", () => {
       this.onConnectionDisconnected(connectionKey);
     });
+
+    this.connections.set(connectionKey, connectionInfo);
 
     return client;
   }
@@ -139,6 +157,7 @@ export class WSConnectionManager {
       options.url,
       options.projectId || 'no-project', // Include projectId in the key
       options.convId || 'no-conv', // Include convId in the key (for embed mode)
+      options.uid || 'no-uid', // Include uid in the key
       options.reconnectAttempts?.toString() || '5',
       options.reconnectDelay?.toString() || '1000',
       options.heartbeatInterval?.toString() || '30000',
@@ -171,6 +190,9 @@ export function useWSConnection(options: WSClientOptions) {
   const memoizedOptions = useMemo(() => options, [
     options.url,
     options.projectId, // Include projectId so connection is recreated when project changes
+    options.convId, // Include convId (embed mode)
+    options.uid, // Include uid (embed auth)
+    options.embedToken, // Include embedToken
     options.reconnectAttempts,
     options.reconnectDelay,
     options.heartbeatInterval,
@@ -181,17 +203,33 @@ export function useWSConnection(options: WSClientOptions) {
   // Initialize and manage connection in useEffect
   useEffect(() => {
     console.log("useWSConnection: useEffect triggered for:", memoizedOptions.url);
+    let isMounted = true;
 
-    // Get or create client
-    const client = managerRef.current.getClient(memoizedOptions);
-    if (client !== clientRef.current) {
-      clientRef.current = client;
-      // Force re-render to update the returned client value
-      forceUpdate({});
-    }
+    // Get or create client (async)
+    const initConnection = async () => {
+      try {
+        const client = await managerRef.current.getClient(memoizedOptions);
+
+        if (isMounted) {
+          if (client !== clientRef.current) {
+            clientRef.current = client;
+            // Force re-render to update the returned client value
+            forceUpdate({});
+          }
+        } else {
+          // If unmounted before completion, release immediately
+          managerRef.current.releaseClient(memoizedOptions);
+        }
+      } catch (error) {
+        console.error("useWSConnection: Failed to initialize connection:", error);
+      }
+    };
+
+    initConnection();
 
     // Cleanup on unmount
     return () => {
+      isMounted = false;
       if (clientRef.current) {
         console.log("useWSConnection: Cleaning up connection");
         managerRef.current.releaseClient(memoizedOptions);

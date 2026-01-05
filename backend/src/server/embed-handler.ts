@@ -54,6 +54,7 @@ export async function handleGetEmbedInfo(req: Request): Promise<Response> {
         description: project.description,
         customCss: project.custom_embed_css,
         welcomeMessage: project.welcome_message,
+        useClientUid: project.use_client_uid,
       },
     });
   } catch (error) {

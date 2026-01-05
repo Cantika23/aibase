@@ -82,12 +82,12 @@ import {
 } from "./tenant-handler";
 import {
   handleGetEmbedInfo,
-  handleRegenerateEmbedToken,
   handleGetEmbedCss,
   handleUpdateEmbedCss,
   handleUpdateWelcomeMessage,
   handleGetEmbedStatus,
 } from "./embed-handler";
+import { handleEmbedAuth } from "./embed-auth-handler";
 import {
   handleVerifyLicense,
   handleGetSetup,
@@ -360,6 +360,16 @@ export class WebSocketServer {
         if (embedWelcomeMessageMatch && req.method === "POST") {
           const projectId = embedWelcomeMessageMatch[1];
           return handleUpdateWelcomeMessage(req, projectId);
+        }
+
+        if (embedWelcomeMessageMatch && req.method === "POST") {
+          const projectId = embedWelcomeMessageMatch[1];
+          return handleUpdateWelcomeMessage(req, projectId);
+        }
+
+        // Embed Authentication endpoint
+        if (pathname === "/api/embed/auth" && req.method === "POST") {
+          return handleEmbedAuth(req);
         }
 
         // Public embed info endpoint (no auth required)

@@ -193,9 +193,18 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
     }
 
     const body = await req.json();
-    const { name, description, is_shared } = body as any;
+    const { name, description, is_shared, show_history, show_files, show_context, show_memory, use_client_uid } = body as any;
 
-    const updates: { name?: string; description?: string; is_shared?: boolean } = {};
+    const updates: {
+      name?: string;
+      description?: string;
+      is_shared?: boolean;
+      show_history?: boolean;
+      show_files?: boolean;
+      show_context?: boolean;
+      show_memory?: boolean;
+      use_client_uid?: boolean;
+    } = {};
 
     if (name !== undefined) {
       if (typeof name !== "string") {
@@ -243,6 +252,41 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
         );
       }
       updates.is_shared = is_shared;
+    }
+
+    if (show_history !== undefined) {
+      if (typeof show_history !== "boolean") {
+        return Response.json({ success: false, error: "show_history must be a boolean" }, { status: 400 });
+      }
+      updates.show_history = show_history;
+    }
+
+    if (show_files !== undefined) {
+      if (typeof show_files !== "boolean") {
+        return Response.json({ success: false, error: "show_files must be a boolean" }, { status: 400 });
+      }
+      updates.show_files = show_files;
+    }
+
+    if (show_context !== undefined) {
+      if (typeof show_context !== "boolean") {
+        return Response.json({ success: false, error: "show_context must be a boolean" }, { status: 400 });
+      }
+      updates.show_context = show_context;
+    }
+
+    if (show_memory !== undefined) {
+      if (typeof show_memory !== "boolean") {
+        return Response.json({ success: false, error: "show_memory must be a boolean" }, { status: 400 });
+      }
+      updates.show_memory = show_memory;
+    }
+
+    if (use_client_uid !== undefined) {
+      if (typeof use_client_uid !== "boolean") {
+        return Response.json({ success: false, error: "use_client_uid must be a boolean" }, { status: 400 });
+      }
+      updates.use_client_uid = use_client_uid;
     }
 
     const project = await projectStorage.update(projectId, auth.user.id, updates);

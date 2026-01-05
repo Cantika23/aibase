@@ -19,6 +19,9 @@ import { getConversationInfo } from "../llm/conversation-info";
 import { generateConversationTitle, getConversationTitle } from "../llm/conversation-title-generator";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { AuthService } from "../services/auth-service";
+
+const authService = AuthService.getInstance();
 
 // Extended message type with custom properties for persistence
 interface ExtendedAssistantMessage extends ChatCompletionAssistantMessageParam {
@@ -168,7 +171,10 @@ export class WSServer extends WSEventEmitter {
 
       // For direct usage without the main server, extract convId here
       const convId = url.searchParams.get("convId");
-      const upgraded = server.upgrade(req, { data: { convId } });
+      const projectId = url.searchParams.get("projectId");
+      const token = url.searchParams.get("token");
+
+      const upgraded = server.upgrade(req, { data: { convId, projectId, token } });
       if (upgraded) {
         return undefined; // WebSocket connection established
       }
@@ -334,10 +340,10 @@ export class WSServer extends WSEventEmitter {
       const lastMessage = history[history.length - 1] as ExtendedAssistantMessage | undefined;
 
       if (lastMessage &&
-          lastMessage.role === "assistant" &&
-          !lastMessage.completionTime &&
-          !lastMessage.aborted &&
-          lastMessage.content) {
+        lastMessage.role === "assistant" &&
+        !lastMessage.completionTime &&
+        !lastMessage.aborted &&
+        lastMessage.content) {
         console.log(
           `sendAccumulatedChunks: Found incomplete message in history without active stream, sending completion for ${lastMessage.id}`
         );
@@ -370,6 +376,40 @@ export class WSServer extends WSEventEmitter {
       console.warn("Failed to extract IDs from WebSocket data:", error);
     }
 
+    // Extract authentication token from URL or protocol
+    let token: string | null = null;
+    try {
+      // Try to get from URL params first (if available in ws.data or we need to parse upgradeReq url again? ws.data comes from upgrade)
+      // Actually ws doesn't have easy access to original request URL here unless we passed it in data.
+      // But typically we can pass token in protocol or query param during upgrade.
+      // Bun's upgrade allows passing `data`. We should update handleHttpUpgrade to extract token and pass it in data.
+      token = ws.data?.token || null;
+    } catch (error) {
+      console.warn("Failed to extract token:", error);
+    }
+
+    // Validate token if present
+    let authenticatedUser = null;
+    if (token) {
+      authenticatedUser = await authService.validateSession(token);
+      if (authenticatedUser) {
+        console.log(`[WSServer] Authenticated user: ${authenticatedUser.username} (${authenticatedUser.id})`);
+      } else {
+        console.warn(`[WSServer] Invalid token provided: ${token}`);
+        this.sendToWebSocket(ws, {
+          type: "error",
+          id: this.generateMessageId(),
+          data: {
+            code: "INVALID_TOKEN",
+            message: "Invalid authentication token.",
+          },
+          metadata: { timestamp: Date.now() },
+        });
+        ws.close(1008, "Invalid token");
+        return;
+      }
+    }
+
     // Use provided client ID or generate a new one
     const convId = urlClientId || this.generateClientId();
     const projectId = urlProjectId;
@@ -396,8 +436,7 @@ export class WSServer extends WSEventEmitter {
     console.log(`convId: ${convId} (from URL: ${!!urlClientId})`);
     console.log(`projectId: ${projectId}`);
     console.log(
-      `Total active streams in manager: ${
-        Array.from(this.streamingManager["activeStreams"].keys()).length
+      `Total active streams in manager: ${Array.from(this.streamingManager["activeStreams"].keys()).length
       }`
     );
     console.log(
@@ -713,11 +752,11 @@ export class WSServer extends WSEventEmitter {
           thinkingDuration: thinkingDurationSeconds,
           tokenUsage: tokenUsage
             ? {
-                promptTokens: tokenUsage.promptTokens,
-                completionTokens: tokenUsage.completionTokens,
-                totalTokens: tokenUsage.totalTokens,
-                messageCount: convInfo?.totalMessages || 0,
-              }
+              promptTokens: tokenUsage.promptTokens,
+              completionTokens: tokenUsage.completionTokens,
+              totalTokens: tokenUsage.totalTokens,
+              messageCount: convInfo?.totalMessages || 0,
+            }
             : undefined,
           maxTokens,
         },
@@ -749,11 +788,13 @@ export class WSServer extends WSEventEmitter {
             id: assistantMsgId,
             completionTime: completionTimeSeconds,
             ...(thinkingDurationSeconds !== undefined && { thinkingDuration: thinkingDurationSeconds }),
-            ...(tokenUsage && { tokenUsage: {
-              promptTokens: tokenUsage.promptTokens,
-              completionTokens: tokenUsage.completionTokens,
-              totalTokens: tokenUsage.totalTokens,
-            }}),
+            ...(tokenUsage && {
+              tokenUsage: {
+                promptTokens: tokenUsage.promptTokens,
+                completionTokens: tokenUsage.completionTokens,
+                totalTokens: tokenUsage.totalTokens,
+              }
+            }),
           };
         }
         // Keep existing ID or don't add one for system/older messages

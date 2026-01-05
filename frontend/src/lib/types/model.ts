@@ -63,16 +63,16 @@ export interface LLMChunkData {
 
 export interface StatusData {
   status:
-    | "connecting"
-    | "connected"
-    | "processing"
-    | "idle"
-    | "error"
-    | "disconnected"
-    | "history"
-    | "status_info"
-    | "cleared"
-    | "aborted";
+  | "connecting"
+  | "connected"
+  | "processing"
+  | "idle"
+  | "error"
+  | "disconnected"
+  | "history"
+  | "status_info"
+  | "cleared"
+  | "aborted";
   message?: string;
   details?: any;
   history?: any[]; // For chat history responses
@@ -82,14 +82,16 @@ export interface StatusData {
 
 export interface ConnectionState {
   status:
-    | "connecting"
-    | "connected"
-    | "disconnecting"
-    | "disconnected"
-    | "reconnecting"
-    | "error";
+  | "connecting"
+  | "connected"
+  | "disconnecting"
+  | "disconnected"
+  | "reconnecting"
+  | "error";
   convId?: string;
   sessionId?: string;
+  uid?: string;
+  embedToken?: string;
   connectedAt?: number;
   messageCount: number;
 }
@@ -111,6 +113,9 @@ export interface WSClientOptions {
   url: string;
   projectId?: string; // Current project ID for the connection
   convId?: string; // Optional conversation ID (for embed mode)
+  token?: string;
+  uid?: string;
+  embedToken?: string;
   reconnectAttempts?: number;
   reconnectDelay?: number;
   heartbeatInterval?: number;

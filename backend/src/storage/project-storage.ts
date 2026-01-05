@@ -18,6 +18,11 @@ export interface Project {
   embed_token: string | null; // Secret token for embed verification
   custom_embed_css: string | null; // Custom CSS for embedded chat
   welcome_message: string | null; // Custom welcome message for embedded chat
+  show_history: boolean; // Show conversation history
+  show_files: boolean; // Show files tab
+  show_context: boolean; // Show context tab
+  show_memory: boolean; // Show memory tab
+  use_client_uid: boolean; // Allow client to provide uid for persistence
   created_at: number;
   updated_at: number;
 }
@@ -28,12 +33,22 @@ export interface CreateProjectData {
   user_id: number;
   tenant_id?: number | null;
   is_shared?: boolean;
+  show_history?: boolean;
+  show_files?: boolean;
+  show_context?: boolean;
+  show_memory?: boolean;
+  use_client_uid?: boolean;
 }
 
 export interface UpdateProjectData {
   name?: string;
   description?: string;
   is_shared?: boolean;
+  show_history?: boolean;
+  show_files?: boolean;
+  show_context?: boolean;
+  show_memory?: boolean;
+  use_client_uid?: boolean;
 }
 
 export class ProjectStorage {
@@ -73,6 +88,11 @@ export class ProjectStorage {
         user_id INTEGER NOT NULL,
         tenant_id INTEGER,
         is_shared INTEGER NOT NULL DEFAULT 0,
+        show_history INTEGER NOT NULL DEFAULT 1,
+        show_files INTEGER NOT NULL DEFAULT 1,
+        show_context INTEGER NOT NULL DEFAULT 1,
+        show_memory INTEGER NOT NULL DEFAULT 1,
+        use_client_uid INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -92,8 +112,14 @@ export class ProjectStorage {
       const hasEmbedTokenColumn = tableInfo.some((col: any) => col.name === 'embed_token');
       const hasCustomEmbedCssColumn = tableInfo.some((col: any) => col.name === 'custom_embed_css');
       const hasWelcomeMessageColumn = tableInfo.some((col: any) => col.name === 'welcome_message');
+      const hasShowHistoryColumn = tableInfo.some((col: any) => col.name === 'show_history');
+      const hasShowFilesColumn = tableInfo.some((col: any) => col.name === 'show_files');
+      const hasShowContextColumn = tableInfo.some((col: any) => col.name === 'show_context');
+      const hasShowMemoryColumn = tableInfo.some((col: any) => col.name === 'show_memory');
+      const hasUseClientUidColumn = tableInfo.some((col: any) => col.name === 'use_client_uid');
 
-      if (!hasEmbeddableColumn || !hasEmbedTokenColumn || !hasCustomEmbedCssColumn || !hasWelcomeMessageColumn) {
+      if (!hasEmbeddableColumn || !hasEmbedTokenColumn || !hasCustomEmbedCssColumn || !hasWelcomeMessageColumn ||
+        !hasShowHistoryColumn || !hasShowFilesColumn || !hasShowContextColumn || !hasShowMemoryColumn || !hasUseClientUidColumn) {
         console.log('[ProjectStorage] Migrating database: adding embed fields');
         this.db.run('BEGIN TRANSACTION');
 
@@ -111,6 +137,26 @@ export class ProjectStorage {
 
         if (!hasWelcomeMessageColumn) {
           this.db.run('ALTER TABLE projects ADD COLUMN welcome_message TEXT NULL');
+        }
+
+        if (!hasShowHistoryColumn) {
+          this.db.run('ALTER TABLE projects ADD COLUMN show_history INTEGER NOT NULL DEFAULT 1');
+        }
+
+        if (!hasShowFilesColumn) {
+          this.db.run('ALTER TABLE projects ADD COLUMN show_files INTEGER NOT NULL DEFAULT 1');
+        }
+
+        if (!hasShowContextColumn) {
+          this.db.run('ALTER TABLE projects ADD COLUMN show_context INTEGER NOT NULL DEFAULT 1');
+        }
+
+        if (!hasShowMemoryColumn) {
+          this.db.run('ALTER TABLE projects ADD COLUMN show_memory INTEGER NOT NULL DEFAULT 1');
+        }
+
+        if (!hasUseClientUidColumn) {
+          this.db.run('ALTER TABLE projects ADD COLUMN use_client_uid INTEGER NOT NULL DEFAULT 0');
         }
 
         // Create index for embed_token lookups
@@ -216,6 +262,24 @@ export class ProjectStorage {
       now
     );
 
+    // Update with default values if provided
+    if (data.show_history !== undefined || data.show_files !== undefined ||
+      data.show_context !== undefined || data.show_memory !== undefined || data.use_client_uid !== undefined) {
+
+      const updates: string[] = [];
+      const values: any[] = [];
+
+      if (data.show_history !== undefined) { updates.push('show_history = ?'); values.push(data.show_history ? 1 : 0); }
+      if (data.show_files !== undefined) { updates.push('show_files = ?'); values.push(data.show_files ? 1 : 0); }
+      if (data.show_context !== undefined) { updates.push('show_context = ?'); values.push(data.show_context ? 1 : 0); }
+      if (data.show_memory !== undefined) { updates.push('show_memory = ?'); values.push(data.show_memory ? 1 : 0); }
+      if (data.use_client_uid !== undefined) { updates.push('use_client_uid = ?'); values.push(data.use_client_uid ? 1 : 0); }
+
+      values.push(id);
+
+      this.db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ?`, ...values);
+    }
+
     // Create project directory
     const projectDir = this.getProjectDir(id);
     await fs.mkdir(projectDir, { recursive: true });
@@ -242,6 +306,10 @@ export class ProjectStorage {
       ...row,
       is_shared: row.is_shared === 1,
       is_embeddable: row.is_embeddable === 1,
+      show_history: row.show_history === 1,
+      show_files: row.show_files === 1,
+      show_context: row.show_context === 1,
+      show_memory: row.show_memory === 1,
     };
   }
 
@@ -275,6 +343,10 @@ export class ProjectStorage {
       ...row,
       is_shared: row.is_shared === 1,
       is_embeddable: row.is_embeddable === 1,
+      show_history: row.show_history === 1,
+      show_files: row.show_files === 1,
+      show_context: row.show_context === 1,
+      show_memory: row.show_memory === 1,
     }));
   }
 
@@ -289,6 +361,10 @@ export class ProjectStorage {
       ...row,
       is_shared: row.is_shared === 1,
       is_embeddable: row.is_embeddable === 1,
+      show_history: row.show_history === 1,
+      show_files: row.show_files === 1,
+      show_context: row.show_context === 1,
+      show_memory: row.show_memory === 1,
     }));
   }
 
@@ -336,6 +412,26 @@ export class ProjectStorage {
     if (updates.is_shared !== undefined) {
       fields.push('is_shared = ?');
       values.push(updates.is_shared ? 1 : 0);
+    }
+    if (updates.show_history !== undefined) {
+      fields.push('show_history = ?');
+      values.push(updates.show_history ? 1 : 0);
+    }
+    if (updates.show_files !== undefined) {
+      fields.push('show_files = ?');
+      values.push(updates.show_files ? 1 : 0);
+    }
+    if (updates.show_context !== undefined) {
+      fields.push('show_context = ?');
+      values.push(updates.show_context ? 1 : 0);
+    }
+    if (updates.show_memory !== undefined) {
+      fields.push('show_memory = ?');
+      values.push(updates.show_memory ? 1 : 0);
+    }
+    if (updates.use_client_uid !== undefined) {
+      fields.push('use_client_uid = ?');
+      values.push(updates.use_client_uid ? 1 : 0);
     }
 
     if (fields.length === 0) {
@@ -474,6 +570,10 @@ export class ProjectStorage {
       ...row,
       is_shared: row.is_shared === 1,
       is_embeddable: row.is_embeddable === 1,
+      show_history: row.show_history === 1,
+      show_files: row.show_files === 1,
+      show_context: row.show_context === 1,
+      show_memory: row.show_memory === 1,
     };
   }
 

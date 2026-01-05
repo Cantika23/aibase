@@ -19,6 +19,7 @@ interface EmbedInfo {
   description: string | null;
   customCss: string | null;
   welcomeMessage: string | null;
+  useClientUid: boolean;
 }
 
 interface EmbedTokenResponse {
@@ -79,6 +80,53 @@ export async function updateEmbedCss(projectId: string, customCss: string): Prom
 
   if (!response.ok || !data.success) {
     throw new Error(data.error || "Failed to update embed CSS");
+  }
+}
+
+/**
+ * Update welcome message for embedded chat
+ */
+export async function updateWelcomeMessage(projectId: string, welcomeMessage: string | null): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/projects/${projectId}/embed/welcome-message`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({ welcomeMessage }),
+  });
+
+  const data: ApiResponse<{ message: string }> = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Failed to update welcome message");
+  }
+}
+
+/**
+ * Authenticate an embed user
+ */
+export async function authenticateEmbedUser(projectId: string, embedToken: string, uid: string): Promise<{ token: string; user: any }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/embed/auth`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ projectId, embedToken, uid }),
+    });
+
+    const data: ApiResponse<{ token: string; user: any }> = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Authentication failed");
+    }
+
+    return data.data!;
+  } catch (error) {
+    console.error("Embed authentication error:", error);
+    throw error; // Re-throw to handle in UI
   }
 }
 
