@@ -6,7 +6,6 @@ import { ConversationHistoryPage } from "./pages/conversation-history";
 import { FilesManagerPage } from "./pages/files-manager";
 import { ProjectSelectorPage } from "./pages/project-selector";
 import { UserManagementPage } from "./pages/user-management";
-import { TenantManagementPage } from "./pages/tenant-management";
 import { LoginPage } from "./pages/login";
 import { AdminSetupPage } from "./pages/admin-setup";
 import { EmbedChatPage } from "./pages/embed-chat";
@@ -21,7 +20,6 @@ import {
   ArrowLeft,
   MessagesSquare,
   Users,
-  Building2,
   Code,
   Brain,
   ScrollText,
@@ -55,8 +53,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
   const currentUser = useAuthStore((state) => state.user);
 
   // Check user roles
-  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "root";
-  const isRoot = currentUser?.role === "root";
+  const isAdmin = currentUser?.role === "admin";
 
   // Load conversations when project changes
   useEffect(() => {
@@ -190,20 +187,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
       {/* Top Right Navigation - Show on all pages except login and embed */}
       {!isLoginRoute && !isEmbedRoute && (
         <div className="absolute top-0 right-0 m-3 z-10 flex gap-2">
-          {/* Tenants button (root only, not on chat routes) */}
-          {isRoot && !isChatRoute && (
-            <Button
-              variant={
-                location.pathname === "/admin/tenants" ? "default" : "ghost"
-              }
-              size="sm"
-              onClick={() => navigate("/admin/tenants")}
-            >
-              <Building2 />
-              {location.pathname === "/admin/tenants" && <span className="hidden sm:inline">Tenants</span>}
-            </Button>
-          )}
-          {/* Users button (admin and root, not on chat routes) */}
+          {/* Users button (admin only, not on chat routes) */}
           {isAdmin && !isChatRoute && (
             <Button
               variant={
@@ -234,14 +218,6 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
             element={
               <ProtectedRoute>
                 <ProjectSelectorPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/tenants"
-            element={
-              <ProtectedRoute>
-                <TenantManagementPage />
               </ProtectedRoute>
             }
           />

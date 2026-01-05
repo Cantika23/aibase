@@ -32,9 +32,6 @@ export function TenantManagementPage() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Check if user is root
-  const isRoot = auth.user?.role === "root";
-
   const handleEditTenant = (tenant: Tenant) => {
     setSelectedTenant(tenant);
     setEditDialogOpen(true);
@@ -70,19 +67,6 @@ export function TenantManagementPage() {
           <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
           <p className="text-muted-foreground">
             Please login to access this page
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isRoot) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground">
-            Only root users can manage tenants
           </p>
         </div>
       </div>

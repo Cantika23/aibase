@@ -4,7 +4,6 @@ import { useProjectStore } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
 import {
   PageActionButton,
-  PageActionGroup,
 } from "@/components/ui/page-action-button";
 import {
   Card,
@@ -182,22 +181,7 @@ export function MemoryEditor() {
 
   return (
     <div className="flex h-full flex-col gap-4 px-4 pt-14 mb-4">
-      {/* Header */}
-      <PageActionGroup>
-        <PageActionButton
-          icon={RefreshCw}
-          label="Refresh"
-          onClick={refresh}
-          variant="outline"
-          isLoading={isLoading}
-          spinIcon={true}
-        />
-        <PageActionButton
-          icon={Plus}
-          label="Add Entry"
-          onClick={handleAddNew}
-        />
-      </PageActionGroup>
+
 
       {/* Search */}
       <div className="flex gap-2">

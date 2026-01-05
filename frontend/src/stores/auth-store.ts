@@ -5,14 +5,14 @@ import { buildApiUrl } from "@/lib/base-path";
 // Use buildApiUrl to support base path
 const API_BASE_URL = buildApiUrl("");
 
-export type UserRole = 'root' | 'admin' | 'user';
+export type UserRole = 'admin' | 'user';
 
 export interface User {
   id: number;
   email: string;
   username: string;
   role: UserRole;
-  tenant_id: number | null;
+  tenant_id: number;
   created_at: number;
   updated_at: number;
 }

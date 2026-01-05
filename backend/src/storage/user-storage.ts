@@ -7,7 +7,7 @@ import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
-export type UserRole = 'root' | 'admin' | 'user';
+export type UserRole = 'admin' | 'user';
 
 export interface User {
   id: number;
@@ -15,7 +15,7 @@ export interface User {
   username: string;
   password_hash: string;
   role: UserRole;
-  tenant_id: number | null; // null for root users, required for admin/user
+  tenant_id: number; // required for admin/user
   created_at: number;
   updated_at: number;
 }
@@ -113,11 +113,9 @@ export class UserStorage {
     const now = Date.now();
     const role = data.role || 'user'; // Default to 'user' role
 
-    // Root users should not have tenant_id, admin/user must have tenant_id
-    let tenantId = data.tenant_id;
-    if (role === 'root') {
-      tenantId = null;
-    } else if (tenantId === undefined || tenantId === null) {
+    // All users must belong to a tenant
+    const tenantId = data.tenant_id;
+    if (tenantId === undefined || tenantId === null) {
       throw new Error('Admin and user roles must belong to a tenant');
     }
 
@@ -277,19 +275,9 @@ export class UserStorage {
     const roleHierarchy: Record<UserRole, number> = {
       'user': 1,
       'admin': 2,
-      'root': 3,
     };
 
     return roleHierarchy[user.role] >= roleHierarchy[requiredRole];
-  }
-
-  /**
-   * Check if a root user exists
-   */
-  hasRootUser(): boolean {
-    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM users WHERE role = ?');
-    const result = stmt.get('root') as { count: number };
-    return result.count > 0;
   }
 
   /**

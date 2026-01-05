@@ -328,10 +328,10 @@ async function verifyLicenseKeyWithFallback(req: Request, bodyKey?: string): Pro
 }
 
 /**
- * Get root user for admin operations
- * When using license key, we operate as the root user
+ * Get admin user for admin operations
+ * When using license key, we operate as an admin user
  */
-async function getRootUser(): Promise<any> {
+async function getAdminUser(): Promise<any> {
   try {
     await authService.initialize();
 
@@ -347,19 +347,19 @@ async function getRootUser(): Promise<any> {
         return null;
       }
 
-      const rootUser = users.find((u: any) => u.role === "root");
-      if (!rootUser) {
-        throw new Error("Root user not found");
+      const adminUser = users.find((u: any) => u.role === "admin");
+      if (!adminUser) {
+        throw new Error("Admin user not found");
       }
-      return rootUser;
+      return adminUser;
     } catch (dbError) {
       // If we can't query the DB directly, return null
-      logger.warn({ error: dbError }, "Could not query users directly, returning null root user");
+      logger.warn({ error: dbError }, "Could not query users directly, returning null admin user");
       return null;
     }
   } catch (error) {
-    logger.error({ error }, "Error getting root user");
-    throw new Error("Failed to get root user");
+    logger.error({ error }, "Error getting admin user");
+    throw new Error("Failed to get admin user");
   }
 }
 
@@ -386,11 +386,11 @@ export async function handleGetUsers(req: Request): Promise<Response> {
       return Response.json({ success: true, users });
     } catch (dbError) {
       // Fall back to normal method if available
-      const rootUser = await getRootUser();
-      if (!rootUser) {
+      const adminUser = await getAdminUser();
+      if (!adminUser) {
         return Response.json({ success: true, users: [] });
       }
-      const users = await authService.getAllUsers(rootUser.id);
+      const users = await authService.getAllUsers(adminUser.id);
       return Response.json({ success: true, users });
     }
   } catch (error) {
@@ -431,16 +431,16 @@ export async function handleCreateUser(req: Request): Promise<Response> {
 
     await authService.initialize();
     await tenantStorage.initialize();
-    const rootUser = await getRootUser();
+    const adminUser = await getAdminUser();
 
     // If no users exist yet, create the first user directly
-    if (!rootUser) {
+    if (!adminUser) {
       try {
         // Use tenant_id from request if provided, otherwise auto-detect
         let finalTenantId: number | null = tenant_id !== undefined ? tenant_id : null;
 
-        // If no tenant_id provided and role is not root, ensure there's a default tenant
-        if (role !== "root" && finalTenantId === null) {
+        // If no tenant_id provided, ensure there's a default tenant
+        if (finalTenantId === null) {
           // Check if any tenant exists
           try {
             const db = authService.getDatabase();
@@ -482,8 +482,8 @@ export async function handleCreateUser(req: Request): Promise<Response> {
       }
     }
 
-    // Normal user creation with root user as parent
-    const newUser = await authService.createUser(rootUser.id, {
+    // Normal user creation with admin user as parent
+    const newUser = await authService.createUser(adminUser.id, {
       email,
       username,
       password,
@@ -527,15 +527,15 @@ export async function handleUpdateUser(req: Request, userId: string): Promise<Re
 
     await authService.initialize();
     await userStorage.initialize();
-    const rootUser = await getRootUser();
+    const adminUser = await getAdminUser();
 
     const userIdNum = parseInt(userId, 10);
     if (isNaN(userIdNum)) {
       return Response.json({ success: false, error: "Invalid user ID" }, { status: 400 });
     }
 
-    // Prevent modifying yourself (if root user exists)
-    if (rootUser && rootUser.id === userIdNum) {
+    // Prevent modifying yourself (if admin user exists)
+    if (adminUser && adminUser.id === userIdNum) {
       return Response.json(
         { success: false, error: "Cannot modify your own account via admin-setup" },
         { status: 400 }
@@ -587,15 +587,15 @@ export async function handleDeleteUser(req: Request, userId: string): Promise<Re
     }
 
     await authService.initialize();
-    const rootUser = await getRootUser();
+    const adminUser = await getAdminUser();
 
     const userIdNum = parseInt(userId, 10);
     if (isNaN(userIdNum)) {
       return Response.json({ success: false, error: "Invalid user ID" }, { status: 400 });
     }
 
-    // Prevent deleting yourself (if root user exists)
-    if (rootUser && rootUser.id === userIdNum) {
+    // Prevent deleting yourself (if admin user exists)
+    if (adminUser && adminUser.id === userIdNum) {
       return Response.json(
         { success: false, error: "Cannot delete your own account via admin-setup" },
         { status: 400 }

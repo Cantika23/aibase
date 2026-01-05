@@ -151,7 +151,7 @@ export function ConversationHistoryPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center p-4">
+    <div className="flex flex-col h-screen items-center p-4">
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deletingConversation} onOpenChange={(open) => !open && setDeletingConversation(null)}>
         <DialogContent className="max-w-md">

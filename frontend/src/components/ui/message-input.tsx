@@ -205,7 +205,7 @@ export function MessageInput({
 
   return (
     <div
-      className="relative flex w-full"
+      className="relative flex w-full px-3 md:px-0"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -270,7 +270,7 @@ export function MessageInput({
         </div>
       </div>
 
-      <div className="absolute right-3 top-3 z-20 flex gap-2">
+      <div className="absolute right-3 top-3 z-20 px-3 md:px-0 flex gap-2">
         {props.allowAttachments && (
           <Button
             type="button"

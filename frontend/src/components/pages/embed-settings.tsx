@@ -3,18 +3,14 @@
  * Full page for managing project embedding settings
  */
 
-import { useState, useEffect, useCallback } from "react";
-import {
-  PageActionButton,
-  PageActionGroup,
-} from "@/components/ui/page-action-button";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert } from "@/components/ui/alert";
-import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
-import { RefreshCw, Copy, Check } from "lucide-react";
+import { useProjectStore } from "@/stores/project-store";
+import { Check, Copy } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const API_BASE_URL = buildApiUrl("");
@@ -228,18 +224,7 @@ export function EmbedSettings() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 px-4 pt-14 mb-4">
-      {/* Header */}
-      <PageActionGroup>
-        <PageActionButton
-          icon={RefreshCw}
-          label="Refresh"
-          onClick={loadEmbedSettings}
-          variant="outline"
-          isLoading={isLoading}
-          spinIcon={true}
-        />
-      </PageActionGroup>
+    <div className="flex h-full flex-col gap-4 pt-14 mb-4">
 
       {error && (
         <Alert variant="destructive">
@@ -253,7 +238,7 @@ export function EmbedSettings() {
           <p className="text-muted-foreground ml-4">Loading embed settings...</p>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 pb-[100px]">
           {/* Welcome Message Section */}
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Welcome Message</h2>

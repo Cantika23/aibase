@@ -22,7 +22,7 @@ interface AdminStore {
     email: string,
     username: string,
     password: string,
-    role: "root" | "admin" | "user"
+    role: "admin" | "user"
   ) => Promise<boolean>;
   deleteUser: (token: string, userId: number) => Promise<boolean>;
 
@@ -91,7 +91,7 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
     email: string,
     username: string,
     password: string,
-    role: "root" | "admin" | "user"
+    role: "admin" | "user"
   ) => {
     set({ isLoading: true, error: null });
 

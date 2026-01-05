@@ -29,7 +29,7 @@ interface User {
   id: number;
   username: string;
   email: string;
-  role: "root" | "admin" | "user";
+  role: "admin" | "user";
   tenant_id: number | null;
 }
 
@@ -117,7 +117,7 @@ export function AdminSetupPage() {
     username: "",
     email: "",
     password: "",
-    role: "user" as "root" | "admin" | "user",
+    role: "user" as "admin" | "user",
     tenant_id: undefined as number | undefined,
   });
 
@@ -141,11 +141,8 @@ export function AdminSetupPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Filter users by tenant_id - include root users and users in this tenant
+        // Filter users by tenant_id
         const tenantUsers = data.users.filter((u: User) => {
-          // Root users appear in all tenants
-          if (u.role === "root") return true;
-          // Users belonging to this tenant
           return u.tenant_id === tenantId;
         });
         setUsers(tenantUsers);
@@ -352,7 +349,7 @@ export function AdminSetupPage() {
         body: JSON.stringify({
           licenseKey,
           ...userForm,
-          tenant_id: userForm.role !== "root" ? (userForm.tenant_id || selectedTenant?.id) : undefined,
+          tenant_id: userForm.tenant_id || selectedTenant?.id,
         }),
       });
 
@@ -389,7 +386,7 @@ export function AdminSetupPage() {
         body: JSON.stringify({
           licenseKey,
           ...userForm,
-          tenant_id: userForm.role !== "root" ? (userForm.tenant_id || selectedTenant?.id) : undefined,
+          tenant_id: userForm.tenant_id || selectedTenant?.id,
         }),
       });
 
@@ -891,15 +888,13 @@ export function AdminSetupPage() {
                             onChange={(e) =>
                               setUserForm({
                                 ...userForm,
-                                role: e.target.value as "root" | "admin" | "user",
+                                role: e.target.value as "admin" | "user",
                               })
                             }
                             className="w-full px-3 py-2 border rounded-md"
-                            disabled={editingUser?.role === "root"}
                           >
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
-                            <option value="root">Root</option>
                           </select>
                         </div>
                       </div>
@@ -945,12 +940,11 @@ export function AdminSetupPage() {
                             <td className="px-4 py-3 text-sm">{user.email}</td>
                             <td className="px-4 py-3 text-sm">
                               <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${user.role === "root"
-                                    ? "bg-purple-100 text-purple-800"
-                                    : user.role === "admin"
-                                      ? "bg-blue-100 text-blue-800"
-                                      : "bg-gray-100 text-gray-800"
-                                  }`}
+                                className={`px-2 py-1 rounded text-xs font-medium ${
+                                  user.role === "admin"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
                               >
                                 {user.role}
                               </span>

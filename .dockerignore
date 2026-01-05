@@ -1,4 +1,4 @@
-node_modules
+**/node_modules
 .git
 .gitignore
 README.md
@@ -10,5 +10,5 @@ coverage
 .nyc_output
 .cache
 .parcel-cache
-dist
+**/dist
 *.log

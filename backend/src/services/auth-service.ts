@@ -139,8 +139,8 @@ export class AuthService {
     // Create user (role defaults to 'user' if not provided)
     const role = data.role || 'user';
 
-    // Validate tenant_id based on role
-    if (role !== 'root' && !data.tenant_id) {
+    // All users must have tenant_id
+    if (!data.tenant_id) {
       throw new Error('Admin and user roles must belong to a tenant');
     }
 
@@ -149,7 +149,7 @@ export class AuthService {
       username: data.username,
       password_hash: passwordHash,
       role,
-      tenant_id: role === 'root' ? null : data.tenant_id,
+      tenant_id: data.tenant_id,
     });
 
     // Create session
@@ -277,7 +277,7 @@ export class AuthService {
   }
 
   /**
-   * Create a user (admin/root only)
+   * Create a user (admin only)
    * This bypasses normal registration flow
    */
   async createUser(
@@ -309,27 +309,9 @@ export class AuthService {
       throw new Error(passwordValidation.message || 'Invalid password');
     }
 
-    // Only root users can create other root users
-    if (data.role === 'root' && adminUser.role !== 'root') {
-      throw new Error('Only root users can create other root users');
-    }
-
-    // Determine tenant_id
-    let tenantId: number | null = null;
+    // Admin can only create users in their own tenant
+    const tenantId = data.tenant_id || adminUser.tenant_id;
     const role = data.role || 'user';
-
-    if (role !== 'root') {
-      // Admin can only create users in their own tenant
-      if (adminUser.role === 'admin') {
-        tenantId = adminUser.tenant_id;
-      } else if (adminUser.role === 'root') {
-        // Root can specify tenant_id
-        if (!data.tenant_id) {
-          throw new Error('Tenant ID is required for admin and user roles');
-        }
-        tenantId = data.tenant_id;
-      }
-    }
 
     // Hash password
     const passwordHash = await this.hashPassword(data.password);
@@ -354,15 +336,8 @@ export class AuthService {
   }
 
   /**
-   * Check if a root user exists (for initial setup)
-   */
-  hasRootUser(): boolean {
-    return this.userStorage.hasRootUser();
-  }
-
-  /**
    * Get all users (admin only)
-   * Root sees all users, admin sees only users in their tenant
+   * Admin sees only users in their tenant
    */
   async getAllUsers(adminUserId: number): Promise<Omit<User, 'password_hash'>[]> {
     if (!this.userStorage.hasRole(adminUserId, 'admin')) {
@@ -372,11 +347,6 @@ export class AuthService {
     const adminUser = this.userStorage.getById(adminUserId);
     if (!adminUser) {
       throw new Error('Admin user not found');
-    }
-
-    // Root can see all users
-    if (adminUser.role === 'root') {
-      return this.userStorage.getAll();
     }
 
     // Admin can only see users in their tenant

@@ -279,7 +279,7 @@ export function MainChat({
       )}
 
       {/* Token Status - Bottom right corner */}
-      <div className={`absolute bottom-2 right-2 z-10 ${isEmbedMode ? 'hidden md:block' : ''}`}>
+      <div className={`absolute bottom-20 right-2 z-10 ${isEmbedMode ? 'hidden md:block' : 'md:bottom-2'}`}>
         <TokenStatus convId={convId} />
       </div>
 

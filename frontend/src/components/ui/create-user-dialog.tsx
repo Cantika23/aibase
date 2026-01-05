@@ -28,7 +28,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<"user" | "admin" | "root">("user");
+  const [role, setRole] = useState<"user" | "admin">("user");
 
   // Reset form
   const resetForm = () => {
@@ -67,10 +67,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     }
   };
 
-  // Check if user can create the selected role
-  const canCreateRole = (selectedRole: "user" | "admin" | "root") => {
+  // Check if user can create users
+  const canCreateRole = () => {
     if (!currentUser) return false;
-    if (selectedRole === "root" && currentUser.role !== "root") return false;
     return true;
   };
 
@@ -154,18 +153,16 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             <select
               id="role"
               value={role}
-              onChange={(e) => setRole(e.target.value as "user" | "admin" | "root")}
+              onChange={(e) => setRole(e.target.value as "user" | "admin")}
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               required
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
-              {currentUser?.role === "root" && <option value="root">Root</option>}
             </select>
             <p className="text-xs text-muted-foreground">
               {role === "user" && "Standard user with basic access"}
               {role === "admin" && "Can create and manage users"}
-              {role === "root" && "Full system access"}
             </p>
           </div>
 
@@ -184,7 +181,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             <Button
               type="submit"
               className="flex-1"
-              disabled={isLoading || !canCreateRole(role)}
+              disabled={isLoading || !canCreateRole()}
             >
               {isLoading ? "Creating..." : "Create User"}
             </Button>

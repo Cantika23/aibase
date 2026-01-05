@@ -119,7 +119,7 @@ export function FilesManagerPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center p-4">
+    <div className="flex h-full flex-col gap-4 px-4 pt-14 mb-4">
       <div className="w-full select-none max-w-4xl space-y-6 h-full flex flex-col">
 
         {/* Files List */}

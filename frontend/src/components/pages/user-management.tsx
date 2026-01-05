@@ -28,7 +28,7 @@ export function UserManagementPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Check if user has admin permissions
-  const isAdmin = auth.user?.role === "admin" || auth.user?.role === "root";
+  const isAdmin = auth.user?.role === "admin";
 
   const handleDeleteUser = (user: User) => {
     setUserToDelete(user);
