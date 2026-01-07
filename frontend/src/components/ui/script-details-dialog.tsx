@@ -224,7 +224,7 @@ export function ScriptDetailsDialog({
                     className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400"
                   >
                     {idx === progressMessages.length - 1 &&
-                    state === "progress" ? (
+                      state === "progress" ? (
                       <Loader2 className="h-4 w-4 animate-spin mt-0.5 shrink-0" />
                     ) : (
                       <span className="text-amber-500">•</span>
@@ -261,7 +261,7 @@ export function ScriptDetailsDialog({
                       className="overflow-auto relative flex-1 [&>pre]:absolute [&>pre]:p-4 [&>pre>code]:whitespace-pre-wrap  [&>pre]:bg-[#0d1117]"
                     />
                   ) : (
-                    <pre className="p-4 bg-[#0d1117] overflow-auto">
+                    <pre className="p-4 bg-[#fff] overflow-auto">
                       <code>{code}</code>
                     </pre>
                   )}

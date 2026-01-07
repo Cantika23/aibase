@@ -141,7 +141,7 @@ export class FileTool extends Tool {
 
           // Remove quotes from string values
           if ((value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'"))) {
+            (value.startsWith("'") && value.endsWith("'"))) {
             value = value.slice(1, -1);
           }
 
@@ -182,30 +182,44 @@ ${frontmatter}
 
   /**
    * Resolve and validate a path within the base directory
-   * Ensures path matches /data/{proj-id}/{conv-id}/files/ pattern
+   * Supports:
+   * 1. Full path relative to project: {conv-id}/files/{filename}
+   * 2. Simple filename relative to current conversation: {filename} -> {current-conv-id}/files/{filename}
    */
   private async resolvePath(userPath: string): Promise<string> {
     const baseDir = this.getBaseDir();
-
-    // Ensure base directory exists
     await fs.mkdir(baseDir, { recursive: true });
 
-    // Resolve the user path relative to base directory
-    const resolvedPath = path.resolve(baseDir, userPath);
+    // 1. Try resolving strictly relative to Project Root (e.g. "other_conv_id/files/data.csv")
+    let resolvedPath = path.resolve(baseDir, userPath);
+    let relativePath = path.relative(baseDir, resolvedPath);
+    let pathParts = relativePath.split(path.sep);
 
-    // Security check: ensure resolved path is within base directory
-    if (!resolvedPath.startsWith(baseDir)) {
-      throw new Error("Access denied: Path is outside allowed directory");
+    // Check if it looks like a valid project-relative path: {conv-id}/files/...
+    const isValidProjectRelative =
+      resolvedPath.startsWith(baseDir) &&
+      pathParts.length >= 2 &&
+      pathParts[1] === "files";
+
+    if (!isValidProjectRelative) {
+      // 2. If not valid project-relative, try resolving relative to CURRENT conversation files dir
+      // This handles the common case: "data.csv" -> "current_conv/files/data.csv"
+      const currentConvFilesDir = path.join(baseDir, this.convId, "files");
+      resolvedPath = path.resolve(currentConvFilesDir, userPath);
+
+      // Re-validate against baseDir to ensure no directory traversal out of project
+      if (!resolvedPath.startsWith(baseDir)) {
+        throw new Error("Access denied: Path is outside allowed directory");
+      }
+
+      relativePath = path.relative(baseDir, resolvedPath);
+      pathParts = relativePath.split(path.sep);
     }
 
-    // Validate that path matches {conv-id}/files/ pattern
-    const relativePath = path.relative(baseDir, resolvedPath);
-    const pathParts = relativePath.split(path.sep);
-
-    // Path should be: {conv-id}/files/{filename}
-    // So we need at least 2 parts, and second part must be "files"
+    // Final Validation: Must be within SOME public/user conversation's "files" directory
+    // Pattern: {any-conv-id}/files/{filename}
     if (pathParts.length < 2 || pathParts[1] !== "files") {
-      throw new Error("Access denied: Path must be within {conv-id}/files/ subdirectories");
+      throw new Error(`Access denied: Path must be within {conv-id}/files/ subdirectories. Got: ${relativePath}`);
     }
 
     return resolvedPath;
