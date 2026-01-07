@@ -11,6 +11,15 @@ RUN bun run build
 # Production stage
 FROM oven/bun:alpine
 
+# Install DuckDB
+RUN apk add --no-cache curl && \
+    curl -L https://github.com/duckdb/duckdb/releases/download/v1.1.3/duckdb_cli-linux-amd64.zip -o /tmp/duckdb.zip && \
+    unzip /tmp/duckdb.zip -d /tmp/ && \
+    mv /tmp/duckdb /usr/local/bin/ && \
+    chmod +x /usr/local/bin/duckdb && \
+    rm /tmp/duckdb.zip && \
+    apk del curl
+
 WORKDIR /app
 
 # Copy backend
