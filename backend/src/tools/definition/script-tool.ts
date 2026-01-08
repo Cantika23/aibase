@@ -135,25 +135,25 @@ PostgreSQL query examples (RECOMMENDED: store credentials in memory):
     value: 'postgresql://user:pass@localhost:5432/mydb'
   });
 
-  // Then reference the credential explicitly (CLEAR which credential is used):
+  // Then use memory.read() to get the credential (CLEAR and type-safe):
   const users = await postgresql({
     query: "SELECT * FROM users WHERE active = true LIMIT 10",
-    connectionUrl: "memory:database.postgresql_url"  // Explicit memory reference
+    connectionUrl: memory.read('database', 'postgresql_url')  // Function call - type-safe!
   });
   progress(\`Found \${users.rowCount} users\`);
   return users.data;
 
-  // Query with aggregation (explicit memory reference)
+  // Query with aggregation (using memory.read())
   const stats = await postgresql({
     query: "SELECT status, COUNT(*) as count FROM orders GROUP BY status",
-    connectionUrl: "memory:database.postgresql_url"
+    connectionUrl: memory.read('database', 'postgresql_url')
   });
   return stats.data;
 
-  // Query with timeout (explicit memory reference)
+  // Query with timeout (using memory.read())
   const large = await postgresql({
     query: "SELECT * FROM large_table",
-    connectionUrl: "memory:database.postgresql_url",
+    connectionUrl: memory.read('database', 'postgresql_url'),
     timeout: 60000 // 60 seconds
   });
   return { rowCount: large.rowCount, executionTime: large.executionTime };
@@ -180,10 +180,10 @@ PDF reader examples (extract text from PDF files):
     value: 'secret123'
   });
 
-  // Then reference the password explicitly (CLEAR which password is used):
+  // Then use memory.read() to get the password (CLEAR and type-safe):
   const secure = await pdfReader({
     filePath: "secure.pdf",
-    password: "memory:credentials.pdf_password"  // Explicit memory reference
+    password: memory.read('credentials', 'pdf_password')  // Function call - type-safe!
   });
   return secure.text;
 
