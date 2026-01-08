@@ -215,24 +215,24 @@ export class ScriptRuntime {
    * Get the PostgreSQL query function
    */
   private createPostgreSQLFunction() {
-    // Return the PostgreSQL function (requires direct connection URL)
-    return createPostgreSQLFunction();
+    // Return the PostgreSQL function with project ID for memory access
+    return createPostgreSQLFunction(this.context.projectId);
   }
 
   /**
    * Get the ClickHouse query function
    */
   private createClickHouseFunction() {
-    // Return the ClickHouse function (requires server URL)
-    return createClickHouseFunction();
+    // Return the ClickHouse function with project ID for memory access
+    return createClickHouseFunction(this.context.projectId);
   }
 
   /**
    * Get the Trino query function
    */
   private createTrinoFunction() {
-    // Return the Trino function (requires server URL)
-    return createTrinoFunction();
+    // Return the Trino function with project ID for memory access
+    return createTrinoFunction(this.context.projectId);
   }
 
   /**
@@ -241,8 +241,8 @@ export class ScriptRuntime {
   private createPDFReaderFunction() {
     // Set working directory to the conversation's files directory
     const cwd = `data/${this.context.projectId}/${this.context.convId}/files`;
-    // Return the PDF reader function from the modular implementation
-    return createPDFReaderFunction(cwd);
+    // Return the PDF reader function with project ID for memory access
+    return createPDFReaderFunction(cwd, this.context.projectId);
   }
 
   /**

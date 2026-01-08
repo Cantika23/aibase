@@ -2,6 +2,26 @@ import * as fs from "fs/promises";
 import * as path from "path";
 
 /**
+ * Load memory from file to retrieve stored credentials
+ */
+async function loadMemory(projectId: string): Promise<Record<string, any>> {
+  const memoryPath = path.join(
+    process.cwd(),
+    "data",
+    projectId,
+    "memory.json"
+  );
+
+  try {
+    const content = await fs.readFile(memoryPath, "utf-8");
+    return JSON.parse(content);
+  } catch (error: any) {
+    // File doesn't exist or is invalid, return empty object
+    return {};
+  }
+}
+
+/**
  * Context documentation for PDF reader functionality
  */
 export const context = async () => {
@@ -13,6 +33,9 @@ Use pdfReader() to extract text from PDF files.
 
 **IMPORTANT:** When using pdfReader with files from \`file({ action: 'list' })\`, use ONLY the filename (pdf.name), NOT the full path (pdf.path)!
 
+**IMPORTANT:** For password-protected PDFs, store the password in memory for security:
+\`await memory({ action: 'set', category: 'credentials', key: 'pdf_password', value: 'your-password' });\`
+
 #### EXAMPLES
 
 \`\`\`typescript
@@ -22,9 +45,12 @@ const pdf = await pdfReader({ filePath: 'document.pdf' });
 progress(\`Extracted \${pdf.totalPages} pages\`);
 return { text: pdf.text, pages: pdf.totalPages, preview: pdf.text.substring(0, 500) + '...' };
 
-// Read password-protected PDF
+// RECOMMENDED: For password-protected PDFs, store password in memory first (do this once):
+await memory({ action: 'set', category: 'credentials', key: 'pdf_password', value: 'secret123' });
+
+// Then read PDF without exposing password in code:
 progress('Opening encrypted PDF...');
-const secure = await pdfReader({ filePath: 'secure.pdf', password: 'secret123' });
+const secure = await pdfReader({ filePath: 'secure.pdf' });
 return { text: secure.text, pages: secure.totalPages };
 
 // Preview first 3 pages
@@ -42,6 +68,9 @@ for (const pdf of pdfs) {
   results.push({ file: pdf.name, pages: content.totalPages, textLength: content.text.length, preview: content.text.substring(0, 200) });
 }
 return { processed: results.length, results };
+
+// Legacy: Direct password (NOT RECOMMENDED - password visible in code)
+const legacy = await pdfReader({ filePath: 'secure.pdf', password: 'secret123' });
 \`\`\``
 };
 
@@ -53,7 +82,7 @@ export interface PDFReaderOptions {
   filePath?: string;
   /** PDF buffer data (alternative to filePath) */
   buffer?: Buffer;
-  /** Password for encrypted PDFs (note: pdf-parse has limited password support) */
+  /** Password for encrypted PDFs (optional if stored in memory) */
   password?: string;
   /** Maximum number of pages to read (0 = all pages) */
   maxPages?: number;
@@ -82,16 +111,21 @@ export interface PDFReaderResult {
 }
 
 /**
- * Create a PDF reader function that extracts text from PDF files
+ * Create a PDF reader function that extracts text from PDF files with memory support
  *
  * Supports:
  * - Reading from file path or buffer
  * - Page extraction
  * - Metadata extraction
+ * - Password storage in memory for encrypted PDFs
+ *
+ * Password can be stored in memory:
+ * await memory({ action: 'set', category: 'credentials', key: 'pdf_password', value: 'secret' });
  *
  * @param cwd - Working directory for resolving relative file paths
+ * @param projectId - Project ID for loading memory
  */
-export function createPDFReaderFunction(cwd?: string) {
+export function createPDFReaderFunction(cwd?: string, projectId?: string) {
   return async (options: PDFReaderOptions): Promise<PDFReaderResult> => {
     if (!options || typeof options !== "object") {
       throw new Error(
@@ -103,6 +137,21 @@ export function createPDFReaderFunction(cwd?: string) {
       throw new Error(
         "pdfReader requires either 'filePath' or 'buffer' parameter. Usage: pdfReader({ filePath: 'document.pdf' })"
       );
+    }
+
+    // Try to get password from memory first, then fall back to provided parameter
+    let password = options.password;
+
+    if (!password && projectId) {
+      try {
+        // Try to read from memory
+        const memory = await loadMemory(projectId);
+        if (memory.credentials && memory.credentials.pdf_password) {
+          password = memory.credentials.pdf_password;
+        }
+      } catch (error) {
+        // Silently ignore memory errors and use provided password
+      }
     }
 
     try {
@@ -140,7 +189,7 @@ export function createPDFReaderFunction(cwd?: string) {
       // Create PDFParse instance with the buffer data
       const pdfParser = new PDFParse({
         data: dataBuffer,
-        password: options.password,
+        password: password,
       });
 
       // Parse options for text extraction
@@ -176,9 +225,9 @@ export function createPDFReaderFunction(cwd?: string) {
  */
 export async function readPDF(
   filePath: string,
-  options?: { password?: string; maxPages?: number; cwd?: string }
+  options?: { password?: string; maxPages?: number; cwd?: string; projectId?: string }
 ): Promise<PDFReaderResult> {
-  return createPDFReaderFunction(options?.cwd)({
+  return createPDFReaderFunction(options?.cwd, options?.projectId)({
     filePath,
     password: options?.password,
     maxPages: options?.maxPages,
@@ -190,9 +239,9 @@ export async function readPDF(
  */
 export async function readPDFBuffer(
   buffer: Buffer,
-  options?: { password?: string; maxPages?: number }
+  options?: { password?: string; maxPages?: number; projectId?: string }
 ): Promise<PDFReaderResult> {
-  return createPDFReaderFunction()({
+  return createPDFReaderFunction(undefined, options?.projectId)({
     buffer,
     password: options?.password,
     maxPages: options?.maxPages,
