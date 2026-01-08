@@ -11,7 +11,8 @@ import { JiraTool } from "./definition/jira-tool";
  */
 export function getBuiltinTools(
   convId: string = "A1",
-  projectId: string = "A1"
+  projectId: string = "A1",
+  userId?: string
 ): Tool[] {
   const fileTool = new FileTool();
   fileTool.setConvId(convId);
@@ -24,6 +25,9 @@ export function getBuiltinTools(
   const scriptTool = new ScriptTool();
   scriptTool.setConvId(convId);
   scriptTool.setProjectId(projectId);
+  if (userId) {
+    scriptTool.setUserId(userId);
+  }
 
   const memoryTool = new MemoryTool();
   memoryTool.setProjectId(projectId);

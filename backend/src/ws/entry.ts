@@ -447,6 +447,7 @@ export class WSServer extends WSEventEmitter {
     const connectionInfo: ConnectionInfo = {
       convId,
       projectId,
+      userId: authenticatedUser?.id,
       sessionId,
       connectedAt: Date.now(),
       lastActivity: Date.now(),
@@ -469,7 +470,7 @@ export class WSServer extends WSEventEmitter {
     // Create conversation for this session with existing history
     // Load from disk if available
     const existingHistory = await this.messagePersistence.getClientHistory(convId, projectId);
-    const conversation = await this.createConversation(existingHistory, convId, projectId);
+    const conversation = await this.createConversation(existingHistory, convId, projectId, authenticatedUser?.id);
     connectionInfo.conversation = conversation;
 
     // Hook into conversation to persist changes to MessagePersistence
@@ -1225,9 +1226,10 @@ export class WSServer extends WSEventEmitter {
   private async createConversation(
     initialHistory: any[] = [],
     convId: string,
-    projectId: string
+    projectId: string,
+    userId?: string
   ): Promise<Conversation> {
-    const tools = await this.getDefaultTools(convId, projectId);
+    const tools = await this.getDefaultTools(convId, projectId, userId);
     const defaultSystemPrompt = `You are a helpful AI assistant connected via WebSocket.
 You have access to tools that can help you provide better responses.
 Always be helpful and conversational.`;
@@ -1355,8 +1357,8 @@ Always be helpful and conversational.`;
     });
   }
 
-  private async getDefaultTools(convId: string, projectId: string): Promise<Tool[]> {
-    const tools = getBuiltinTools(convId, projectId);
+  private async getDefaultTools(convId: string, projectId: string, userId?: string): Promise<Tool[]> {
+    const tools = getBuiltinTools(convId, projectId, userId);
 
     // Set up broadcast callback for TodoTool
     const todoTool = tools.find(t => t.name === "todo");
@@ -1500,6 +1502,7 @@ Always be helpful and conversational.`;
 interface ConnectionInfo {
   convId: string;
   projectId: string;
+  userId?: string;
   sessionId: string;
   connectedAt: number;
   lastActivity: number;

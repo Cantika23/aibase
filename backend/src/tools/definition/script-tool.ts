@@ -50,7 +50,7 @@ export const context = async () => {
  *   Note: connectionUrl is required
  * - pdfReader(options) for extracting text from PDF files
  *   Options: { filePath?, buffer?, password?, maxPages?, debug? }
- * - convId and projectId for context
+ * - convId, projectId, and CURRENT_UID for context
  * - console for debugging
  * - fetch for HTTP requests
  */
@@ -60,7 +60,7 @@ export class ScriptTool extends Tool {
   description = `Execute Bun TypeScript code with programmatic access to other tools.
 Use for batch operations, complex workflows, data transformations, SQL queries, database operations, and PDF text extraction.
 Available functions: progress(message, data?), duckdb(options), postgresql(options), pdfReader(options), showChart(options), showTable(options), and all registered tools as async functions.
-Context variables: convId, projectId. Note: Bun is used instead of Node.js (Do not use require).`;
+Context variables: convId, projectId, CURRENT_UID. Note: Bun is used instead of Node.js (Do not use require).`;
 
   parameters = {
     type: "object",
@@ -182,6 +182,7 @@ PDF reader examples (extract text from PDF files):
   // Context injected from conversation
   private convId: string = "";
   private projectId: string = "";
+  private userId: string = "";
   private toolsRegistry: Map<string, Tool> = new Map();
   private broadcastFn?: (type: "tool_call" | "tool_result", data: any) => void;
   private currentToolCallId?: string;
@@ -198,6 +199,13 @@ PDF reader examples (extract text from PDF files):
    */
   setProjectId(projectId: string): void {
     this.projectId = projectId;
+  }
+
+  /**
+   * Set user ID for context
+   */
+  setUserId(userId: string): void {
+    this.userId = userId;
   }
 
   /**
@@ -344,6 +352,7 @@ PDF reader examples (extract text from PDF files):
       const runtime = new ScriptRuntime({
         convId: this.convId,
         projectId: this.projectId,
+        userId: this.userId,
         tools: this.toolsRegistry,
         broadcast: this.broadcastFn,
         toolCallId: this.currentToolCallId,
@@ -369,6 +378,7 @@ PDF reader examples (extract text from PDF files):
           const retryRuntime = new ScriptRuntime({
             convId: this.convId,
             projectId: this.projectId,
+            userId: this.userId,
             tools: this.toolsRegistry,
             broadcast: this.broadcastFn,
             toolCallId: this.currentToolCallId,
