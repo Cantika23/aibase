@@ -69,7 +69,7 @@ await todo({ action: 'add', texts });
 return { created: texts.length };
 \`\`\`
 
-**Available:** fetch, progress(msg), file(...), todo(...), memory(...), peek(outputId, offset, limit), peekInfo(outputId), webSearch(...), imageSearch(...), convId, projectId, console`;
+**Available:** fetch, progress(msg), file(...), todo(...), memory(...), peek(outputId, offset, limit), peekInfo(outputId), webSearch(...), imageSearch(...), convId, projectId, CURRENT_UID, console`;
 };
 
 /**
@@ -78,6 +78,7 @@ return { created: texts.length };
 export interface ScriptContext {
   convId: string;
   projectId: string;
+  userId: string;
   tools: Map<string, Tool>;
   broadcast: (type: "tool_call" | "tool_result", data: any) => void;
   toolCallId: string;
@@ -130,6 +131,7 @@ export class ScriptRuntime {
       // Context variables
       convId: this.context.convId,
       projectId: this.context.projectId,
+      CURRENT_UID: this.context.userId,
 
       // Allow console for debugging
       console: console,
