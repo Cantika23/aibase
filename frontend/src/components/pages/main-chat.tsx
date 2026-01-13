@@ -263,7 +263,7 @@ export function MainChat({
   // }, [convId, currentProject?.id, messages.length, setMessages]);
 
   return (
-    <div className={`flex h-screen ${className} relative`}>
+    <div className={`flex h-screen-mobile ${className} relative`}>
       {/* New Conversation Button - Absolute positioned top right (only show if messages exist and not in embed mode) */}
       {!isEmbedMode && messages.length > 0 && (
         <PageActionGroup>

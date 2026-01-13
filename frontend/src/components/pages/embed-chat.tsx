@@ -108,7 +108,7 @@ export function EmbedChatPage() {
 
   if (isValidating) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center">
+      <div className="flex h-screen-mobile w-screen items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading chat...</p>
@@ -119,7 +119,7 @@ export function EmbedChatPage() {
 
   if (error) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center">
+      <div className="flex h-screen-mobile w-screen items-center justify-center">
         <div className="text-center max-w-md p-6">
           <div className="rounded-lg bg-red-50 p-4 mb-4">
             <h2 className="text-lg font-semibold text-red-900 mb-2">
@@ -141,7 +141,7 @@ export function EmbedChatPage() {
   const finalConvId = effectiveUid ? `embed_user_${effectiveUid}` : convId;
 
   return (
-    <div className="h-screen w-screen embed-mode">
+    <div className="h-screen-mobile w-screen embed-mode">
       <MainChat
         wsUrl={wsUrl}
         className="embed-chat"

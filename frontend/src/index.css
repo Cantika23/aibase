@@ -78,4 +78,10 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Fix mobile viewport height to account for browser UI */
+  .h-screen-mobile {
+    height: 100vh; /* Fallback for older browsers */
+    height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
+  }
 }
