@@ -7,9 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogClose,
 } from "./dialog";
 import { ScrollArea } from "./scroll-area";
-import { File, Folder, Info, Trash2, Edit3 } from "lucide-react";
+import { File, Folder, Info, Trash2, Edit3, X } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 
 interface FileToolDetailsDialogProps {
@@ -119,19 +120,23 @@ export function FileToolDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90dvh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ActionIcon className="h-5 w-5" />
-            <span>{getActionLabel(action)}</span>
-            <span className={`text-sm font-normal ${getStateColor()}`}>
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg pr-8">
+            <ActionIcon className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+            <span className="truncate">{getActionLabel(action)}</span>
+            <span className={`text-xs sm:text-sm font-normal ${getStateColor()} shrink-0`}>
               {getStateLabel()}
             </span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="truncate text-xs sm:text-sm">
             {path && <span>Path: {path}</span>}
             {newPath && <span className="ml-4">→ {newPath}</span>}
           </DialogDescription>
+          <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
