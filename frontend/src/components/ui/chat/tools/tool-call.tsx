@@ -192,7 +192,7 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
                       ? "call"
                       : invocation.state,
                   result: actualResult,
-                  error: "error" in invocation ? invocation.error : undefined,
+                  error: ('result' in invocation && invocation.result?.error) || invocation.error,
                 });
               }
             }

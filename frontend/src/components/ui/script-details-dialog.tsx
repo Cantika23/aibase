@@ -9,8 +9,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "./dialog";
-import { Loader2, Copy, Check } from "lucide-react";
+import { Loader2, Copy, Check, X } from "lucide-react";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { useUIStore } from "@/stores/ui-store";
@@ -195,12 +196,16 @@ export function ScriptDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-[95vw] sm:max-w-7xl max-h-[90dvh] flex flex-col p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span>{purpose}</span>
-            <Badge>{getStateLabel()}</Badge>
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg pr-8">
+            <span className="truncate">{purpose}</span>
+            <Badge className="shrink-0">{getStateLabel()}</Badge>
           </DialogTitle>
+          <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden">
@@ -236,9 +241,9 @@ export function ScriptDetailsDialog({
             )}
 
             {/* Code and Result Side by Side */}
-            <div className="grid grid-cols-2 gap-4 h-full min-h-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
               {/* Script Code - Left */}
-              <div className="flex flex-col min-h-0 h-[80vh]">
+              <div className="flex flex-col min-h-0 h-[40vh] md:h-[70vh]">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold">Code</h3>
                   <Button
@@ -269,7 +274,7 @@ export function ScriptDetailsDialog({
               </div>
 
               {/* Result/Error - Right */}
-              <div className="flex flex-col min-h-0">
+              <div className="flex flex-col min-h-0 h-[40vh] md:h-auto">
                 {result && state === "result" && (
                   <>
                     <div className="flex items-center justify-between mb-2">

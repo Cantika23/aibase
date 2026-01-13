@@ -6,9 +6,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 
 export interface GenericToolDetails {
@@ -81,12 +83,16 @@ export function GenericToolDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90dvh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="font-mono">{toolName}</span>
-            <Badge variant={getStateBadgeVariant()}>{state}</Badge>
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg pr-8">
+            <span className="font-mono truncate">{toolName}</span>
+            <Badge variant={getStateBadgeVariant()} className="shrink-0">{state}</Badge>
           </DialogTitle>
+          <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
