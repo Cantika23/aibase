@@ -97,8 +97,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Determine ports based on OS
+	var backendPort, qdrantHttpPort, qdrantGrpcPort string
+	if runtime.GOOS == "windows" {
+		backendPort = "3678"
+		qdrantHttpPort = "3679"
+		qdrantGrpcPort = "3680"
+	} else {
+		backendPort = "5040"
+		qdrantHttpPort = "6333"
+		qdrantGrpcPort = "6334"
+	}
+
 	// Clean up any processes using our ports
-	killProcessesOnPorts()
+	killProcessesOnPorts(backendPort, qdrantHttpPort, qdrantGrpcPort)
 
 	// Step 5: Start all processes
 	currentStep++
@@ -121,8 +133,8 @@ func main() {
 	createQdrantConfig(qdrantConfigDir, qdrantStoragePath)
 
 	qdrantEnv := []string{
-		"QDRANT__SERVICE__HTTP_PORT=6333",
-		"QDRANT__SERVICE__GRPC_PORT=6334",
+		"QDRANT__SERVICE__HTTP_PORT=" + qdrantHttpPort,
+		"QDRANT__SERVICE__GRPC_PORT=" + qdrantGrpcPort,
 		fmt.Sprintf("QDRANT__STORAGE__STORAGE_PATH=%s", qdrantStoragePath),
 	}
 	orch.AddProcess("qdrant", qdrantDataDir, qdrantBinary, []string{}, qdrantEnv, qdrantLogsPath)
@@ -151,8 +163,16 @@ func main() {
 	showProgress(currentStep, totalSteps, "All services ready!")
 	fmt.Println()
 
+	// Determine display URL based on OS
+	var displayURL string
+	if runtime.GOOS == "windows" {
+		displayURL = "http://localhost:3678"
+	} else {
+		displayURL = "http://localhost:5040"
+	}
+
 	color.Green("\n✓ All services started successfully\n")
-	color.Cyan("\n→ Backend URL: http://localhost:5040\n")
+	color.Cyan("\n→ Backend URL: %s\n", displayURL)
 	color.Cyan("\nPress Ctrl+C to stop all services\n\n")
 
 	// Setup signal handling for graceful shutdown
@@ -316,8 +336,8 @@ storage:
 }
 
 // killProcessesOnPorts kills any processes using our required ports
-func killProcessesOnPorts() {
-	ports := []string{"5040", "6333", "6334"}
+func killProcessesOnPorts(backendPort, qdrantHttpPort, qdrantGrpcPort string) {
+	ports := []string{backendPort, qdrantHttpPort, qdrantGrpcPort}
 
 	for _, port := range ports {
 		killProcessOnPort(port)

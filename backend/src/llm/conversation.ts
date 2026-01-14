@@ -192,6 +192,12 @@ export interface ConversationOptions {
    * Project ID for loading context-specific data
    */
   projectId?: string;
+
+  /**
+   * URL parameters for placeholder replacement in context (e.g., { hewan: "burung" })
+   * Use {{param_name}} in context template to reference these values
+   */
+  urlParams?: Record<string, string>;
 }
 
 /**
@@ -213,6 +219,7 @@ export class Conversation {
   private currentAbortController: AbortController | null = null;
   private convId: string = "default";
   private projectId: string = "A1";
+  private urlParams: Record<string, string> | undefined;
 
   /**
    * Create a new Conversation instance
@@ -239,6 +246,9 @@ export class Conversation {
     this.convId = options.convId || "default";
     this.projectId = options.projectId || "A1";
 
+    // Store URL parameters for context replacement
+    this.urlParams = options.urlParams;
+
     // Set model parameters
     if (options.temperature !== undefined)
       this.modelParams.temperature = options.temperature;
@@ -257,7 +267,7 @@ export class Conversation {
     if (!hasSystemMessage) {
       // Initialize history with system prompt
       // Start with default context and append custom systemPrompt if provided
-      const baseContext = await defaultContext(this.convId, this.projectId);
+      const baseContext = await defaultContext(this.convId, this.projectId, this.urlParams);
       const systemPrompt = options.systemPrompt
         ? `${baseContext}\n\n${options.systemPrompt}`
         : baseContext;

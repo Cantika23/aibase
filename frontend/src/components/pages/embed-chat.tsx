@@ -101,9 +101,18 @@ export function EmbedChatPage() {
 
   // Build public WebSocket URL
   // Include uid parameter if present so backend can use it as CURRENT_UID
+  // Also include ALL other URL parameters for context replacement (e.g., ?hewan=burung)
   const uidParam = uid ? `&uid=${encodeURIComponent(uid)}` : '';
+
+  // Extract custom URL parameters (excluding system params) for context replacement
+  const systemParams = ['projectId', 'embedToken', 'uid'];
+  const customParams = Array.from(searchParams.entries())
+    .filter(([key]) => !systemParams.includes(key))
+    .map(([key, value]) => `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('');
+
   const wsUrl = typeof window !== 'undefined' && projectId && embedToken
-    ? buildWsUrl(`/api/embed/ws?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}${uidParam}`)
+    ? buildWsUrl(`/api/embed/ws?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}${uidParam}${customParams}`)
     : '';
 
   if (isValidating) {

@@ -392,6 +392,12 @@ export class WSServer extends WSEventEmitter {
     // Extract embedUid for embed connections (used as CURRENT_UID instead of database user ID)
     const embedUid = ws.data?.embedUid || null;
 
+    // Extract URL parameters for context replacement (from embed connections)
+    const urlParams: Record<string, string> | undefined = ws.data?.urlParams;
+    if (urlParams && Object.keys(urlParams).length > 0) {
+      console.log(`[WSServer] URL parameters extracted for context:`, urlParams);
+    }
+
     // Validate token if present
     let authenticatedUser = null;
     if (token) {
@@ -473,6 +479,7 @@ export class WSServer extends WSEventEmitter {
       lastActivity: Date.now(),
       messageCount: 0,
       isAlive: true,
+      urlParams, // Include URL parameters for context replacement
     };
 
     this.connections.set(ws, connectionInfo);
@@ -490,7 +497,7 @@ export class WSServer extends WSEventEmitter {
     // Create conversation for this session with existing history
     // Load from disk if available
     const existingHistory = await this.messagePersistence.getClientHistory(convId, projectId);
-    const conversation = await this.createConversation(existingHistory, convId, projectId, effectiveUserId);
+    const conversation = await this.createConversation(existingHistory, convId, projectId, effectiveUserId, urlParams);
     connectionInfo.conversation = conversation;
 
     // Hook into conversation to persist changes to MessagePersistence
@@ -1247,7 +1254,8 @@ export class WSServer extends WSEventEmitter {
     initialHistory: any[] = [],
     convId: string,
     projectId: string,
-    userId?: string
+    userId?: string,
+    urlParams?: Record<string, string>
   ): Promise<Conversation> {
     const tools = await this.getDefaultTools(convId, projectId, userId);
     const defaultSystemPrompt = `You are a helpful AI assistant connected via WebSocket.
@@ -1270,6 +1278,7 @@ Always be helpful and conversational.`;
       tools,
       convId,
       projectId,
+      urlParams, // Pass URL parameters for context replacement
       thinking: thinkingMode,
       hooks: {
         message: {
@@ -1529,4 +1538,5 @@ interface ConnectionInfo {
   messageCount: number;
   isAlive: boolean;
   conversation?: Conversation;
+  urlParams?: Record<string, string>; // URL parameters for context replacement
 }

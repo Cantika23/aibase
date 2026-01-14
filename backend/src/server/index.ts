@@ -175,8 +175,13 @@ export class WebSocketServer {
   private options: Required<ServerOptions>;
 
   constructor(options: ServerOptions = {}) {
+    // Detect OS and set default port accordingly
+    // Windows: 3678, Linux/Mac: 5040
+    const isWindows = process.platform === 'win32';
+    const defaultPort = isWindows ? 3678 : 5040;
+
     this.options = {
-      port: 5040,
+      port: defaultPort,
       hostname: "0.0.0.0",
       development: false,
       maxConnections: 100,
@@ -262,9 +267,18 @@ export class WebSocketServer {
           // This is the original uid value passed in the embed URL, not the database user ID
           const embedUid = url.searchParams.get("uid");
 
-          // Upgrade to WebSocket with embed flag, session token, and uid
+          // Extract ALL URL parameters for context replacement (excluding known system params)
+          const urlParams: Record<string, string> = {};
+          for (const [key, value] of url.searchParams.entries()) {
+            // Skip known system parameters
+            if (!['embedToken', 'projectId', 'convId', 'token', 'uid'].includes(key)) {
+              urlParams[key] = value;
+            }
+          }
+
+          // Upgrade to WebSocket with embed flag, session token, uid, and URL params
           const upgraded = server.upgrade(req, {
-            data: { convId, projectId, isEmbed: true, token: sessionToken, embedUid }
+            data: { convId, projectId, isEmbed: true, token: sessionToken, embedUid, urlParams }
           });
 
           if (upgraded) {
@@ -279,9 +293,18 @@ export class WebSocketServer {
           const convId = url.searchParams.get("convId");
           const projectId = url.searchParams.get("projectId");
 
-          // Pass conversation ID and project ID as data to WebSocket connection
+          // Extract ALL URL parameters for context replacement (excluding known system params)
+          const urlParams: Record<string, string> = {};
+          for (const [key, value] of url.searchParams.entries()) {
+            // Skip known system parameters
+            if (!['projectId', 'convId'].includes(key)) {
+              urlParams[key] = value;
+            }
+          }
+
+          // Pass conversation ID, project ID, and URL params as data to WebSocket connection
           const upgraded = server.upgrade(req, {
-            data: { convId, projectId }
+            data: { convId, projectId, urlParams }
           });
           if (upgraded) {
             return undefined; // WebSocket connection established
