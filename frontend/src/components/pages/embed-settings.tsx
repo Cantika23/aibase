@@ -268,7 +268,10 @@ export function EmbedSettings() {
                     checked={showHistory}
                     onCheckedChange={(c) => setShowHistory(c === true)}
                   />
-                  <Label htmlFor="show-history">History</Label>
+                  <div className="flex flex-col">
+                    <Label htmlFor="show-history" className="cursor-pointer">Conversation History</Label>
+                    <p className="text-xs text-muted-foreground">Show sidebar with conversation list (only when user identification is enabled)</p>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2">

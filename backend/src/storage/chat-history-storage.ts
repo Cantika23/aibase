@@ -1,7 +1,9 @@
 /**
  * Chat history storage service
  * Persists conversation history to disk at:
- * /data/{proj-id}/{conv-id}/chats/{conv-start-timestamp}.json
+ * /data/{proj-id}/{userId}/{conv-id}/chats/{conv-start-timestamp}.json
+ *
+ * For anonymous users (no userId), uses "anonymous" as the user path.
  */
 
 import * as fs from 'fs/promises';
@@ -41,15 +43,16 @@ export class ChatHistoryStorage {
   /**
    * Get the chat directory path for a conversation
    */
-  private getChatDir(convId: string, projectId: string): string {
-    return path.join(this.baseDir, projectId, convId, 'chats');
+  private getChatDir(convId: string, projectId: string, userId?: string): string {
+    const userPath = userId || 'anonymous';
+    return path.join(this.baseDir, projectId, userPath, convId, 'chats');
   }
 
   /**
    * Get the chat file path for a conversation
    */
-  private getChatFilePath(convId: string, projectId: string): string {
-    const chatDir = this.getChatDir(convId, projectId);
+  private getChatFilePath(convId: string, projectId: string, userId?: string): string {
+    const chatDir = this.getChatDir(convId, projectId, userId);
     const timestamp = this.convStartTimes.get(convId) || Date.now();
 
     // Store the timestamp for this conversation if not already set
@@ -63,8 +66,8 @@ export class ChatHistoryStorage {
   /**
    * Ensure chat directory exists
    */
-  private async ensureChatDir(convId: string, projectId: string): Promise<void> {
-    const chatDir = this.getChatDir(convId, projectId);
+  private async ensureChatDir(convId: string, projectId: string, userId?: string): Promise<void> {
+    const chatDir = this.getChatDir(convId, projectId, userId);
     await fs.mkdir(chatDir, { recursive: true });
   }
 
@@ -74,9 +77,10 @@ export class ChatHistoryStorage {
    */
   async loadChatHistory(
     convId: string,
-    projectId: string
+    projectId: string,
+    userId?: string
   ): Promise<ChatCompletionMessageParam[]> {
-    const chatDir = this.getChatDir(convId, projectId);
+    const chatDir = this.getChatDir(convId, projectId, userId);
 
     try {
       // Check if chat directory exists
@@ -127,13 +131,14 @@ export class ChatHistoryStorage {
   async saveChatHistory(
     convId: string,
     messages: ChatCompletionMessageParam[],
-    projectId: string
+    projectId: string,
+    userId?: string
   ): Promise<void> {
     try {
       // Ensure directory exists
-      await this.ensureChatDir(convId, projectId);
+      await this.ensureChatDir(convId, projectId, userId);
 
-      const filePath = this.getChatFilePath(convId, projectId);
+      const filePath = this.getChatFilePath(convId, projectId, userId);
       const timestamp = this.convStartTimes.get(convId) || Date.now();
 
       const chatHistory: ChatHistoryFile = {
@@ -166,9 +171,10 @@ export class ChatHistoryStorage {
    */
   async listChatHistoryFiles(
     convId: string,
-    projectId: string
+    projectId: string,
+    userId?: string
   ): Promise<string[]> {
-    const chatDir = this.getChatDir(convId, projectId);
+    const chatDir = this.getChatDir(convId, projectId, userId);
 
     try {
       const files = await fs.readdir(chatDir);
@@ -186,9 +192,10 @@ export class ChatHistoryStorage {
    */
   async deleteChatHistory(
     convId: string,
-    projectId: string
+    projectId: string,
+    userId?: string
   ): Promise<void> {
-    const chatDir = this.getChatDir(convId, projectId);
+    const chatDir = this.getChatDir(convId, projectId, userId);
 
     try {
       await fs.rm(chatDir, { recursive: true, force: true });
@@ -205,9 +212,10 @@ export class ChatHistoryStorage {
    */
   async getChatHistoryMetadata(
     convId: string,
-    projectId: string
+    projectId: string,
+    userId?: string
   ): Promise<ChatHistoryMetadata | null> {
-    const chatDir = this.getChatDir(convId, projectId);
+    const chatDir = this.getChatDir(convId, projectId, userId);
 
     try {
       const files = await fs.readdir(chatDir);
@@ -273,6 +281,49 @@ export class ChatHistoryStorage {
         return [];
       }
       console.error('[ChatHistoryStorage] Error listing conversations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * List all conversations for a specific user within a project
+   * Returns metadata for each conversation sorted by lastUpdatedAt (descending)
+   */
+  async listUserConversations(
+    projectId: string,
+    userId: string
+  ): Promise<ChatHistoryMetadata[]> {
+    const userDir = path.join(this.baseDir, projectId, userId);
+
+    try {
+      // Check if user directory exists
+      const dirExists = await fs.access(userDir).then(() => true).catch(() => false);
+      if (!dirExists) {
+        return [];
+      }
+
+      // Read all conversation directories for this user
+      const entries = await fs.readdir(userDir, { withFileTypes: true });
+      const convDirs = entries.filter(entry => entry.isDirectory());
+
+      // Get metadata for each conversation in parallel
+      const metadataPromises = convDirs.map(async (convDir) => {
+        const convId = convDir.name;
+        return await this.getChatHistoryMetadata(convId, projectId, userId);
+      });
+
+      const metadataResults = await Promise.all(metadataPromises);
+      const conversations = metadataResults.filter((m): m is ChatHistoryMetadata => m !== null);
+
+      // Sort by lastUpdatedAt descending (most recent first)
+      conversations.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
+
+      return conversations;
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return [];
+      }
+      console.error('[ChatHistoryStorage] Error listing user conversations:', error);
       throw error;
     }
   }

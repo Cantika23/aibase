@@ -194,6 +194,7 @@ export function MainChat({
       currentToolInvocationsRef,
       currentPartsRef,
       generateNewConvId,
+      isEmbedMode,
     });
 
   const handleInputChange = useCallback(
@@ -264,7 +265,7 @@ export function MainChat({
 
   return (
     <div className={`flex h-screen-mobile ${className} relative`}>
-      {/* New Conversation Button - Absolute positioned top right (only show if messages exist and not in embed mode) */}
+      {/* New Conversation Button - Absolute positioned top right (hidden in embed mode) */}
       {!isEmbedMode && messages.length > 0 && (
         <PageActionGroup>
           <PageActionButton

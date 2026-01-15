@@ -49,14 +49,18 @@ import {
 import {
   handleGetConversations,
   handleGetConversationMessages,
+  handleCreateNewChat,
   handleDeleteConversation,
   handleRegenerateConversationTitle,
+  handleGetEmbedUserConversations,
+  handleDeleteEmbedConversation,
 } from "./conversations-handler";
 import {
   handleGetProjectFiles,
   handleGetConversationFiles,
   handleDeleteFile,
 } from "./files-handler";
+import { migrateEmbedConversations } from "../scripts/migrate-embed-conversations";
 import {
   handleRegister,
   handleLogin,
@@ -204,6 +208,11 @@ export class WebSocketServer {
    * Start the server
    */
   async start(): Promise<void> {
+    // Run migration for embed conversations (async, don't wait)
+    migrateEmbedConversations().catch((error) => {
+      console.error('[Server] Migration failed:', error);
+    });
+
     const wsHandlers = this.wsServer.getWebSocketHandlers();
 
     this.bunServer = Bun.serve({
@@ -422,7 +431,28 @@ export class WebSocketServer {
           return handleGetEmbedInfo(req);
         }
 
+        // Embed conversations endpoint (for listing user's conversations in embed mode)
+        if (pathname === "/api/embed/conversations" && req.method === "GET") {
+          return handleGetEmbedUserConversations(req);
+        }
+
+        // Match /api/embed/conversations/:convId endpoints (DELETE for embed mode)
+        const embedConvIdMatch = pathname.match(/^\/api\/embed\/conversations\/([^\/]+)$/);
+        if (embedConvIdMatch) {
+          const convId = embedConvIdMatch[1];
+          // Support both DELETE and POST with X-HTTP-Method-Override header
+          // (for reverse proxies that don't forward DELETE methods)
+          if (req.method === "DELETE" ||
+            (req.method === "POST" && req.headers.get("X-HTTP-Method-Override") === "DELETE")) {
+            return handleDeleteEmbedConversation(req, convId);
+          }
+        }
+
         // Conversations API endpoints
+        if (pathname === "/api/conversations" && req.method === "POST") {
+          return handleCreateNewChat(req);
+        }
+
         if (pathname === "/api/conversations" && req.method === "GET") {
           return handleGetConversations(req);
         }

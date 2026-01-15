@@ -20,10 +20,27 @@ interface EmbedInfo {
   customCss: string | null;
   welcomeMessage: string | null;
   useClientUid: boolean;
+  showHistory: boolean;
 }
 
 interface EmbedTokenResponse {
   embedToken: string;
+}
+
+interface NewChatResponse {
+  convId: string;
+  projectId: string;
+  timestamp: number;
+  filePath: string;
+}
+
+export interface ChatHistoryMetadata {
+  convId: string;
+  projectId: string;
+  createdAt: number;
+  lastUpdatedAt: number;
+  messageCount: number;
+  title?: string;
 }
 
 /**
@@ -131,6 +148,33 @@ export async function authenticateEmbedUser(projectId: string, embedToken: strin
 }
 
 /**
+ * Create a new chat (creates new JSON file in chats folder)
+ */
+export async function createNewChat(projectId: string, convId: string): Promise<NewChatResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/conversations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ projectId, convId }),
+    });
+
+    const data: ApiResponse<NewChatResponse> = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Failed to create new chat");
+    }
+
+    return data.data!;
+  } catch (error) {
+    console.error("Create new chat error:", error);
+    throw error;
+  }
+}
+
+/**
  * Generate embed code (iframe)
  * Note: CSS is stored in project config, not in URL
  */
@@ -181,4 +225,46 @@ export function generateJavaScriptCode(
   document.getElementById('aibase-chat').appendChild(iframe);
 })();
 </script>`;
+}
+
+/**
+ * Get all conversations for an embed user
+ */
+export async function getEmbedUserConversations(
+  projectId: string,
+  userId: string
+): Promise<ChatHistoryMetadata[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/embed/conversations?projectId=${encodeURIComponent(projectId)}&userId=${encodeURIComponent(userId)}`
+  );
+
+  const data: ApiResponse<{ conversations: ChatHistoryMetadata[] }> = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Failed to get embed user conversations");
+  }
+
+  return data.data!.conversations;
+}
+
+/**
+ * Delete an embed conversation
+ */
+export async function deleteEmbedConversation(
+  projectId: string,
+  userId: string,
+  convId: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/embed/conversations/${encodeURIComponent(convId)}?projectId=${encodeURIComponent(projectId)}&userId=${encodeURIComponent(userId)}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  const data: ApiResponse<{ message: string }> = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Failed to delete conversation");
+  }
 }

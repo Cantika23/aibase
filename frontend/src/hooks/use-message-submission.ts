@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import type { Message } from "@/components/ui/chat";
 import type { WSClient } from "@/lib/ws/ws-connection-manager";
 import { uploadFilesWithProgress } from "@/lib/file-upload";
+import { createNewChat } from "@/lib/embed-api";
 
 interface UseMessageSubmissionProps {
   wsClient: WSClient | null;
@@ -20,6 +21,7 @@ interface UseMessageSubmissionProps {
   currentToolInvocationsRef: React.MutableRefObject<Map<string, any>>;
   currentPartsRef: React.MutableRefObject<any[]>;
   generateNewConvId: () => string;
+  isEmbedMode?: boolean;
 }
 
 export function useMessageSubmission({
@@ -39,6 +41,7 @@ export function useMessageSubmission({
   currentToolInvocationsRef,
   currentPartsRef,
   generateNewConvId,
+  isEmbedMode = false,
 }: UseMessageSubmissionProps) {
   // Track if we're currently submitting to prevent double submissions
   const isSubmittingRef = useRef(false);
@@ -279,8 +282,24 @@ export function useMessageSubmission({
     setMessages((prev) => [...prev, newMessage]);
   }, [setMessages]);
 
-  const handleNewConversation = useCallback(() => {
+  const handleNewConversation = useCallback(async () => {
     console.log("[New Conversation] Clearing all messages and starting fresh");
+
+    // Generate new conversation ID FIRST (before clearing messages)
+    const newConvId = generateNewConvId();
+    console.log("[New Conversation] Generated new conversation ID:", newConvId);
+
+    // For embed mode, create new chat file on backend with the NEW convId
+    if (isEmbedMode && projectId) {
+      try {
+        console.log("[New Conversation] Creating new chat file on backend with convId:", newConvId);
+        await createNewChat(projectId, newConvId);
+        console.log("[New Conversation] New chat file created successfully");
+      } catch (error) {
+        console.error("[New Conversation] Failed to create new chat file:", error);
+        // Continue anyway - the chat will still work
+      }
+    }
 
     // Clear all messages
     setMessages(() => []);
@@ -311,10 +330,6 @@ export function useMessageSubmission({
       wsClient.disconnect();
     }
 
-    // Generate new conversation ID and store in local storage
-    const newConvId = generateNewConvId();
-    console.log("[New Conversation] Generated new conversation ID:", newConvId);
-
     // Reconnect with new convId after a short delay to ensure clean disconnect
     setTimeout(() => {
       if (wsClient) {
@@ -340,6 +355,8 @@ export function useMessageSubmission({
     currentToolInvocationsRef,
     currentPartsRef,
     thinkingStartTimeRef,
+    isEmbedMode,
+    projectId,
   ]);
 
   return {

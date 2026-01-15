@@ -304,7 +304,7 @@ export class WSServer extends WSEventEmitter {
    * Only sends currently active (incomplete) streams
    * Note: Completed message history is sent via get_history control message
    */
-  private async sendAccumulatedChunks(ws: ServerWebSocket, convId: string, projectId: string): Promise<void> {
+  private async sendAccumulatedChunks(ws: ServerWebSocket, convId: string, projectId: string, userId?: string): Promise<void> {
     const activeStreams = this.streamingManager.getActiveStreamsForConv(convId);
 
     console.log(
@@ -337,7 +337,7 @@ export class WSServer extends WSEventEmitter {
     // If there are no active streams but history has an incomplete message,
     // send a completion event to close it out on the frontend
     if (activeStreams.length === 0) {
-      const history = await this.messagePersistence.getClientHistory(convId, projectId);
+      const history = await this.messagePersistence.getClientHistory(convId, projectId, userId);
       const lastMessage = history[history.length - 1] as ExtendedAssistantMessage | undefined;
 
       if (lastMessage &&
@@ -496,7 +496,7 @@ export class WSServer extends WSEventEmitter {
 
     // Create conversation for this session with existing history
     // Load from disk if available
-    const existingHistory = await this.messagePersistence.getClientHistory(convId, projectId);
+    const existingHistory = await this.messagePersistence.getClientHistory(convId, projectId, effectiveUserId);
     const conversation = await this.createConversation(existingHistory, convId, projectId, effectiveUserId, urlParams);
     connectionInfo.conversation = conversation;
 
@@ -506,14 +506,14 @@ export class WSServer extends WSEventEmitter {
       originalAddMessage(message);
       // Immediately persist the updated conversation history
       const history = (conversation as any)._history || [];
-      this.messagePersistence.setClientHistory(convId, history, projectId);
+      this.messagePersistence.setClientHistory(convId, history, projectId, effectiveUserId);
     };
 
     // Start heartbeat for this connection
     this.startHeartbeat(ws);
 
     // Send accumulated chunks from active streams for this conversation
-    await this.sendAccumulatedChunks(ws, convId, projectId);
+    await this.sendAccumulatedChunks(ws, convId, projectId, effectiveUserId);
 
     // Send welcome message
     this.sendToWebSocket(ws, {
@@ -847,13 +847,15 @@ export class WSServer extends WSEventEmitter {
       this.messagePersistence.setClientHistory(
         connectionInfo.convId,
         historyWithIds,
-        connectionInfo.projectId
+        connectionInfo.projectId,
+        connectionInfo.userId
       );
 
       // Verify it was saved
       const savedHistory = await this.messagePersistence.getClientHistory(
         connectionInfo.convId,
-        connectionInfo.projectId
+        connectionInfo.projectId,
+        connectionInfo.userId
       );
       console.log(
         `[Backend Complete] Verification: Saved history has ${savedHistory.length} messages`
@@ -946,7 +948,7 @@ export class WSServer extends WSEventEmitter {
           });
 
           // Save to persistent storage
-          this.messagePersistence.setClientHistory(connectionInfo.convId, historyWithIds, connectionInfo.projectId);
+          this.messagePersistence.setClientHistory(connectionInfo.convId, historyWithIds, connectionInfo.projectId, connectionInfo.userId);
           console.log(`[Abort] Saved aborted message to history`);
         }
 
@@ -1037,7 +1039,7 @@ export class WSServer extends WSEventEmitter {
           if (conversation) {
             conversation.clearHistory();
             // Also clear from persistent storage
-            this.messagePersistence.clearClientHistory(connectionInfo.convId, connectionInfo.projectId);
+            this.messagePersistence.clearClientHistory(connectionInfo.convId, connectionInfo.projectId, connectionInfo.userId);
             this.sendToWebSocket(ws, {
               type: "control_response",
               id: message.id,
@@ -1054,7 +1056,8 @@ export class WSServer extends WSEventEmitter {
           );
           const history = await this.messagePersistence.getClientHistory(
             connectionInfo.convId,
-            connectionInfo.projectId
+            connectionInfo.projectId,
+            connectionInfo.userId
           );
 
           // Filter out system messages - they should never be sent to client
@@ -1101,7 +1104,7 @@ export class WSServer extends WSEventEmitter {
           console.log(
             `Backend: Checking for active streams to send accumulated chunks`
           );
-          await this.sendAccumulatedChunks(ws, connectionInfo.convId, connectionInfo.projectId);
+          await this.sendAccumulatedChunks(ws, connectionInfo.convId, connectionInfo.projectId, connectionInfo.userId);
 
           // Check if there are active streams for this conversation
           const activeStreams = this.streamingManager.getActiveStreamsForConv(connectionInfo.convId);

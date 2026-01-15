@@ -11,6 +11,7 @@ import { getEmbedInfo } from "@/lib/embed-api";
 import { buildWsUrl } from "@/lib/base-path";
 import { useEmbedConvId } from "@/lib/embed-conv-id";
 import { useChatStore } from "@/stores/chat-store";
+import { EmbedConversationList } from "@/components/ui/embed-conversation-list";
 
 export function EmbedChatPage() {
   const [searchParams] = useSearchParams();
@@ -22,9 +23,11 @@ export function EmbedChatPage() {
     customCss: string | null;
     welcomeMessage: string | null;
     useClientUid: boolean;
-  }>({ customCss: null, welcomeMessage: null, useClientUid: false });
+    showHistory: boolean;
+  }>({ customCss: null, welcomeMessage: null, useClientUid: false, showHistory: true });
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Use embed-specific conversation ID management (URL hash based)
   const { convId, generateNewConvId, ensureHashUpdated } = useEmbedConvId();
@@ -44,7 +47,9 @@ export function EmbedChatPage() {
   useEffect(() => {
     const validate = async () => {
       if (!projectId || !embedToken) {
-        setError("Invalid embed configuration: missing projectId or embedToken");
+        setError(
+          "Invalid embed configuration: missing projectId or embedToken"
+        );
         setIsValidating(false);
         return;
       }
@@ -56,10 +61,15 @@ export function EmbedChatPage() {
           customCss: info.customCss,
           welcomeMessage: info.welcomeMessage,
           useClientUid: info.useClientUid,
+          showHistory: info.showHistory,
         });
         setIsValidating(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to validate embed configuration");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to validate embed configuration"
+        );
         setIsValidating(false);
       }
     };
@@ -74,13 +84,13 @@ export function EmbedChatPage() {
     try {
       // Basic sanitization: remove script tags and javascript: URLs
       const sanitizedCss = embedInfo.customCss
-        .replace(/<script[^>]*>.*?<\/script>/gi, '')
-        .replace(/javascript:/gi, '')
-        .replace(/on\w+\s*=/gi, '');
+        .replace(/<script[^>]*>.*?<\/script>/gi, "")
+        .replace(/javascript:/gi, "")
+        .replace(/on\w+\s*=/gi, "");
 
       // Limit CSS size to 10KB
       if (sanitizedCss.length > 10240) {
-        console.warn('[Embed] Custom CSS exceeds 10KB limit, truncating');
+        console.warn("[Embed] Custom CSS exceeds 10KB limit, truncating");
         return;
       }
 
@@ -91,29 +101,37 @@ export function EmbedChatPage() {
 
       return () => {
         // Clean up on unmount
-        const styles = document.querySelectorAll('[data-embed-custom-css="true"]');
+        const styles = document.querySelectorAll(
+          '[data-embed-custom-css="true"]'
+        );
         styles.forEach((s) => s.remove());
       };
     } catch (error) {
-      console.error('[Embed] Failed to inject custom CSS:', error);
+      console.error("[Embed] Failed to inject custom CSS:", error);
     }
   }, [embedInfo.customCss]);
 
   // Build public WebSocket URL
   // Include uid parameter if present so backend can use it as CURRENT_UID
   // Also include ALL other URL parameters for context replacement (e.g., ?hewan=burung)
-  const uidParam = uid ? `&uid=${encodeURIComponent(uid)}` : '';
+  const uidParam = uid ? `&uid=${encodeURIComponent(uid)}` : "";
 
   // Extract custom URL parameters (excluding system params) for context replacement
-  const systemParams = ['projectId', 'embedToken', 'uid'];
+  const systemParams = ["projectId", "embedToken", "uid"];
   const customParams = Array.from(searchParams.entries())
     .filter(([key]) => !systemParams.includes(key))
-    .map(([key, value]) => `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('');
+    .map(
+      ([key, value]) =>
+        `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+    )
+    .join("");
 
-  const wsUrl = typeof window !== 'undefined' && projectId && embedToken
-    ? buildWsUrl(`/api/embed/ws?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}${uidParam}${customParams}`)
-    : '';
+  const wsUrl =
+    typeof window !== "undefined" && projectId && embedToken
+      ? buildWsUrl(
+          `/api/embed/ws?projectId=${encodeURIComponent(projectId)}&embedToken=${encodeURIComponent(embedToken)}${uidParam}${customParams}`
+        )
+      : "";
 
   if (isValidating) {
     return (
@@ -137,32 +155,59 @@ export function EmbedChatPage() {
             <p className="text-sm text-red-700">{error}</p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Please check your embed code and try again. If the problem persists, contact the website administrator.
+            Please check your embed code and try again. If the problem persists,
+            contact the website administrator.
           </p>
         </div>
       </div>
     );
   }
 
-  // If uid is present AND enabled in config, derive convId from it to ensure persistence
-  // Otherwise use the hash-based/generated convId
+  // If uid is present AND enabled in config, use it for user identification
+  // BUT always use the hash-based convId for conversation tracking
+  // This allows users to have multiple conversations (each with its own hash)
   const effectiveUid = embedInfo.useClientUid ? uid : undefined;
-  const finalConvId = effectiveUid ? `embed_user_${effectiveUid}` : convId;
+  // ALWAYS use hash-based convId - never override it!
+  // The convId from hash represents the specific conversation
 
   return (
     <div className="h-screen-mobile w-screen embed-mode">
-      <MainChat
-        wsUrl={wsUrl}
-        className="embed-chat"
-        isTodoPanelVisible={false}
-        isEmbedMode={true}
+      {/* Conversation list - only show for authenticated users AND if showHistory is enabled */}
+      {effectiveUid && embedInfo.showHistory && (
+        <EmbedConversationList
+          projectId={projectId!}
+          userId={effectiveUid}
+          currentConvId={convId}
+          isCollapsed={isSidebarCollapsed}
+          onCollapsedChange={setIsSidebarCollapsed}
+          onConversationSelect={(newConvId) => {
+            // Update URL hash to trigger conversation switch
+            window.location.hash = newConvId;
+            // Force reload to load new conversation
+            window.location.reload();
+          }}
+          onNewChat={() => {
+            generateNewConvId();
+          }}
+        />
+      )}
+
+      {/* Main Chat Area - Add margin for sidebar only if it's visible */}
+      <div className={effectiveUid && embedInfo.showHistory ? (isSidebarCollapsed ? "ml-16" : "ml-80") : ""}>
+        <MainChat
+          wsUrl={wsUrl}
+          className="embed-chat"
+          isTodoPanelVisible={false}
+          isEmbedMode={true}
         welcomeMessage={embedInfo.welcomeMessage}
-        embedConvId={finalConvId}
+        // Always pass the hash-based convId for conversation tracking
+        embedConvId={convId}
         embedGenerateNewConvId={generateNewConvId}
         uid={effectiveUid}
         embedToken={embedToken || undefined}
         projectId={projectId || undefined}
       />
+      </div>
     </div>
   );
 }

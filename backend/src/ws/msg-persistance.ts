@@ -26,10 +26,11 @@ export class MessagePersistence {
   }
 
   /**
-   * Generate cache key from projectId and convId
+   * Generate cache key from projectId, userId, and convId
    */
-  private getCacheKey(projectId: string, convId: string): string {
-    return `${projectId}:${convId}`;
+  private getCacheKey(projectId: string, userId: string | undefined, convId: string): string {
+    const userPath = userId || 'anonymous';
+    return `${projectId}:${userPath}:${convId}`;
   }
 
   /**
@@ -46,8 +47,8 @@ export class MessagePersistence {
    * Get message history for a conversation
    * Loads from disk if not in memory
    */
-  async getClientHistory(convId: string, projectId: string): Promise<ChatCompletionMessageParam[]> {
-    const cacheKey = this.getCacheKey(projectId, convId);
+  async getClientHistory(convId: string, projectId: string, userId?: string): Promise<ChatCompletionMessageParam[]> {
+    const cacheKey = this.getCacheKey(projectId, userId, convId);
     const history = this.convHistories[cacheKey];
     if (history) {
       return [...history.messages]; // Return a copy to prevent direct modification
@@ -55,7 +56,7 @@ export class MessagePersistence {
 
     // Try loading from disk
     try {
-      const diskHistory = await this.chatHistoryStorage.loadChatHistory(convId, projectId);
+      const diskHistory = await this.chatHistoryStorage.loadChatHistory(convId, projectId, userId);
       if (diskHistory.length > 0) {
         // Store in memory for faster access
         this.convHistories[cacheKey] = {
@@ -93,9 +94,10 @@ export class MessagePersistence {
   setClientHistory(
     convId: string,
     messages: ChatCompletionMessageParam[],
-    projectId: string
+    projectId: string,
+    userId?: string
   ): void {
-    const cacheKey = this.getCacheKey(projectId, convId);
+    const cacheKey = this.getCacheKey(projectId, userId, convId);
     this.convHistories[cacheKey] = {
       convId,
       projectId,
@@ -105,7 +107,7 @@ export class MessagePersistence {
     };
 
     // Asynchronously save to disk (don't wait)
-    this.chatHistoryStorage.saveChatHistory(convId, messages, projectId).catch(error => {
+    this.chatHistoryStorage.saveChatHistory(convId, messages, projectId, userId).catch(error => {
       console.error(`[MessagePersistence] Error saving history for ${convId}:`, error);
     });
   }
@@ -114,8 +116,8 @@ export class MessagePersistence {
    * Add a message to conversation history
    * Also saves to disk
    */
-  addClientMessage(convId: string, message: ChatCompletionMessageParam, projectId: string): void {
-    const cacheKey = this.getCacheKey(projectId, convId);
+  addClientMessage(convId: string, message: ChatCompletionMessageParam, projectId: string, userId?: string): void {
+    const cacheKey = this.getCacheKey(projectId, userId, convId);
     if (!this.convHistories[cacheKey]) {
       this.convHistories[cacheKey] = {
         convId,
@@ -132,7 +134,7 @@ export class MessagePersistence {
 
     // Asynchronously save to disk (don't wait)
     const messages = this.convHistories[cacheKey].messages;
-    this.chatHistoryStorage.saveChatHistory(convId, messages, projectId).catch(error => {
+    this.chatHistoryStorage.saveChatHistory(convId, messages, projectId, userId).catch(error => {
       console.error(`[MessagePersistence] Error saving history for ${convId}:`, error);
     });
   }
@@ -140,8 +142,8 @@ export class MessagePersistence {
   /**
    * Clear message history for a conversation
    */
-  clearClientHistory(convId: string, projectId: string, keepSystemPrompt: boolean = true): void {
-    const cacheKey = this.getCacheKey(projectId, convId);
+  clearClientHistory(convId: string, projectId: string, userId?: string, keepSystemPrompt: boolean = true): void {
+    const cacheKey = this.getCacheKey(projectId, userId, convId);
     const history = this.convHistories[cacheKey];
     if (!history) return;
 
@@ -158,8 +160,8 @@ export class MessagePersistence {
   /**
    * Delete conversation history completely
    */
-  deleteClientHistory(convId: string, projectId: string): boolean {
-    const cacheKey = this.getCacheKey(projectId, convId);
+  deleteClientHistory(convId: string, projectId: string, userId?: string): boolean {
+    const cacheKey = this.getCacheKey(projectId, userId, convId);
     if (this.convHistories[cacheKey]) {
       delete this.convHistories[cacheKey];
       return true;
@@ -222,8 +224,8 @@ export class MessagePersistence {
   /**
    * Check if conversation has history
    */
-  hasClientHistory(convId: string, projectId: string): boolean {
-    const cacheKey = this.getCacheKey(projectId, convId);
+  hasClientHistory(convId: string, projectId: string, userId?: string): boolean {
+    const cacheKey = this.getCacheKey(projectId, userId, convId);
     return (
       !!this.convHistories[cacheKey] &&
       this.convHistories[cacheKey].messages.length > 0
@@ -233,8 +235,8 @@ export class MessagePersistence {
   /**
    * Get message count for a conversation
    */
-  getClientMessageCount(convId: string, projectId: string): number {
-    const cacheKey = this.getCacheKey(projectId, convId);
+  getClientMessageCount(convId: string, projectId: string, userId?: string): number {
+    const cacheKey = this.getCacheKey(projectId, userId, convId);
     return this.convHistories[cacheKey]?.messageCount || 0;
   }
 
@@ -242,24 +244,24 @@ export class MessagePersistence {
    * Check if compaction is needed and perform it
    * This should be called after adding messages
    */
-  async checkAndCompact(projectId: string, convId: string): Promise<{
+  async checkAndCompact(projectId: string, convId: string, userId?: string): Promise<{
     compacted: boolean;
     newChatFile?: string;
     tokensSaved?: number;
   }> {
     try {
       // Check if compaction is needed
-      const shouldCompact = await chatCompaction.shouldCompact(projectId, convId);
+      const shouldCompact = await chatCompaction.shouldCompact(projectId, convId, userId);
 
       if (!shouldCompact) {
         return { compacted: false };
       }
 
       // Get current messages
-      const messages = await this.getClientHistory(convId, projectId);
+      const messages = await this.getClientHistory(convId, projectId, userId);
 
       // Perform compaction
-      const result = await chatCompaction.compactChat(projectId, convId, messages);
+      const result = await chatCompaction.compactChat(projectId, convId, messages, userId);
 
       if (result.compacted && result.newChatFile) {
         console.log(`[MessagePersistence] Compacted ${result.messagesCompacted} messages for ${convId}`);
@@ -285,7 +287,7 @@ export class MessagePersistence {
   /**
    * Get compaction status for a conversation
    */
-  async getCompactionStatus(projectId: string, convId: string) {
-    return await chatCompaction.getCompactionStatus(projectId, convId);
+  async getCompactionStatus(projectId: string, convId: string, userId?: string) {
+    return await chatCompaction.getCompactionStatus(projectId, convId, userId);
   }
 }
