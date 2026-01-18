@@ -47,6 +47,15 @@ import {
   handleDeleteProject,
 } from "./projects-handler";
 import {
+  handleGetExtensions,
+  handleGetExtension,
+  handleCreateExtension,
+  handleUpdateExtension,
+  handleDeleteExtension,
+  handleToggleExtension,
+  handleResetExtensions,
+} from "./extensions-handler";
+import {
   handleGetConversations,
   handleGetConversationMessages,
   handleCreateNewChat,
@@ -414,6 +423,43 @@ export class WebSocketServer {
         if (embedWelcomeMessageMatch && req.method === "POST") {
           const projectId = embedWelcomeMessageMatch[1];
           return handleUpdateWelcomeMessage(req, projectId);
+        }
+
+        // Extensions API endpoints
+        const extensionsMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions$/);
+        if (extensionsMatch) {
+          const projectId = extensionsMatch[1];
+          if (req.method === "GET") {
+            return handleGetExtensions(req, projectId);
+          } else if (req.method === "POST") {
+            return handleCreateExtension(req, projectId);
+          }
+        }
+
+        const extensionResetMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/reset$/);
+        if (extensionResetMatch && req.method === "POST") {
+          const projectId = extensionResetMatch[1];
+          return handleResetExtensions(req, projectId);
+        }
+
+        const extensionIdMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/([^\/]+)$/);
+        if (extensionIdMatch) {
+          const projectId = extensionIdMatch[1];
+          const extensionId = extensionIdMatch[2];
+          if (req.method === "GET") {
+            return handleGetExtension(req, projectId, extensionId);
+          } else if (req.method === "PUT") {
+            return handleUpdateExtension(req, projectId, extensionId);
+          } else if (req.method === "DELETE") {
+            return handleDeleteExtension(req, projectId, extensionId);
+          }
+        }
+
+        const extensionToggleMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/([^\/]+)\/toggle$/);
+        if (extensionToggleMatch && req.method === "POST") {
+          const projectId = extensionToggleMatch[1];
+          const extensionId = extensionToggleMatch[2];
+          return handleToggleExtension(req, projectId, extensionId);
         }
 
         // Embed Authentication endpoint

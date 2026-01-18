@@ -11,6 +11,7 @@ import { context as showTableContext } from "../script-runtime/show-table";
 import { context as showMermaidContext } from "../script-runtime/show-mermaid";
 import { context as convertDocumentContext } from "../script-runtime/convert-document";
 import { storeOutput } from "../script-runtime/output-storage";
+import { ExtensionLoader } from "../extensions/extension-loader";
 
 /**
  * Dynamically merge contexts from all script-runtime files
@@ -395,7 +396,11 @@ PDF reader examples (extract text from PDF files):
     };
 
     try {
-      // Create runtime with injected context
+      // Load project extensions
+      const extensionLoader = new ExtensionLoader();
+      const extensions = await extensionLoader.loadExtensions(this.projectId);
+
+      // Create runtime with injected context and extensions
       const runtime = new ScriptRuntime({
         convId: this.convId,
         projectId: this.projectId,
@@ -405,6 +410,7 @@ PDF reader examples (extract text from PDF files):
         toolCallId: this.currentToolCallId,
         purpose: args.purpose,
         code: args.code,
+        extensions,
       });
 
       // Try executing as-is first
@@ -431,6 +437,7 @@ PDF reader examples (extract text from PDF files):
             toolCallId: this.currentToolCallId,
             purpose: args.purpose,
             code: fixedCode,
+            extensions,
           });
 
           result = await retryRuntime.execute(fixedCode);

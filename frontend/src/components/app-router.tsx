@@ -10,6 +10,8 @@ import { LoginPage } from "./pages/login";
 import { AdminSetupPage } from "./pages/admin-setup";
 import { EmbedChatPage } from "./pages/embed-chat";
 import { EmbedSettings } from "./pages/embed-settings";
+import { ExtensionsSettings } from "./pages/extensions-settings";
+import { ExtensionEditor } from "./pages/extension-editor";
 import { ProjectRouteHandler } from "./project/project-route-handler";
 import { ProtectedRoute } from "./auth/protected-route";
 import { Button } from "./ui/button";
@@ -24,6 +26,7 @@ import {
   Brain,
   ScrollText,
   FolderTree,
+  Puzzle,
 } from "lucide-react";
 import { Toaster } from "./ui/sonner";
 import { useState, useEffect } from "react";
@@ -169,6 +172,20 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               <span className="hidden sm:inline">Embed</span>
             )}
           </Button>
+          <Button
+            variant={
+              location.pathname.startsWith(`/projects/${currentProject.id}/extensions`)
+                ? "default"
+                : "ghost"
+            }
+            size="sm"
+            onClick={() => navigate(`/projects/${currentProject.id}/extensions`)}
+          >
+            <Puzzle />
+            {location.pathname.startsWith(`/projects/${currentProject.id}/extensions`) && (
+              <span className="hidden sm:inline">Extensions</span>
+            )}
+          </Button>
           {location.pathname === `/projects/${currentProject.id}/chat` &&
             todos?.items?.length > 0 && (
               <Button
@@ -288,6 +305,26 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               <ProtectedRoute>
                 <ProjectRouteHandler>
                   <EmbedSettings />
+                </ProjectRouteHandler>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:projectId/extensions"
+            element={
+              <ProtectedRoute>
+                <ProjectRouteHandler>
+                  <ExtensionsSettings />
+                </ProjectRouteHandler>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:projectId/extensions/:extensionId"
+            element={
+              <ProtectedRoute>
+                <ProjectRouteHandler>
+                  <ExtensionEditor />
                 </ProjectRouteHandler>
               </ProtectedRoute>
             }
