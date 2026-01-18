@@ -15,7 +15,6 @@ import {
   createExtension,
   updateExtension,
 } from "@/lib/api/extensions";
-import type { Extension } from "@/types/extension";
 import { ArrowLeft, Save } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
