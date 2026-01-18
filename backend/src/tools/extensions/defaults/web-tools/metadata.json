@@ -1,0 +1,11 @@
+{
+  "id": "web-tools",
+  "name": "Web Tools",
+  "description": "Utilities for web scraping, API calls, and data fetching",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "enabled": true,
+  "isDefault": true,
+  "createdAt": 0,
+  "updatedAt": 0
+}

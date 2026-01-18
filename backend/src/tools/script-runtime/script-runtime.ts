@@ -93,6 +93,7 @@ export interface ScriptContext {
   toolCallId: string;
   purpose: string;
   code: string;
+  extensions?: Record<string, any>; // Extension exports to inject into scope
 }
 
 /**
@@ -247,6 +248,12 @@ export class ScriptRuntime {
       if (name === "memory") continue; // Prevent overriding memory object with read() method
 
       scope[name] = this.createToolFunction(name, tool);
+    }
+
+    // Inject extension exports into scope
+    if (this.context.extensions) {
+      Object.assign(scope, this.context.extensions);
+      console.log(`[ScriptRuntime] Loaded ${Object.keys(this.context.extensions).length} extension functions`);
     }
 
     return scope;
