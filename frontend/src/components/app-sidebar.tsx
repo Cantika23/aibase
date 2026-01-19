@@ -7,7 +7,7 @@ import {
   History,
   Database,
   FileText,
-  Settings,
+  Code,
   LifeBuoy,
   Send,
   Users,
@@ -40,6 +40,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return `/projects/${currentProject.id}/${path}`
   }
 
+  // Project-specific items that will appear in the Projects dropdown
+  const projectItems = [
+    {
+      name: "Context",
+      url: getUrl("context"),
+      icon: FileText,
+    },
+    {
+      name: "Files",
+      url: getUrl("files"),
+      icon: FileText,
+    },
+    {
+      name: "Memory",
+      url: getUrl("memory"),
+      icon: Database,
+    },
+  ]
+
   const data = {
     user: {
       name: (currentUser as any)?.name || "User",
@@ -59,34 +78,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: History,
       },
       {
-        title: "Memory",
-        url: getUrl("memory"),
-        icon: Database,
+        title: "Embed",
+        url: getUrl("embed"),
+        icon: Code,
       },
       {
-        title: "Context",
-        url: getUrl("context"),
-        icon: FileText,
-      },
-      {
-        title: "Files",
-        url: getUrl("files"),
-        icon: FileText,
-      },
-      {
-        title: "Settings",
-        url: "#",
-        icon: Settings,
-        items: [
-          {
-            title: "Embed",
-            url: getUrl("embed"),
-          },
-          {
-            title: "Extensions",
-            url: getUrl("extensions"),
-          },
-        ],
+        title: "Extensions",
+        url: getUrl("extensions"),
+        icon: Code,
       },
       ...(isAdmin ? [{
         title: "Admin",
@@ -106,7 +105,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: Send,
       },
     ],
-    projects: [], // Will be populated dynamically if needed
+    projects: projectItems,
   }
 
   return (
