@@ -137,9 +137,9 @@ export function ExtensionEditor() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen-mobile flex flex-col">
       {/* Header */}
-      <div className="border-b px-6 py-4">
+      <div className="border-b px-4 py-4 pt-[60px] md:px-6 md:pt-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={handleBack}>
@@ -165,7 +165,7 @@ export function ExtensionEditor() {
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto px-4 pb-6 md:px-6 md:pb-6">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Metadata */}
           <div className="grid grid-cols-2 gap-4">

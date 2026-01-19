@@ -158,7 +158,7 @@ export function ExtensionsSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 pt-[60px] md:px-6 pb-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

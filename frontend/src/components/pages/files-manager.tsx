@@ -119,7 +119,7 @@ export function FilesManagerPage() {
   }
 
   return (
-    <div className="h-screen gap-4 px-4 py-4 md:pt-16 pt-20">
+    <div className="h-screen gap-4 px-4 pt-[60px] md:px-6 pb-4">
 
       {/* Files List */}
       {files.length > 0 ? (

@@ -84,4 +84,20 @@
     height: 100vh; /* Fallback for older browsers */
     height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
   }
+
+  /* Navigation offset - consistent spacing for all pages */
+  .nav-offset {
+    padding-top: 60px;
+  }
+}
+
+/* Page container utilities */
+@layer components {
+  .page-container {
+    @apply relative w-full px-4 pb-4 md:px-6 md:pb-6;
+  }
+
+  .page-scrollable {
+    @apply h-full overflow-y-auto;
+  }
 }

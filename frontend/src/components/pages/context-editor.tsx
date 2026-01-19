@@ -184,7 +184,7 @@ export function ContextEditor() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 px-4 pt-[100px] md:pt-14 mb-4">
+    <div className="flex h-full flex-col gap-4 px-4 pt-[60px] md:px-6 pb-4">
 
       {/* Header */}
       <div className="flex items-center justify-end gap-4 shrink-0">

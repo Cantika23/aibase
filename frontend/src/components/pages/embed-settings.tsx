@@ -224,7 +224,7 @@ export function EmbedSettings() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 pt-14 mb-4">
+    <div className="flex h-full flex-col gap-4 px-4 pt-[60px] md:px-6 pb-4">
       {error && (
         <Alert variant="destructive">
           <p className="text-sm">{error}</p>

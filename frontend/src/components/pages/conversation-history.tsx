@@ -151,7 +151,7 @@ export function ConversationHistoryPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen items-center p-4">
+    <div className="flex flex-col h-screen items-center px-4 pt-[60px] md:px-6 pb-4">
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deletingConversation} onOpenChange={(open) => !open && setDeletingConversation(null)}>
         <DialogContent className="max-w-md">
@@ -208,7 +208,7 @@ export function ConversationHistoryPage() {
         />
       </PageActionGroup>
 
-      <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col md:mt-8 mt-16">
+      <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col">
         {/* Conversations List */}
         {conversations.length > 0 ? (
           <div className="overflow-auto relative flex-1 ">
