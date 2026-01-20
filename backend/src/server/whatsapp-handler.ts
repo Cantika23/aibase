@@ -53,7 +53,9 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
     const data = await response.json();
 
     // Find client for this project (client ID would be the projectId)
-    const client = data.clients?.find((c: any) => c.id === projectId);
+    // Handle both array response and object with clients property
+    const clientsArray = Array.isArray(data) ? data : data.clients;
+    const client = clientsArray?.find((c: any) => c.id === projectId);
 
     if (!client) {
       return Response.json(
