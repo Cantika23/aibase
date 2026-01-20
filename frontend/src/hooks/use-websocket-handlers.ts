@@ -522,47 +522,50 @@ export function useWebSocketHandlers({
 
             const mergedToolInvocations = Array.from(toolInvocationsMap.values());
 
-            // Update parts array: replace text part with fullText from backend
-            // This ensures the message displays the complete text instead of streaming chunks
-            let updatedParts = existingMessage.parts;
-            if (existingMessage.parts && existingMessage.parts.length > 0) {
-              // Check if there's a text part (should be the last one or first one)
+            // SOLUTION: Update or remove 'parts' from message after completion
+            // If there are tool invocations, we need to keep parts but update the text part
+            // If there are no tool invocations, remove parts entirely to force rendering from content
+            let finalParts = existingMessage.parts;
+
+            if (mergedToolInvocations.length > 0 && existingMessage.parts) {
+              // Has tool invocations - update text part in parts array
               const textPartIndex = existingMessage.parts.findIndex(p => p.type === "text");
               if (textPartIndex !== -1) {
-                // Update the text part with fullText from backend
-                updatedParts = [...existingMessage.parts];
+                // Create new parts array with updated text
+                finalParts = [...existingMessage.parts];
                 const textPart = existingMessage.parts[textPartIndex];
                 if (textPart.type === "text") {
-                  updatedParts[textPartIndex] = {
-                    ...textPart,
+                  finalParts[textPartIndex] = {
+                    type: "text",
                     text: fullText,
                   };
                   console.log(
-                    `[Complete] Updated text part at index ${textPartIndex} from ${textPart.text.length} chars to ${fullText.length} chars`
+                    `[Complete] Updated text part at index ${textPartIndex} from ${textPart.text.length} to ${fullText.length} chars (keeping ${mergedToolInvocations.length} tool invocations)`
                   );
                 }
-              } else {
-                // No text part found, add one at the beginning
-                updatedParts = [
-                  { type: "text", text: fullText },
-                  ...existingMessage.parts,
-                ];
-                console.log(`[Complete] Added new text part with ${fullText.length} chars`);
               }
+            } else {
+              // No tool invocations - remove parts to force rendering from content
+              console.log(
+                `[Complete] No tool invocations - removing parts array (${existingMessage.parts?.length || 0} items) to force rendering from content (${fullText.length} chars)`
+              );
+              finalParts = undefined;
             }
 
             // Update message AND remove thinking indicator in one atomic render
             return prevMessages.map((msg, idx) => {
               if (idx === messageIndex) {
-                return {
+                const updatedMsg = {
                   ...msg,
                   content: fullText,
-                  ...(updatedParts && { parts: updatedParts }),
+                  ...(finalParts !== undefined && { parts: finalParts }),
                   completionTime: completionTimeSeconds,
                   ...(data.thinkingDuration !== undefined && { thinkingDuration: data.thinkingDuration }),
                   ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
                   ...(mergedToolInvocations.length > 0 && { toolInvocations: mergedToolInvocations }),
                 };
+                console.log(`[Complete] Updated message: content=${fullText.length} chars, parts=${finalParts?.length || 'removed'}, tools=${mergedToolInvocations.length}`);
+                return updatedMsg;
               }
               // Remove thinking indicator in the same render
               return msg.isThinking ? (undefined as any) : msg;
