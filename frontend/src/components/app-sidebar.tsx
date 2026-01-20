@@ -126,6 +126,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               email: currentUser.email,
             }}
             onLogout={logout}
+            showInline={true}
           />
         </SidebarFooter>
       )}

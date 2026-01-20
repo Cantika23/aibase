@@ -32,15 +32,57 @@ function getInitials(username: string): string {
 export function UserAccountMenu({
   user,
   onLogout,
+  showInline = false,
 }: {
   user: {
     username: string
     email: string
   }
   onLogout?: () => void
+  /**
+   * If true, shows username and email inline with the avatar (for sidebar footer)
+   * If false, shows only avatar button with dropdown (for top header)
+   */
+  showInline?: boolean
 }) {
   const initials = getInitials(user.username)
 
+  // Inline variant for sidebar footer - shows avatar + text + menu trigger
+  if (showInline) {
+    return (
+      <DropdownMenu>
+        <div className="flex items-center gap-2 w-full">
+          <Avatar className="h-8 w-8 rounded-lg">
+            <AvatarImage src="" alt={user.username} />
+            <AvatarFallback className="rounded-lg bg-primary text-primary-foreground text-xs">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <span className="truncate text-sm font-medium">{user.username}</span>
+            <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+          </div>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+        </div>
+        <DropdownMenuContent
+          className="w-56 rounded-lg"
+          align="end"
+          sideOffset={4}
+        >
+          <DropdownMenuItem onClick={onLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  // Default variant for top header - avatar button with dropdown
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
