@@ -151,6 +151,92 @@ export async function handleGetConversationFiles(
 }
 
 /**
+ * Handle PATCH /api/files/:projectId/:convId/:fileName/rename - Rename a file
+ */
+export async function handleRenameFile(
+  req: Request,
+  projectId: string,
+  convId: string,
+  fileName: string
+): Promise<Response> {
+  try {
+    const body = await req.json();
+    const { newName } = body;
+
+    if (!newName) {
+      return Response.json(
+        {
+          success: false,
+          error: "newName is required in request body",
+        },
+        { status: 400 }
+      );
+    }
+
+    await fileStorage.renameFile(convId, fileName, newName, projectId);
+
+    return Response.json({
+      success: true,
+      message: "File renamed successfully",
+      data: {
+        oldName: fileName,
+        newName,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error renaming file");
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to rename file",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/files/move - Move a file to a different conversation
+ */
+export async function handleMoveFile(req: Request): Promise<Response> {
+  try {
+    const body = await req.json();
+    const { projectId, fromConvId, toConvId, fileName } = body;
+
+    if (!projectId || !fromConvId || !toConvId || !fileName) {
+      return Response.json(
+        {
+          success: false,
+          error: "projectId, fromConvId, toConvId, and fileName are required",
+        },
+        { status: 400 }
+      );
+    }
+
+    await fileStorage.moveFile(fromConvId, toConvId, fileName, projectId);
+
+    return Response.json({
+      success: true,
+      message: "File moved successfully",
+      data: {
+        fromConvId,
+        toConvId,
+        fileName,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error moving file");
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to move file",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * Handle DELETE /api/files/:projectId/:convId/:fileName - Delete a specific file
  */
 export async function handleDeleteFile(

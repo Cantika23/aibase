@@ -275,6 +275,103 @@ ${frontmatter}
   }
 
   /**
+   * Rename/move a file within the same conversation
+   */
+  async renameFile(convId: string, oldName: string, newName: string, projectId: string): Promise<void> {
+    const sanitizedOldName = path.basename(oldName);
+    const decodedOldName = decodeURIComponent(sanitizedOldName);
+    const sanitizedNewName = path.basename(newName);
+
+    const oldPath = path.join(this.getConvDir(convId, projectId), decodedOldName);
+    const newPath = path.join(this.getConvDir(convId, projectId), sanitizedNewName);
+
+    // Check if source file exists
+    try {
+      await fs.access(oldPath);
+    } catch (error: any) {
+      throw new Error(`Source file "${oldName}" not found`);
+    }
+
+    // Check if destination file already exists
+    try {
+      await fs.access(newPath);
+      throw new Error(`File "${newName}" already exists`);
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    // Rename the file
+    await fs.rename(oldPath, newPath);
+
+    // Also rename metadata file if it exists
+    const oldMetaPath = this.getMetaFilePath(convId, decodedOldName, projectId);
+    const newMetaPath = this.getMetaFilePath(convId, sanitizedNewName, projectId);
+
+    try {
+      await fs.rename(oldMetaPath, newMetaPath);
+    } catch (error: any) {
+      // Metadata file might not exist, ignore
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Move a file to a different conversation
+   */
+  async moveFile(
+    fromConvId: string,
+    toConvId: string,
+    fileName: string,
+    projectId: string
+  ): Promise<void> {
+    const sanitizedName = path.basename(fileName);
+    const decodedName = decodeURIComponent(sanitizedName);
+
+    const fromPath = path.join(this.getConvDir(fromConvId, projectId), decodedName);
+    const toPath = path.join(this.getConvDir(toConvId, projectId), decodedName);
+
+    // Ensure target directory exists
+    await this.ensureConvDir(toConvId, projectId);
+
+    // Check if source file exists
+    try {
+      await fs.access(fromPath);
+    } catch (error: any) {
+      throw new Error(`Source file "${fileName}" not found`);
+    }
+
+    // Check if destination file already exists
+    try {
+      await fs.access(toPath);
+      throw new Error(`File "${fileName}" already exists in target conversation`);
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    // Move the file
+    await fs.rename(fromPath, toPath);
+
+    // Also move metadata file if it exists
+    const oldMetaPath = this.getMetaFilePath(fromConvId, decodedName, projectId);
+    const newMetaPath = this.getMetaFilePath(toConvId, decodedName, projectId);
+
+    try {
+      await fs.rename(oldMetaPath, newMetaPath);
+    } catch (error: any) {
+      // Metadata file might not exist, ignore
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Delete all files for a conversation
    */
   async deleteAllFiles(convId: string, projectId: string): Promise<void> {

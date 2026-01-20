@@ -54,6 +54,60 @@ export async function fetchConversationFiles(
 }
 
 /**
+ * Rename a file
+ */
+export async function renameFile(
+  projectId: string,
+  convId: string,
+  fileName: string,
+  newName: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/files/${projectId}/${convId}/${fileName}/rename`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ newName }),
+    }
+  );
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.error || "Failed to rename file");
+  }
+}
+
+/**
+ * Move a file to a different conversation
+ */
+export async function moveFile(
+  projectId: string,
+  fromConvId: string,
+  toConvId: string,
+  fileName: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/files/move`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      projectId,
+      fromConvId,
+      toConvId,
+      fileName,
+    }),
+  });
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.error || "Failed to move file");
+  }
+}
+
+/**
  * Delete a file
  */
 export async function deleteFile(

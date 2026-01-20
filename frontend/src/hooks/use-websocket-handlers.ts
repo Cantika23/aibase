@@ -5,6 +5,7 @@ import { activeTabManager } from "@/lib/ws/active-tab-manager";
 import type { WSClient } from "@/lib/ws/ws-connection-manager";
 import { useConversationStore } from "@/stores/conversation-store";
 import { useProjectStore } from "@/stores/project-store";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface UseWebSocketHandlersProps {
   wsClient: WSClient | null;
@@ -1455,6 +1456,13 @@ export function useWebSocketHandlers({
       }
     };
 
+    const handleAuthFailed = (data: { code: number; reason: string }) => {
+      // Authentication failure - logout the user
+      console.error("[Auth Failed] WebSocket authentication failed:", data);
+      const { logout } = useAuthStore.getState();
+      logout();
+    };
+
     // Register event listeners
     wsClient.on("connected", handleConnected);
     wsClient.on("disconnected", handleDisconnected);
@@ -1469,6 +1477,7 @@ export function useWebSocketHandlers({
     wsClient.on("tool_result", handleToolResult);
     wsClient.on("todo_update", handleTodoUpdate);
     wsClient.on("conversation_title_update", handleConversationTitleUpdate);
+    wsClient.on("auth_failed", handleAuthFailed);
 
     // Connect to WebSocket (connection manager handles multiple calls gracefully)
     wsClient.connect().catch(handleError);
@@ -1493,6 +1502,7 @@ export function useWebSocketHandlers({
       wsClient.off("tool_result", handleToolResult);
       wsClient.off("todo_update", handleTodoUpdate);
       wsClient.off("conversation_title_update", handleConversationTitleUpdate);
+      wsClient.off("auth_failed", handleAuthFailed);
     };
   }, [wsClient, convId, componentRef, setMessages, setIsLoading, setIsHistoryLoading, setError, setTodos, isLoading, thinkingStartTimeRef, currentMessageRef, currentMessageIdRef, currentToolInvocationsRef, currentPartsRef, refreshConversations, currentProject]);
 }

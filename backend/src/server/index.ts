@@ -75,6 +75,8 @@ import {
   handleGetProjectFiles,
   handleGetConversationFiles,
   handleDeleteFile,
+  handleRenameFile,
+  handleMoveFile,
 } from "./files-handler";
 import { migrateEmbedConversations } from "../scripts/migrate-embed-conversations";
 import {
@@ -353,6 +355,18 @@ export class WebSocketServer {
         if (fileDeleteMatch && req.method === "DELETE") {
           const [, projectId, convId, fileName] = fileDeleteMatch;
           return handleDeleteFile(req, projectId, convId, fileName);
+        }
+
+        // Handle file rename (PATCH /api/files/{projectId}/{convId}/{fileName}/rename)
+        const fileRenameMatch = pathname.match(/^\/api\/files\/([^\/]+)\/([^\/]+)\/([^\/]+)\/rename$/);
+        if (fileRenameMatch && req.method === "PATCH") {
+          const [, projectId, convId, fileName] = fileRenameMatch;
+          return handleRenameFile(req, projectId, convId, fileName);
+        }
+
+        // Handle file move (POST /api/files/move)
+        if (pathname === "/api/files/move" && req.method === "POST") {
+          return handleMoveFile(req);
         }
 
         // Get all files for a project (GET /api/files?projectId={id})

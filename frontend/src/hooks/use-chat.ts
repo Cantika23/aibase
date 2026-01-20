@@ -4,6 +4,7 @@ import type { Message } from "@/components/ui/chat";
 import { uploadFiles } from "@/lib/file-upload";
 import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
+import { useAuthStore } from "@/stores/auth-store";
 
 export interface UseChatOptions {
   wsUrl: string;
@@ -155,6 +156,13 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
       }
     };
 
+    const handleAuthFailed = (data: { code: number; reason: string }) => {
+      // Authentication failure - logout the user
+      console.error("[Auth Failed] WebSocket authentication failed:", data);
+      const { logout } = useAuthStore.getState();
+      logout();
+    };
+
     // Register event listeners
     wsClient.on("connected", handleConnected);
     wsClient.on("disconnected", handleDisconnected);
@@ -164,11 +172,13 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
     wsClient.on("llm_complete", handleLLMComplete);
     wsClient.on("communication_error", handleCommunicationError);
     wsClient.on("status", handleStatus);
+    wsClient.on("auth_failed", handleAuthFailed);
 
     // Connect to WebSocket
     wsClient.connect().catch(handleError);
 
     return () => {
+      wsClient.off("auth_failed", handleAuthFailed);
       wsClient.disconnect();
     };
   }, [wsUrl, currentProject?.id, onError, onStatusChange]);

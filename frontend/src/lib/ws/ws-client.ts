@@ -316,10 +316,24 @@ export class WSClient extends WSEventEmitter {
         this.clearHeartbeat();
         this.clearPendingMessages(); // Clear pending messages on close
         this.setState("disconnected");
-        this.emit("disconnected", { code: event.code, reason: event.reason });
 
-        if (!event.wasClean && this.options.reconnectAttempts > 0) {
-          this.attemptReconnect();
+        // Check for authentication failure (WebSocket close codes)
+        // 1008 = Policy Violation (used by server for invalid token)
+        // 4001-4999 = Application-specific errors (often used for auth)
+        const isAuthFailure = event.code === 1008 || (event.code >= 4001 && event.code < 5000);
+
+        if (isAuthFailure) {
+          // Emit auth_failed event instead of attempting reconnection
+          console.warn(`[WSClient] Authentication failure (code: ${event.code}): ${event.reason}`);
+          this.emit("auth_failed", { code: event.code, reason: event.reason });
+        } else {
+          // Normal disconnect
+          this.emit("disconnected", { code: event.code, reason: event.reason });
+
+          // Only attempt reconnect for non-auth failures
+          if (!event.wasClean && this.options.reconnectAttempts > 0) {
+            this.attemptReconnect();
+          }
         }
       };
 
