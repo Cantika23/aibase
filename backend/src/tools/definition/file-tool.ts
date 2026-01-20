@@ -1,7 +1,7 @@
 import { Tool } from "../../llm/conversation";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { extractTextFromFile, isDocxFile, isPdfFile } from "../../utils/document-extractor";
+import { extractTextFromFile, isDocxFile, isPdfFile, isExcelFile, isPowerPointFile } from "../../utils/document-extractor";
 
 type FileScope = 'user' | 'public';
 
@@ -34,7 +34,13 @@ All file paths are relative to the conversation's files directory.
 ### Examples:
 \`\`\`typescript
 // List all files in current conversation
-await file({ action: 'list' });
+// Returns: { baseDirectory, totalFiles, scope, files: [...] }
+const result = await file({ action: 'list' });
+const files = JSON.parse(result).files; // Extract the files array
+
+// Find a specific file by name
+const files = JSON.parse(await file({ action: 'list' })).files;
+const myFile = files.find(f => f.name === 'document.pdf');
 
 // List only public files
 await file({ action: 'list', scope: 'public' });
@@ -649,10 +655,10 @@ ${frontmatter}
     // Maximum characters to return (approximately 2000 tokens, assuming ~4 chars per token)
     const MAX_CHARS = 8000;
 
-    // Read file content - use document extractor for .docx and .pdf files
+    // Read file content - use document extractor for .docx, .pdf, .xlsx, and .pptx files
     let content: string;
-    if (isDocxFile(fileName) || isPdfFile(fileName)) {
-      // Extract text from .docx or .pdf file
+    if (isDocxFile(fileName) || isPdfFile(fileName) || isExcelFile(fileName) || isPowerPointFile(fileName)) {
+      // Extract text from document files
       content = await extractTextFromFile(resolvedPath, fileName);
     } else {
       // Read as plain text
@@ -698,10 +704,10 @@ ${frontmatter}
     const startOffset = offset ?? 0;
     const maxChars = limit ?? 1000;
 
-    // Read file content - use document extractor for .docx and .pdf files
+    // Read file content - use document extractor for .docx, .pdf, .xlsx, and .pptx files
     let content: string;
-    if (isDocxFile(fileName) || isPdfFile(fileName)) {
-      // Extract text from .docx or .pdf file
+    if (isDocxFile(fileName) || isPdfFile(fileName) || isExcelFile(fileName) || isPowerPointFile(fileName)) {
+      // Extract text from document files
       content = await extractTextFromFile(resolvedPath, fileName);
     } else {
       // Read as plain text
