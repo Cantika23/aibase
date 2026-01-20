@@ -266,7 +266,7 @@ export function ChatMessages({
       onScroll={handleScroll}
       onTouchStart={handleTouchStart}
     >
-      <div className="grid grid-cols-1 max-w-[650px] w-full mx-auto pt-10 pb-[200px]">
+      <div className="grid grid-cols-1 max-w-[650px] w-full mx-auto pt-10 pb-4">
         <div className="max-w-full col-[1/1] md:px-0 px-4 md:mt-4 mt-12 row-[1/1]">{children}</div>
 
         {!shouldAutoScroll && (
