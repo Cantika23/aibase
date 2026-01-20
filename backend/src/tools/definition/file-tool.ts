@@ -1,6 +1,7 @@
 import { Tool } from "../../llm/conversation";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { extractTextFromFile, isDocxFile } from "../../utils/document-extractor";
 
 type FileScope = 'user' | 'public';
 
@@ -21,6 +22,11 @@ All file paths are relative to the conversation's files directory.
 **File Scopes:**
 - user: Only visible to the user who uploaded (default)
 - public: Visible to all users in the conversation
+
+**Supported File Types:**
+- Plain text files (.txt, .md, .json, .csv, etc.)
+- Word documents (.docx) - text is automatically extracted
+- Other binary formats may not be readable
 
 ### Examples:
 \`\`\`typescript
@@ -46,7 +52,9 @@ await file({ action: 'uploadUrl', url: 'https://example.com/file.pdf', path: 'do
 await file({ action: 'write', path: 'output.txt', content: 'Hello World' });
 
 // Read file content (returns up to ~8000 characters, roughly 2000 tokens)
+// For .docx files, text is automatically extracted
 await file({ action: 'read', path: 'data.json' });
+await file({ action: 'read', path: 'document.docx' });
 
 // Peek at file with offset and limit (for paginated reading)
 await file({ action: 'peek', path: 'large-file.log', offset: 0, limit: 100 });
@@ -632,12 +640,20 @@ ${frontmatter}
     const baseDir = this.getBaseDir();
     const stats = await fs.stat(resolvedPath);
     const relativePath = path.relative(baseDir, resolvedPath);
+    const fileName = path.basename(resolvedPath);
 
     // Maximum characters to return (approximately 2000 tokens, assuming ~4 chars per token)
     const MAX_CHARS = 8000;
 
-    // Read file content
-    const content = await fs.readFile(resolvedPath, 'utf-8');
+    // Read file content - use document extractor for .docx files
+    let content: string;
+    if (isDocxFile(fileName)) {
+      // Extract text from .docx file
+      content = await extractTextFromFile(resolvedPath, fileName);
+    } else {
+      // Read as plain text
+      content = await fs.readFile(resolvedPath, 'utf-8');
+    }
 
     // Truncate if exceeds max length (don't error, just warn)
     let truncated = false;
@@ -653,7 +669,7 @@ ${frontmatter}
     return JSON.stringify({
       success: true,
       path: relativePath,
-      name: path.basename(resolvedPath),
+      name: fileName,
       size: stats.size,
       sizeHuman: this.formatBytes(stats.size),
       totalCharacters: content.length,
@@ -672,13 +688,21 @@ ${frontmatter}
     const baseDir = this.getBaseDir();
     const stats = await fs.stat(resolvedPath);
     const relativePath = path.relative(baseDir, resolvedPath);
+    const fileName = path.basename(resolvedPath);
 
     // Set defaults
     const startOffset = offset ?? 0;
     const maxChars = limit ?? 1000;
 
-    // Read file content
-    const content = await fs.readFile(resolvedPath, 'utf-8');
+    // Read file content - use document extractor for .docx files
+    let content: string;
+    if (isDocxFile(fileName)) {
+      // Extract text from .docx file
+      content = await extractTextFromFile(resolvedPath, fileName);
+    } else {
+      // Read as plain text
+      content = await fs.readFile(resolvedPath, 'utf-8');
+    }
 
     // Validate offset
     if (startOffset < 0 || startOffset >= content.length) {
@@ -692,7 +716,7 @@ ${frontmatter}
     return JSON.stringify({
       success: true,
       path: relativePath,
-      name: path.basename(resolvedPath),
+      name: fileName,
       size: stats.size,
       sizeHuman: this.formatBytes(stats.size),
       totalCharacters: content.length,
