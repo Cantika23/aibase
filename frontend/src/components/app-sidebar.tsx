@@ -10,13 +10,10 @@ import {
   Files,
   Terminal,
   Puzzle,
-  LifeBuoy,
-  Send,
   Users,
 } from "lucide-react"
 
 import { NavSection } from "@/components/nav-section"
-import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -97,18 +94,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: Users,
       }] : []),
     ],
-    navSecondary: [
-      {
-        title: "Support",
-        url: "https://github.com/rizrmd/aibase/issues",
-        icon: LifeBuoy,
-      },
-      {
-        title: "Feedback",
-        url: "https://github.com/rizrmd/aibase/issues",
-        icon: Send,
-      },
-    ],
   }
 
   return (
@@ -137,7 +122,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSection title="Workspace" items={data.workspace} />
         {/* Developer - integration/dev tools */}
         <NavSection title="Developer" items={data.developer} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
