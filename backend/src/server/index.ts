@@ -120,10 +120,6 @@ import {
   handleCreateUser,
   handleUpdateUser,
   handleDeleteUser,
-  handleGetTenants,
-  handleCreateTenant,
-  handleUpdateTenant,
-  handleDeleteTenant,
 } from "./setup-handler";
 import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware/rate-limiter";
 import { ProjectStorage } from "../storage/project-storage";

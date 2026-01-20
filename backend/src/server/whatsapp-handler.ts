@@ -247,16 +247,17 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     const uid = `wa_${whatsappNumber}`;
 
     // Get or create conversation for this WhatsApp contact
-    const conversationStorage = (await import("../storage/conversation-storage")).ConversationStorage.getInstance();
+    const { ChatHistoryStorage } = await import("../storage/chat-history-storage");
+    const chatHistoryStorage = ChatHistoryStorage.getInstance();
 
     // Find existing conversation for this UID
     let convId: string | null = null;
-    const conversations = conversationStorage.listByProject(projectId);
+    const conversations = await chatHistoryStorage.listAllConversations(projectId);
 
-    // Look for existing conversation with this WhatsApp number in the title or metadata
+    // Look for existing conversation with this WhatsApp number in the ID
     for (const conv of conversations) {
-      if (conv.title?.includes(whatsappNumber) || conv.id.includes(whatsappNumber)) {
-        convId = conv.id;
+      if (conv.convId.includes(whatsappNumber)) {
+        convId = conv.convId;
         break;
       }
     }
@@ -266,13 +267,9 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       convId = `wa_${whatsappNumber}_${Date.now()}`;
       const title = `WhatsApp - ${messageData.pushName || whatsappNumber}`;
 
-      conversationStorage.create({
-        id: convId,
-        projectId,
-        title,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
+      // Initialize conversation with title
+      const { setConversationTitle } = await import("../llm/conversation-title-generator");
+      await setConversationTitle(convId, projectId, title);
 
       console.log("[WhatsApp] Created new conversation:", convId);
     }
@@ -346,8 +343,6 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     }
 
     // Process the message through the AI system
-    // This will be handled by the WebSocket system
-    // For now, we store the webhook data and trigger processing
     console.log("[WhatsApp] Processing message:", {
       projectId,
       convId,
@@ -356,13 +351,15 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       attachments,
     });
 
-    // Send response back to WhatsApp
-    // We'll implement this in the next step
-    if (messageText) {
-      await sendWhatsAppMessage(projectId, whatsappNumber, {
-        text: "Message received! Processing with AI...",
+    // Process message through AI (async, don't block webhook response)
+    processWhatsAppMessageWithAI(projectId, convId, whatsappNumber, messageText, attachments, uid)
+      .catch((error) => {
+        console.error("[WhatsApp] Error processing message with AI:", error);
+        // Send error message to user
+        sendWhatsAppMessage(projectId, whatsappNumber, {
+          text: "Sorry, I encountered an error processing your message. Please try again.",
+        }).catch(console.error);
       });
-    }
 
     return Response.json({ success: true, convId, uid });
   } catch (error) {
@@ -371,6 +368,102 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       { success: false, error: "Failed to handle webhook" },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Process WhatsApp message with AI
+ */
+async function processWhatsAppMessageWithAI(
+  projectId: string,
+  convId: string,
+  whatsappNumber: string,
+  messageText: string,
+  attachments: any[],
+  uid: string
+): Promise<void> {
+  try {
+    // Load conversation and process message through AI
+    const { Conversation } = await import("../llm/conversation");
+    const { ChatHistoryStorage } = await import("../storage/chat-history-storage");
+    const chatHistoryStorage = ChatHistoryStorage.getInstance();
+
+    // Load existing conversation history
+    const existingHistory = await chatHistoryStorage.getClientHistory(convId, projectId, uid);
+
+    // Create conversation instance
+    const conversation = await Conversation.create({
+      projectId,
+      userId: uid,
+      convId,
+      urlParams: { CURRENT_UID: uid },
+    });
+
+    // Load history if exists
+    if (existingHistory && existingHistory.length > 0) {
+      (conversation as any)._history = existingHistory;
+    }
+
+    // Process the message through AI
+    let fullResponse = "";
+
+    // Add user message with attachments if any
+    const userMessage: any = {
+      role: "user",
+      content: messageText,
+    };
+
+    // Add attachments to message if present
+    if (attachments.length > 0) {
+      const content: any[] = [{ type: "text", text: messageText }];
+
+      for (const attachment of attachments) {
+        if (attachment.type === "image") {
+          // Download image and convert to base64 for vision
+          try {
+            const imageResponse = await fetch(attachment.url);
+            const imageBuffer = await imageResponse.arrayBuffer();
+            const base64Image = Buffer.from(imageBuffer).toString("base64");
+            const mimeType = attachment.mimeType || "image/jpeg";
+
+            content.push({
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mimeType,
+                data: base64Image,
+              },
+            });
+          } catch (error) {
+            console.error("[WhatsApp] Error downloading image:", error);
+          }
+        }
+      }
+
+      userMessage.content = content;
+    }
+
+    // Send user message to conversation
+    await conversation.sendMessage(userMessage, {
+      onChunk: (chunk: string) => {
+        fullResponse += chunk;
+      },
+      onComplete: async () => {
+        // Save conversation history
+        const history = (conversation as any)._history || [];
+        await chatHistoryStorage.setClientHistory(convId, history, projectId, uid);
+
+        // Send response back to WhatsApp
+        if (fullResponse.trim()) {
+          await sendWhatsAppMessage(projectId, whatsappNumber, {
+            text: fullResponse,
+          });
+        }
+      },
+    });
+  } catch (error) {
+    console.error("[WhatsApp] Error in AI processing:", error);
+    throw error;
   }
 }
 
