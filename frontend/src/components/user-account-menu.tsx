@@ -47,32 +47,44 @@ export function UserAccountMenu({
 }) {
   const initials = getInitials(user.username)
 
-  // Inline variant for sidebar footer - shows avatar + text + menu trigger
+  // Inline variant for sidebar footer - shows avatar + text with dropdown menu
   if (showInline) {
     return (
       <DropdownMenu>
-        <div className="flex items-center gap-2 w-full">
-          <Avatar className="h-8 w-8 rounded-lg">
-            <AvatarImage src="" alt={user.username} />
-            <AvatarFallback className="rounded-lg bg-primary text-primary-foreground text-xs">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <span className="truncate text-sm font-medium">{user.username}</span>
-            <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+        <DropdownMenuTrigger asChild>
+          <div className="flex items-center gap-2 w-full cursor-pointer hover:bg-accent rounded-lg transition-colors p-1 -mx-1">
+            <Avatar className="h-8 w-8 rounded-lg">
+              <AvatarImage src="" alt={user.username} />
+              <AvatarFallback className="rounded-lg bg-primary text-primary-foreground text-xs">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-1 flex-col overflow-hidden text-left">
+              <span className="truncate text-sm font-medium">{user.username}</span>
+              <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+            </div>
           </div>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-        </div>
+        </DropdownMenuTrigger>
         <DropdownMenuContent
           className="w-56 rounded-lg"
           align="end"
           sideOffset={4}
         >
+          <DropdownMenuLabel className="p-0 font-normal">
+            <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage src="" alt={user.username} />
+                <AvatarFallback className="rounded-lg bg-primary text-primary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">{user.username}</span>
+                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              </div>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onLogout}>
             <LogOut className="mr-2 h-4 w-4" />
             Log out
