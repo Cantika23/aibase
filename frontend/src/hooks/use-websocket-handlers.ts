@@ -522,13 +522,12 @@ export function useWebSocketHandlers({
 
             const mergedToolInvocations = Array.from(toolInvocationsMap.values());
 
-            // SOLUTION: Update or remove 'parts' from message after completion
-            // If there are tool invocations, we need to keep parts but update the text part
-            // If there are no tool invocations, remove parts entirely to force rendering from content
+            // SOLUTION: Always keep parts array consistent to avoid re-render/blink
+            // Update the text part with fullText, keep tool invocations if any
             let finalParts = existingMessage.parts;
 
-            if (mergedToolInvocations.length > 0 && existingMessage.parts) {
-              // Has tool invocations - update text part in parts array
+            if (existingMessage.parts && existingMessage.parts.length > 0) {
+              // Has parts array - update text part in place
               const textPartIndex = existingMessage.parts.findIndex(p => p.type === "text");
               if (textPartIndex !== -1) {
                 // Create new parts array with updated text
@@ -540,41 +539,46 @@ export function useWebSocketHandlers({
                     text: fullText,
                   };
                   console.log(
-                    `[Complete] Updated text part at index ${textPartIndex} from ${textPart.text.length} to ${fullText.length} chars (keeping ${mergedToolInvocations.length} tool invocations)`
+                    `[Complete] Updated text part at index ${textPartIndex} from ${textPart.text.length} to ${fullText.length} chars`
                   );
                 }
+              } else {
+                // No text part exists, add one
+                finalParts = [
+                  { type: "text", text: fullText },
+                  ...existingMessage.parts,
+                ];
+                console.log(
+                  `[Complete] Added new text part with ${fullText.length} chars to existing parts array`
+                );
               }
             } else {
-              // No tool invocations - remove parts to force rendering from content
+              // No parts array exists - create one with text part
+              // This ensures consistency with streaming behavior
+              finalParts = [{ type: "text", text: fullText }];
               console.log(
-                `[Complete] No tool invocations - removing parts array (${existingMessage.parts?.length || 0} items) to force rendering from content (${fullText.length} chars)`
+                `[Complete] Created new parts array with text part (${fullText.length} chars)`
               );
-              finalParts = undefined;
             }
 
             // Update message AND remove thinking indicator in one atomic render
             return prevMessages.map((msg, idx) => {
               if (idx === messageIndex) {
-                // CRITICAL FIX: Explicitly set parts to undefined when removing it
-                // Using conditional spread (...) won't remove the field from the object
                 const updatedMsg: any = {
                   ...msg,
                   content: fullText,
                   completionTime: completionTimeSeconds,
                   ...(data.thinkingDuration !== undefined && { thinkingDuration: data.thinkingDuration }),
                   ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
+                  // Always keep parts array to ensure consistent rendering (no blink!)
+                  parts: finalParts,
+                  // Preserve toolInvocations for backward compatibility
                   ...(mergedToolInvocations.length > 0 && { toolInvocations: mergedToolInvocations }),
                   // Preserve attachments field to maintain file UI after completion
                   ...(msg.attachments && { attachments: msg.attachments }),
                   ...(msg.experimental_attachments && { experimental_attachments: msg.experimental_attachments }),
                 };
-                // Explicitly handle parts
-                if (finalParts !== undefined) {
-                  updatedMsg.parts = finalParts;
-                } else {
-                  delete updatedMsg.parts; // Remove parts field entirely
-                }
-                console.log(`[Complete] Updated message: content=${fullText.length} chars, parts=${finalParts?.length || 'removed'}, tools=${mergedToolInvocations.length}, attachments=${msg.attachments?.length || 0}`);
+                console.log(`[Complete] Updated message: content=${fullText.length} chars, parts=${finalParts?.length || 0}, tools=${mergedToolInvocations.length}, attachments=${msg.attachments?.length || 0}`);
                 return updatedMsg;
               }
               // Remove thinking indicator in the same render
@@ -595,24 +599,23 @@ export function useWebSocketHandlers({
               ? Array.from(currentToolInvocationsRef.current.values())
               : undefined;
 
-          // Create parts array for new message
+          // Create parts array for new message (always include to ensure consistent rendering)
           // Start with text part, then add tool invocations if any
-          let parts: any[] | undefined = [{ type: "text", text: fullText }];
+          const parts: any[] = [{ type: "text", text: fullText }];
           if (toolInvocations && toolInvocations.length > 0) {
-            parts = [
-              { type: "text", text: fullText },
+            parts.push(
               ...toolInvocations.map(inv => ({
                 type: "tool-invocation",
                 toolInvocation: inv,
-              })),
-            ];
+              }))
+            );
           }
 
           const newMessage: Message = {
             id: data.messageId,
             role: "assistant",
             content: fullText,
-            ...(parts && { parts }),
+            parts: parts, // Always include parts
             createdAt: new Date(),
             completionTime: completionTimeSeconds,
             ...(data.thinkingDuration !== undefined && { thinkingDuration: data.thinkingDuration }),
