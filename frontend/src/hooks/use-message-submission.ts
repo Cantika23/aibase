@@ -202,8 +202,11 @@ export function useMessageSubmission({
           "[Submit] Sending message to backend:",
           messageText.substring(0, 50)
         );
-        // Send message with file list to backend (for context)
-        await wsClient.sendMessage(messageText + fileListText);
+
+        // Send message with file IDs to backend so AI can read them
+        await wsClient.sendMessage(messageText + fileListText, {
+          fileIds: uploadedFiles?.map(f => f.id)
+        });
         console.log("[Submit] Message sent successfully");
       } catch (error) {
         console.log("[Submit] Error sending message:", error);

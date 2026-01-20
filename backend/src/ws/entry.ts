@@ -686,8 +686,16 @@ export class WSServer extends WSEventEmitter {
       let fullResponse = "";
       let chunkCount = 0;
 
+      // If file IDs are provided, add a note to the message so AI knows to read them
+      let messageText = userData.text;
+      if (userData.fileIds && userData.fileIds.length > 0) {
+        console.log("[UserMessage] Processing message with file IDs:", userData.fileIds);
+        // Add a note that files were uploaded - AI will use the file tool to list/read them
+        messageText += `\n\n[Note: ${userData.fileIds.length} file(s) were uploaded with this message. Use the 'file' tool with action 'list' to see available files, then 'read' to examine their contents.]`;
+      }
+
       // Process message with streaming - no timeouts
-      for await (const chunk of conversation.sendMessage(userData.text)) {
+      for await (const chunk of conversation.sendMessage(messageText)) {
         fullResponse += chunk;
         chunkCount++;
 
