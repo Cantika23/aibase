@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { useConversationStore } from "@/stores/conversation-store";
-import { FileIcon, Trash2, Download, MessageSquare, AlertCircle, Edit3, CheckSquare, Square, LayoutGrid, List, Search } from "lucide-react";
+import { FileIcon, Trash2, Download, MessageSquare, AlertCircle, Edit3, CheckSquare, Square, LayoutGrid, List, Search, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ import {
 import { useConvId } from "@/lib/conv-id";
 import { useChatStore } from "@/stores/chat-store";
 import { Input } from "@/components/ui/input";
+import { FilePreviewDialog } from "@/components/ui/file-preview-dialog";
 
 // Error Boundary component to catch rendering errors
 class FilesErrorBoundary extends React.Component<
@@ -91,6 +92,8 @@ export function FilesManagerPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<'all' | 'image' | 'video' | 'audio' | 'document' | 'code'>('all');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   useEffect(() => {
     // Load conversations and files when component mounts
@@ -239,7 +242,17 @@ export function FilesManagerPage() {
     window.open(file.url, "_blank");
   };
 
-  const handleGoToConversation = (file: FileInfo) => {
+  const handleFileClick = (file: FileInfo) => {
+    // Find the index in filtered files
+    const index = filteredFiles.findIndex(f => f.convId === file.convId && f.name === file.name);
+    if (index !== -1) {
+      setPreviewIndex(index);
+      setPreviewOpen(true);
+    }
+  };
+
+  const handleGoToConversation = (e: React.MouseEvent, file: FileInfo) => {
+    e.stopPropagation(); // Prevent card click
     if (!projectId) return;
 
     // Set the conversation ID
@@ -412,7 +425,7 @@ export function FilesManagerPage() {
                         ? "cursor-pointer transition-all hover:shadow-lg group p-4 flex flex-col gap-3"
                         : "cursor-pointer transition-all hover:shadow-lg hover:scale-[1.01] group pt-3 pb-1"
                       }
-                      onClick={() => handleGoToConversation(file)}
+                      onClick={() => handleFileClick(file)}
                     >
                       <CardHeader className={viewMode === 'grid' ? "min-h-0 h-auto p-0 flex-1" : "min-h-0 h-auto"}>
                         <div className={viewMode === 'grid'
@@ -500,6 +513,14 @@ export function FilesManagerPage() {
                               title="Rename file"
                             >
                               <Edit3 className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => handleGoToConversation(e, file)}
+                              title="Go to conversation"
+                            >
+                              <ExternalLink className="size-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -609,6 +630,15 @@ export function FilesManagerPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* File Preview Dialog */}
+        <FilePreviewDialog
+          files={filteredFiles}
+          initialIndex={previewIndex}
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          getConversationTitle={getConversationTitle}
+        />
       </div>
     </FilesErrorBoundary>
   );

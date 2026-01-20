@@ -5,13 +5,24 @@
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { buildApiUrl } from "@/lib/base-path";
 import { useProjectStore } from "@/stores/project-store";
-import { MessageCircle, QrCode, Smartphone, Trash2, RefreshCw } from "lucide-react";
+import {
+  MessageCircle,
+  RefreshCw,
+  Smartphone,
+  Trash2
+} from "lucide-react";
+import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import QRCodeLib from "qrcode";
 
 const API_BASE_URL = buildApiUrl("");
 
@@ -40,7 +51,7 @@ export function WhatsAppSettings() {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/whatsapp/client?projectId=${currentProject.id}`
+        `${API_BASE_URL}/api/whatsapp/client?projectId=${currentProject.id}`,
       );
 
       if (!response.ok) {
@@ -59,7 +70,8 @@ export function WhatsAppSettings() {
         fetchQRCode(data.client.id);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to load WhatsApp client";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load WhatsApp client";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -71,7 +83,7 @@ export function WhatsAppSettings() {
   const fetchQRCode = useCallback(async (clientId: string) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/whatsapp/qr?clientId=${clientId}`
+        `${API_BASE_URL}/api/whatsapp/qr?clientId=${clientId}`,
       );
 
       if (!response.ok) {
@@ -133,7 +145,8 @@ export function WhatsAppSettings() {
         fetchQRCode(data.client.id);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create WhatsApp client";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create WhatsApp client";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -150,7 +163,7 @@ export function WhatsAppSettings() {
         `${API_BASE_URL}/api/whatsapp/client?clientId=${client.id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (!response.ok) {
@@ -161,7 +174,8 @@ export function WhatsAppSettings() {
       setQrCodeImage(null);
       toast.success("WhatsApp client deleted successfully");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete WhatsApp client";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete WhatsApp client";
       toast.error(errorMessage);
     }
   }, [currentProject, client]);
@@ -194,7 +208,9 @@ export function WhatsAppSettings() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Loading WhatsApp settings...</p>
+          <p className="text-sm text-muted-foreground">
+            Loading WhatsApp settings...
+          </p>
         </div>
       </div>
     );
@@ -219,7 +235,8 @@ export function WhatsAppSettings() {
             <CardHeader>
               <CardTitle>Connect WhatsApp Device</CardTitle>
               <CardDescription>
-                Link a WhatsApp device to this project to enable AI conversations via WhatsApp
+                Link a WhatsApp device to this project to enable AI
+                conversations via WhatsApp
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -273,8 +290,12 @@ export function WhatsAppSettings() {
                     <div className="flex items-center gap-3">
                       <Smartphone className="h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">{client.deviceName || "WhatsApp Device"}</p>
-                        <p className="text-sm text-muted-foreground">Client ID: {client.id}</p>
+                        <p className="font-medium">
+                          {client.deviceName || "WhatsApp Device"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Client ID: {client.id}
+                        </p>
                       </div>
                     </div>
                     <Button
@@ -290,7 +311,6 @@ export function WhatsAppSettings() {
                   <div className="space-y-4">
                     {qrCodeImage ? (
                       <div className="flex flex-col items-center gap-4 p-6 border rounded-lg bg-white">
-                        <QrCode className="h-6 w-6 text-muted-foreground" />
                         <img
                           src={qrCodeImage}
                           alt="WhatsApp QR Code"
@@ -316,7 +336,9 @@ export function WhatsAppSettings() {
                         <li>Open WhatsApp on your phone</li>
                         <li>Tap Menu or Settings and select Linked Devices</li>
                         <li>Tap on Link a Device</li>
-                        <li>Point your phone at this screen to scan the QR code</li>
+                        <li>
+                          Point your phone at this screen to scan the QR code
+                        </li>
                       </ol>
                     </div>
                     <Button
@@ -339,15 +361,17 @@ export function WhatsAppSettings() {
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <p>
-                    When someone sends a message to your WhatsApp number, the AI will automatically
-                    respond to them in this project's context.
+                    When someone sends a message to your WhatsApp number, the AI
+                    will automatically respond to them in this project's
+                    context.
                   </p>
                   <p>
-                    Each WhatsApp contact will get their own unique conversation that persists
-                    across sessions.
+                    Each WhatsApp contact will get their own unique conversation
+                    that persists across sessions.
                   </p>
                   <p>
-                    The AI can receive and send text messages, images, locations, and other media types.
+                    The AI can receive and send text messages, images,
+                    locations, and other media types.
                   </p>
                 </CardContent>
               </Card>
