@@ -564,6 +564,9 @@ export function useWebSocketHandlers({
                   ...(data.thinkingDuration !== undefined && { thinkingDuration: data.thinkingDuration }),
                   ...(data.tokenUsage && { tokenUsage: data.tokenUsage }),
                   ...(mergedToolInvocations.length > 0 && { toolInvocations: mergedToolInvocations }),
+                  // Preserve attachments field to maintain file UI after completion
+                  ...(msg.attachments && { attachments: msg.attachments }),
+                  ...(msg.experimental_attachments && { experimental_attachments: msg.experimental_attachments }),
                 };
                 // Explicitly handle parts
                 if (finalParts !== undefined) {
@@ -571,7 +574,7 @@ export function useWebSocketHandlers({
                 } else {
                   delete updatedMsg.parts; // Remove parts field entirely
                 }
-                console.log(`[Complete] Updated message: content=${fullText.length} chars, parts=${finalParts?.length || 'removed'}, tools=${mergedToolInvocations.length}`);
+                console.log(`[Complete] Updated message: content=${fullText.length} chars, parts=${finalParts?.length || 'removed'}, tools=${mergedToolInvocations.length}, attachments=${msg.attachments?.length || 0}`);
                 return updatedMsg;
               }
               // Remove thinking indicator in the same render
