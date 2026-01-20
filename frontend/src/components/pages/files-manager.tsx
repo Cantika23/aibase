@@ -193,7 +193,7 @@ export function FilesManagerPage() {
 
   return (
     <FilesErrorBoundary>
-      <div className="h-screen gap-4 px-4 pt-[60px] md:px-6 pb-4">
+      <div className="flex h-screen flex-col gap-4 px-4 pt-[60px] md:px-6 pb-4">
 
         {/* Files List */}
         {files.length > 0 ? (
