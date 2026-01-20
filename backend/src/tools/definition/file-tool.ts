@@ -34,7 +34,13 @@ All file paths are relative to the conversation's files directory.
 ### Examples:
 \`\`\`typescript
 // List all files in current conversation
-await file({ action: 'list' });
+// Returns: { baseDirectory, totalFiles, scope, files: [...] }
+const result = await file({ action: 'list' });
+const files = JSON.parse(result).files; // Extract the files array
+
+// Find a specific file by name
+const files = JSON.parse(await file({ action: 'list' })).files;
+const myFile = files.find(f => f.name === 'document.pdf');
 
 // List only public files
 await file({ action: 'list', scope: 'public' });
