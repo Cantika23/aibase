@@ -26,7 +26,8 @@ All file paths are relative to the conversation's files directory.
 **Supported File Types:**
 - Plain text files (.txt, .md, .json, .csv, etc.)
 - Word documents (.docx) - text is automatically extracted
-- PDF documents (.pdf) - text is automatically extracted
+- PDF documents (.pdf) - NOT SUPPORTED (Bun runtime limitation)
+  Please convert PDFs to .txt or .docx format
 - Other binary formats may not be readable
 
 ### Examples:
@@ -53,10 +54,10 @@ await file({ action: 'uploadUrl', url: 'https://example.com/file.pdf', path: 'do
 await file({ action: 'write', path: 'output.txt', content: 'Hello World' });
 
 // Read file content (returns up to ~8000 characters, roughly 2000 tokens)
-// For .docx and .pdf files, text is automatically extracted
+// For .docx files, text is automatically extracted
+// PDF files are NOT supported - ask user to convert to .txt or .docx
 await file({ action: 'read', path: 'data.json' });
 await file({ action: 'read', path: 'document.docx' });
-await file({ action: 'read', path: 'report.pdf' });
 
 // Peek at file with offset and limit (for paginated reading)
 await file({ action: 'peek', path: 'large-file.log', offset: 0, limit: 100 });

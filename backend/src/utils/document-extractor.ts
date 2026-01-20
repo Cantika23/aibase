@@ -5,7 +5,6 @@
 
 import * as fs from 'fs/promises';
 import mammoth from 'mammoth';
-import pdf from 'pdf-parse';
 
 /**
  * Extract text from a .docx file
@@ -24,17 +23,19 @@ export async function extractTextFromDocx(filePath: string): Promise<string> {
 
 /**
  * Extract text from a .pdf file
+ * NOTE: PDF reading is not currently supported in Bun runtime.
+ * PDF libraries like pdf-parse and pdfjs-dist require Node.js or browser APIs
+ * that are not available in Bun. Users should convert PDFs to .txt or .docx format.
+ *
  * @param filePath - Path to the .pdf file
- * @returns Extracted text content
+ * @returns Error message indicating PDF is not supported
  */
 export async function extractTextFromPdf(filePath: string): Promise<string> {
-  try {
-    const dataBuffer = await fs.readFile(filePath);
-    const data = await pdf(dataBuffer);
-    return data.text;
-  } catch (error: any) {
-    throw new Error(`Failed to extract text from .pdf file: ${error.message}`);
-  }
+  throw new Error(
+    'PDF files are not currently supported. Please convert the PDF to a .txt or .docx file, ' +
+    'or copy-paste the text content directly. This is a known limitation due to PDF processing libraries ' +
+    'requiring Node.js/browser APIs that are incompatible with the Bun runtime.'
+  );
 }
 
 /**
