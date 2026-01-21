@@ -3,7 +3,7 @@
  * Full page for managing WhatsApp integration with device linking
  */
 
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,14 +14,9 @@ import {
 } from "@/components/ui/card";
 import { buildApiUrl } from "@/lib/base-path";
 import { useProjectStore } from "@/stores/project-store";
-import {
-  MessageCircle,
-  RefreshCw,
-  Smartphone,
-  Trash2
-} from "lucide-react";
+import { MessageCircle, RefreshCw, Smartphone, Trash2 } from "lucide-react";
 import QRCodeLib from "qrcode";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 
 const API_BASE_URL = buildApiUrl("");
@@ -34,6 +29,19 @@ interface WhatsAppClient {
   deviceName?: string;
 }
 
+interface WhatsAppWSMessage {
+  type: 'subscribed' | 'status' | 'qr_code' | 'connected' | 'disconnected' | 'error';
+  projectId?: string;
+  data?: {
+    projectId: string;
+    connected?: boolean;
+    connectedAt?: string;
+    qrCode?: string;
+    deviceName?: string;
+    error?: string;
+  };
+}
+
 export function WhatsAppSettings() {
   const { currentProject } = useProjectStore();
   const [client, setClient] = useState<WhatsAppClient | null>(null);
@@ -41,6 +49,7 @@ export function WhatsAppSettings() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   // Load WhatsApp client for current project
   const loadClient = useCallback(async () => {
@@ -180,28 +189,108 @@ export function WhatsAppSettings() {
     }
   }, [currentProject, client]);
 
-  // Refresh QR code
-  const refreshQRCode = useCallback(() => {
-    if (client && !client.connected) {
-      fetchQRCode(client.id);
-    }
-  }, [client, fetchQRCode]);
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    if (!currentProject) return;
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.host;
+    const wsBasePath = buildApiUrl("").replace(/^https?:\/\//, '').replace(/^http?:\/\//, '');
+    const wsUrl = `${wsProtocol}//${wsHost}${wsBasePath}/api/whatsapp/ws`;
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('[WhatsApp WS] Connected');
+      // Subscribe to this project's updates
+      ws.send(JSON.stringify({
+        type: 'subscribe',
+        projectId: currentProject.id,
+      }));
+    };
+
+    ws.onmessage = async (event) => {
+      try {
+        const message: WhatsAppWSMessage = JSON.parse(event.data);
+        console.log('[WhatsApp WS] Message:', message);
+
+        switch (message.type) {
+          case 'subscribed':
+            console.log('[WhatsApp WS] Subscribed to project:', message.projectId);
+            break;
+
+          case 'status':
+          case 'connected':
+          case 'disconnected':
+            if (message.data) {
+              setClient({
+                id: message.data.projectId,
+                connected: message.data.connected || false,
+                connectedAt: message.data.connectedAt,
+                deviceName: message.data.deviceName,
+              });
+
+              // Show notification on status change
+              if (message.type === 'connected') {
+                toast.success('WhatsApp connected successfully!');
+                setQrCodeImage(null);
+              } else if (message.type === 'disconnected') {
+                toast.error('WhatsApp disconnected');
+              }
+            }
+            break;
+
+          case 'qr_code':
+            if (message.data?.qrCode) {
+              const qrDataUrl = await QRCodeLib.toDataURL(message.data.qrCode, {
+                width: 256,
+                margin: 2,
+                color: {
+                  dark: "#000000",
+                  light: "#FFFFFF",
+                },
+              });
+              setQrCodeImage(qrDataUrl);
+            }
+            break;
+
+          case 'error':
+            if (message.data?.error) {
+              toast.error(message.data.error);
+            }
+            break;
+        }
+      } catch (err) {
+        console.error('[WhatsApp WS] Error parsing message:', err);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('[WhatsApp WS] Error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('[WhatsApp WS] Disconnected');
+    };
+
+    return () => {
+      // Unsubscribe before closing
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'unsubscribe',
+          projectId: currentProject.id,
+        }));
+      }
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [currentProject]);
 
   // Load client when project changes
   useEffect(() => {
     loadClient();
   }, [loadClient]);
-
-  // Poll for connection status when QR code is shown
-  useEffect(() => {
-    if (!client || client.connected) return;
-
-    const interval = setInterval(() => {
-      loadClient();
-    }, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(interval);
-  }, [client, loadClient]);
 
   if (isLoading) {
     return (
@@ -226,7 +315,7 @@ export function WhatsAppSettings() {
 
         {error && (
           <Alert variant="destructive">
-            <p>{error}</p>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
@@ -316,14 +405,10 @@ export function WhatsAppSettings() {
                           alt="WhatsApp QR Code"
                           className="w-64 h-64"
                         />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={refreshQRCode}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Refresh QR Code
-                        </Button>
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Waiting for QR code to be scanned...
+                        </p>
                       </div>
                     ) : (
                       <div className="flex items-center justify-center p-12 border rounded-lg">

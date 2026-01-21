@@ -52,6 +52,8 @@ import {
   handleDeleteWhatsAppClient,
   handleGetWhatsAppQRCode,
   handleWhatsAppWebhook,
+  handleWhatsAppConnectionStatus,
+  initWhatsAppNotifications,
 } from "./whatsapp-handler";
 import {
   handleGetExtensions,
@@ -479,6 +481,14 @@ export class WebSocketServer {
           return handleToggleExtension(req, projectId, extensionId);
         }
 
+        // WhatsApp WebSocket endpoint for real-time status updates
+        if (pathname === "/api/whatsapp/ws") {
+          const wsModule = await import("./whatsapp-ws");
+          // Initialize notification functions so whatsapp-handler can use them
+          initWhatsAppNotifications(wsModule.notifyWhatsAppStatus, wsModule.notifyWhatsAppQRCode);
+          return wsModule.handleWhatsAppWebSocket(req);
+        }
+
         // WhatsApp API endpoints
         if (pathname === "/api/whatsapp/client" && req.method === "GET") {
           return handleGetWhatsAppClient(req);
@@ -498,6 +508,10 @@ export class WebSocketServer {
 
         if (pathname === "/api/whatsapp/webhook" && req.method === "POST") {
           return handleWhatsAppWebhook(req);
+        }
+
+        if (pathname === "/api/whatsapp/status" && req.method === "POST") {
+          return handleWhatsAppConnectionStatus(req);
         }
 
         // Embed Authentication endpoint

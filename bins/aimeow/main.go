@@ -570,6 +570,7 @@ type ClientResponse struct {
 	QRCode       string     `json:"qrCode,omitempty"`
 	ConnectedAt  *time.Time `json:"connectedAt,omitempty"`
 	MessageCount int        `json:"messageCount"`
+	OSName       string     `json:"osName,omitempty"`
 }
 
 type CreateClientResponse struct {
@@ -730,6 +731,7 @@ func getAllClients(c *gin.Context) {
 			QRCode:       client.qrCode,
 			ConnectedAt:  client.connectedAt,
 			MessageCount: len(client.messages),
+			OSName:       client.osName,
 		}
 		// Add phone number if device is connected
 		if client.deviceStore != nil && client.deviceStore.ID != nil {

@@ -7,6 +7,16 @@ import { ProjectStorage } from "../storage/project-storage";
 
 const WHATSAPP_API_URL = "http://localhost:7031/api/v1";
 
+// Import notification functions for WebSocket broadcasts
+let notifyWhatsAppStatus: (projectId: string, status: any) => void = () => {};
+let notifyWhatsAppQRCode: (projectId: string, qrCode: string) => void = () => {};
+
+// Initialize notification functions (called after whatsapp-ws is loaded)
+export function initWhatsAppNotifications(notifyStatus: typeof notifyWhatsAppStatus, notifyQR: typeof notifyWhatsAppQRCode) {
+  notifyWhatsAppStatus = notifyStatus;
+  notifyWhatsAppQRCode = notifyQR;
+}
+
 interface WhatsAppClient {
   id: string;
   connected: boolean;
@@ -69,8 +79,8 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
       client: {
         id: client.id,
         connected: client.is_connected || false,
-        connectedAt: client.connected_at,
-        deviceName: client.os_name || "WhatsApp Device",
+        connectedAt: client.connectedAt,
+        deviceName: client.osName || "WhatsApp Device",
       },
     });
   } catch (error) {
@@ -509,5 +519,83 @@ async function sendWhatsAppMessage(
   } catch (error) {
     console.error("[WhatsApp] Error sending message:", error);
     throw error;
+  }
+}
+
+/**
+ * Handle connection status updates from aimeow
+ * This webhook is called when a WhatsApp client connects or disconnects
+ */
+export async function handleWhatsAppConnectionStatus(req: Request): Promise<Response> {
+  try {
+    const body = await req.json();
+    const { clientId, event, data } = body;
+
+    console.log("[WhatsApp] Connection status update:", { clientId, event, data });
+
+    if (!clientId) {
+      return Response.json(
+        { success: false, error: "Missing clientId" },
+        { status: 400 }
+      );
+    }
+
+    // The clientId is the projectId
+    const projectId = clientId;
+
+    // Verify project exists
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(projectId);
+
+    if (!project) {
+      console.error("[WhatsApp] Project not found:", projectId);
+      return Response.json({ success: false, error: "Project not found" }, { status: 404 });
+    }
+
+    // Process the connection event
+    switch (event) {
+      case "connected":
+        // Client successfully connected to WhatsApp
+        notifyWhatsAppStatus(projectId, {
+          connected: true,
+          connectedAt: new Date().toISOString(),
+          deviceName: data?.osName || "WhatsApp Device",
+        });
+        console.log("[WhatsApp] Client connected:", projectId);
+        break;
+
+      case "disconnected":
+        // Client disconnected from WhatsApp
+        notifyWhatsAppStatus(projectId, {
+          connected: false,
+        });
+        console.log("[WhatsApp] Client disconnected:", projectId);
+        break;
+
+      case "qr_code":
+        // New QR code available
+        if (data?.qrCode) {
+          notifyWhatsAppQRCode(projectId, data.qrCode);
+        }
+        break;
+
+      case "error":
+        // Error occurred
+        notifyWhatsAppStatus(projectId, {
+          error: data?.error || "Unknown error",
+        });
+        break;
+
+      default:
+        console.log("[WhatsApp] Unknown event:", event);
+    }
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("[WhatsApp] Error handling connection status:", error);
+    return Response.json(
+      { success: false, error: "Failed to handle connection status" },
+      { status: 500 }
+    );
   }
 }
