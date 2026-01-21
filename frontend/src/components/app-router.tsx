@@ -16,6 +16,7 @@ import { WhatsAppSettings } from "./pages/whatsapp-settings";
 import { ProjectRouteHandler } from "./project/project-route-handler";
 import { ProtectedRoute } from "./auth/protected-route";
 import { Toaster } from "./ui/sonner";
+import { SetupRequired } from "./setup-required";
 import { useEffect } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { useConversationStore } from "@/stores/conversation-store";
@@ -34,7 +35,14 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
 
   const { currentProject } = useProjectStore();
   const { loadConversations } = useConversationStore();
-  const { user, logout } = useAuthStore();
+  const { user, logout, needsSetup, checkSetup, setupChecked } = useAuthStore();
+
+  // Check setup status on mount
+  useEffect(() => {
+    if (!setupChecked) {
+      checkSetup();
+    }
+  }, [checkSetup, setupChecked]);
 
   // Load conversations when project changes
   useEffect(() => {
@@ -55,6 +63,9 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
 
   // Show top header account menu only when NOT inside a project (root/home or admin pages)
   const shouldShowTopAccountMenu = !isLoginRoute && user && !shouldShowSidebar;
+
+  // Show setup required page when no tenants exist
+  const shouldShowSetupRequired = needsSetup && !isAdminSetupRoute;
 
   return (
     <SidebarProvider>
@@ -85,7 +96,10 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
 
         {/* Content Area */}
         <main className="flex-1 overflow-hidden">
-          <Routes>
+          {shouldShowSetupRequired ? (
+            <SetupRequired />
+          ) : (
+            <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin-setup" element={<AdminSetupPage />} />
@@ -203,7 +217,8 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
           />
           {/* Catch-all route - redirect to root */}
           <Route path="*" element={<ProtectedRoute><ProjectSelectorPage /></ProtectedRoute>} />
-        </Routes>
+          </Routes>
+          )}
         </main>
 
         {/* Toast Notifications */}

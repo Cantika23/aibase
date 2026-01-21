@@ -1,6 +1,6 @@
 /**
  * WhatsApp Settings Page
- * Full page for managing WhatsApp integration with device linking
+ * Full page for managing WhatsApp integration with device linking and conversation management
  */
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,9 +12,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { buildApiUrl } from "@/lib/base-path";
 import { useProjectStore } from "@/stores/project-store";
-import { MessageCircle, RefreshCw, Smartphone, Trash2 } from "lucide-react";
+import { MessageCircle, RefreshCw, Smartphone, Trash2, Users, MessageSquare } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
@@ -28,6 +36,15 @@ interface WhatsAppClient {
   connectedAt?: string;
   qrCode?: string;
   deviceName?: string;
+}
+
+interface WhatsAppConversation {
+  convId: string;
+  phoneNumber: string;
+  title: string;
+  messageCount: number;
+  lastUpdatedAt: number;
+  createdAt: number;
 }
 
 interface WhatsAppWSMessage {
@@ -44,13 +61,20 @@ interface WhatsAppWSMessage {
   };
 }
 
+type TabType = 'device' | 'conversations';
+
 export function WhatsAppSettings() {
   const { currentProject } = useProjectStore();
+  const [activeTab, setActiveTab] = useState<TabType>('device');
   const [client, setClient] = useState<WhatsAppClient | null>(null);
+  const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<WhatsAppConversation | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef<boolean>(false as boolean); // Track latest connection status from WebSocket
 
@@ -248,6 +272,78 @@ export function WhatsAppSettings() {
     }
   }, [currentProject, client, loadClient]);
 
+  // Load WhatsApp conversations
+  const loadConversations = useCallback(async () => {
+    if (!currentProject) return;
+
+    setIsLoadingConversations(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/whatsapp/conversations?projectId=${currentProject.id}`,
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load conversations");
+      }
+
+      const data = await response.json();
+      setConversations(data.conversations || []);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load conversations";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  }, [currentProject]);
+
+  // Delete conversation
+  const deleteConversation = useCallback(async (conversation: WhatsAppConversation) => {
+    if (!currentProject) return;
+
+    setConversationToDelete(conversation);
+    setDeleteDialogOpen(true);
+  }, [currentProject]);
+
+  // Confirm delete conversation
+  const confirmDeleteConversation = useCallback(async () => {
+    if (!currentProject || !conversationToDelete) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/whatsapp/conversations/delete?convId=${conversationToDelete.convId}&projectId=${currentProject.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete conversation");
+      }
+
+      toast.success("Conversation deleted successfully");
+      setDeleteDialogOpen(false);
+      setConversationToDelete(null);
+
+      // Reload conversations
+      loadConversations();
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete conversation";
+      toast.error(errorMessage);
+    }
+  }, [currentProject, conversationToDelete, loadConversations]);
+
+  // Load conversations when switching to conversations tab
+  useEffect(() => {
+    if (activeTab === 'conversations') {
+      loadConversations();
+    }
+  }, [activeTab, loadConversations]);
+
   // WebSocket connection for real-time updates
   useEffect(() => {
     if (!currentProject) return;
@@ -378,9 +474,31 @@ export function WhatsAppSettings() {
   return (
     <div className="h-full overflow-auto">
       <div className="container max-w-4xl mx-auto p-6 space-y-6">
-        <div className="flex items-center gap-2 mb-6">
-          <MessageCircle className="h-6 w-6" />
-          <h1 className="text-2xl font-semibold">WhatsApp Integration</h1>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-6 w-6" />
+            <h1 className="text-2xl font-semibold">WhatsApp Integration</h1>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2">
+            <Button
+              variant={activeTab === 'device' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('device')}
+            >
+              <Smartphone className="h-4 w-4 mr-2" />
+              Device
+            </Button>
+            <Button
+              variant={activeTab === 'conversations' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('conversations')}
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Conversations
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -389,6 +507,9 @@ export function WhatsAppSettings() {
           </Alert>
         )}
 
+        {/* Device Tab */}
+        {activeTab === 'device' && (
+          <>
         {!client ? (
           <Card>
             <CardHeader>
@@ -546,6 +667,95 @@ export function WhatsAppSettings() {
             )}
           </div>
         )}
+          </>
+        )}
+
+        {/* Conversations Tab */}
+        {activeTab === 'conversations' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                WhatsApp Conversations
+              </CardTitle>
+              <CardDescription>
+                Manage all conversations with different WhatsApp contacts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingConversations ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="text-center py-12">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground mb-2">No conversations yet</p>
+                  <p className="text-sm text-muted-foreground">
+                    Conversations will appear here when people send messages to your WhatsApp number
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {conversations.map((conv) => (
+                    <div
+                      key={conv.convId}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium">{conv.title}</p>
+                          <span className="text-xs text-muted-foreground">
+                            {conv.messageCount} {conv.messageCount === 1 ? 'message' : 'messages'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Last active: {new Date(conv.lastUpdatedAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteConversation(conv)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Conversation?</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the conversation with{" "}
+                <span className="font-medium">{conversationToDelete?.title}</span>?
+                This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteConversation}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
