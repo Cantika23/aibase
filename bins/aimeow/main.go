@@ -459,11 +459,11 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 
 			// Save the mapping from WhatsApp device ID to our UUID
 			// Find our UUID for this client by searching through manager.clients
+			var ourUUID string
 			if client.deviceStore.ID != nil {
 				whatsappID := client.deviceStore.ID.String()
 				cm.mutex.Lock()
 				// Find the UUID key for this client
-				var ourUUID string
 				for uuid, c := range cm.clients {
 					if c == client {
 						ourUUID = uuid
@@ -497,10 +497,60 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 					cm.mutex.Unlock()
 				}
 			}
+
+			// Send connection status webhook after successful connection
+			if ourUUID != "" {
+				go cm.sendConnectionStatusWebhook(ourUUID, "connected", map[string]interface{}{
+					"osName":       client.osName,
+					"connectedAt":  now.Format(time.RFC3339),
+					"phone":        client.deviceStore.ID.User,
+				})
+			}
 		case *events.LoggedOut:
 			client.isConnected = false
+			client.connectedAt = nil
+
+			// Send disconnection status webhook
+			cm.mutex.RLock()
+			whatsappID := client.deviceStore.ID.String()
+			clientID, exists := cm.clientIDMap[whatsappID]
+			if !exists {
+				// Try to find the UUID by searching
+				for uuid, c := range cm.clients {
+					if c == client {
+						clientID = uuid
+						break
+					}
+				}
+			}
+			cm.mutex.RUnlock()
+
+			if clientID != "" {
+				go cm.sendConnectionStatusWebhook(clientID, "disconnected", map[string]interface{}{})
+			}
 		case *events.QR:
 			client.qrCode = v.Codes[0]
+
+			// Send QR code webhook
+			cm.mutex.RLock()
+			whatsappID := client.deviceStore.ID.String()
+			clientID, exists := cm.clientIDMap[whatsappID]
+			if !exists {
+				// Try to find the UUID by searching
+				for uuid, c := range cm.clients {
+					if c == client {
+						clientID = uuid
+						break
+					}
+				}
+			}
+			cm.mutex.RUnlock()
+
+			if clientID != "" {
+				go cm.sendConnectionStatusWebhook(clientID, "qr_code", map[string]interface{}{
+					"qrCode": v.Codes[0],
+				})
+			}
 		}
 	}
 }
@@ -1921,6 +1971,48 @@ func (cm *ClientManager) sendWebhook(client *WhatsAppClient, message interface{}
 		fmt.Printf("Webhook returned error status: %d\n", resp.StatusCode)
 	} else {
 		fmt.Printf("[Aimeow Webhook] Successfully sent to %s (status: %d)\n", cm.callbackURL, resp.StatusCode)
+	}
+}
+
+// sendConnectionStatusWebhook sends connection status updates to the backend
+func (cm *ClientManager) sendConnectionStatusWebhook(clientID string, event string, data map[string]interface{}) {
+	if cm.callbackURL == "" {
+		return
+	}
+
+	// Construct status webhook URL by appending /status to the callback URL
+	statusURL := cm.callbackURL
+	if !strings.HasSuffix(statusURL, "/") {
+		statusURL += "/"
+	}
+	statusURL += "status"
+
+	webhookData := map[string]interface{}{
+		"clientId": clientID,
+		"event":    event,
+		"data":     data,
+		"timestamp": time.Now().Unix(),
+	}
+
+	jsonData, err := json.Marshal(webhookData)
+	if err != nil {
+		fmt.Printf("Failed to marshal status webhook data: %v\n", err)
+		return
+	}
+
+	fmt.Printf("[Aimeow Status Webhook] Event: %s, Client: %s, Payload: %s\n", event, clientID, string(jsonData))
+
+	resp, err := http.Post(statusURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Printf("Failed to send status webhook: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		fmt.Printf("Status webhook returned error status: %d\n", resp.StatusCode)
+	} else {
+		fmt.Printf("[Aimeow Status Webhook] Successfully sent to %s (status: %d)\n", statusURL, resp.StatusCode)
 	}
 }
 
