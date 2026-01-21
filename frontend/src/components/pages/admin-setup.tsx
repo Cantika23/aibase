@@ -1141,7 +1141,13 @@ export function AdminSetupPage() {
 
                 <div className="flex justify-between items-center">
                   <h3 className="text-xl font-semibold">Users</h3>
-                  <Button onClick={() => setShowUserForm(true)} disabled={showUserForm}>
+                  <Button onClick={() => {
+                    setShowUserForm(true);
+                    // Pre-fill tenant_id when in tenant detail view
+                    if (selectedTenant) {
+                      setUserForm({ ...userForm, tenant_id: selectedTenant.id });
+                    }
+                  }} disabled={showUserForm}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add User
                   </Button>
