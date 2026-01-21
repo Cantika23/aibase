@@ -88,8 +88,9 @@ RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 
 # Skip frontend dependency install (dist is pre-built in Docker)
-# aimeow is built in Docker with CGO
+# aimeow is built in Docker with CGO (so skip runtime build)
 ENV SKIP_FRONTEND_INSTALL=1
+ENV SKIP_AIMEOW_BUILD=1
 
 # Start all services via start.linux (which runs backend, Qdrant, and aimeow)
 CMD ["./start.linux"]
