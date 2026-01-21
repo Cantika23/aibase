@@ -1,7 +1,14 @@
 # Multi-stage Dockerfile for full-stack application
+# All stages use Debian bookworm for binary compatibility
 
 # Stage 1: Build frontend
-FROM oven/bun:alpine AS frontend-build
+FROM node:20-bookworm-slim AS frontend-build
+
+# Install Bun
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://bun.sh/install.sh | bash && \
+    export BUN_INSTALL=$HOME/.bun && \
+    export PATH="$BUN_INSTALL/bin:$PATH"
 
 # Build frontend
 WORKDIR /app/frontend
@@ -11,10 +18,10 @@ COPY frontend/ ./
 RUN bun run build
 
 # Stage 2: Build aimeow with CGO for SQLite
-FROM golang:1.25-alpine AS aimeow-build
+FROM golang:1.25-bookworm AS aimeow-build
 
-# Install build dependencies
-RUN apk add --no-cache git gcc musl-dev
+# Install build dependencies (gcc already included in bookworm)
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/bins/aimeow
 
@@ -24,7 +31,7 @@ RUN go mod download
 
 COPY bins/aimeow/ ./
 
-# Install swag and generate docs
+# Install swag and generate swagger docs
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN $(go env GOPATH)/bin/swag init
 
@@ -32,16 +39,21 @@ RUN $(go env GOPATH)/bin/swag init
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o aimeow.linux .
 
 # Stage 3: Production stage
-FROM oven/bun:alpine
+FROM node:20-bookworm-slim
 
-# Install DuckDB and Pandoc
-RUN apk add --no-cache curl pandoc && \
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y curl pandoc sqlite3 && \
     curl -L https://github.com/duckdb/duckdb/releases/download/v1.1.3/duckdb_cli-linux-amd64.zip -o /tmp/duckdb.zip && \
     unzip /tmp/duckdb.zip -d /tmp/ && \
     mv /tmp/duckdb /usr/local/bin/ && \
     chmod +x /usr/local/bin/duckdb && \
-    rm /tmp/duckdb.zip && \
-    apk del curl
+    rm -rf /tmp/duckdb.zip /var/lib/apt/lists/*
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install.sh | bash && \
+    export BUN_INSTALL=$HOME/.bun && \
+    export PATH="$BUN_INSTALL/bin:$PATH"
 
 WORKDIR /app
 
@@ -62,7 +74,7 @@ RUN chmod +x ./bins/aimeow/aimeow.linux
 # Copy aimeow docs from aimeow-build stage
 COPY --from=aimeow-build /app/bins/aimeow/docs ./bins/aimeow/docs
 
-# Build locally: cd bins/start && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o start.linux
+# Copy pre-built start binary (built locally without CGO)
 COPY bins/start/start.linux ./
 RUN chmod +x ./start.linux
 
@@ -87,8 +99,8 @@ RUN mkdir -p /app/data
 # This includes: todos, memory, uploaded files, and conversation data
 VOLUME ["/app/data"]
 
-# Skip frontend dependency install (dist is pre-built in Docker)
-# aimeow is built in Docker with CGO (so skip runtime build)
+# Skip frontend dependency install (dist is pre-built)
+# aimeow is built in Docker with CGO
 ENV SKIP_FRONTEND_INSTALL=1
 ENV SKIP_AIMEOW_BUILD=1
 
