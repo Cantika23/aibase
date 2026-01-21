@@ -78,6 +78,7 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
       success: true,
       client: {
         id: client.id,
+        phone: client.phone || null,
         connected: client.is_connected || false,
         connectedAt: client.connectedAt,
         deviceName: client.osName || "WhatsApp Device",

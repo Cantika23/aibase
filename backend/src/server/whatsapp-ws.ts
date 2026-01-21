@@ -130,6 +130,7 @@ async function handleMessage(ws: any, message: string | Buffer) {
                 const isConnected = client.isConnected || false;
                 console.log('[WhatsApp WS] Sending current status to new subscriber:', {
                   projectId: data.projectId,
+                  phone: client.phone,
                   connected: isConnected,
                   deviceName: client.osName || 'WhatsApp Device',
                 });
@@ -139,6 +140,7 @@ async function handleMessage(ws: any, message: string | Buffer) {
                   type: 'status',
                   data: {
                     projectId: data.projectId,
+                    phone: client.phone,
                     connected: isConnected,
                     connectedAt: client.connectedAt,
                     deviceName: client.osName || 'WhatsApp Device',

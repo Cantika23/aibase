@@ -23,6 +23,7 @@ const API_BASE_URL = buildApiUrl("");
 
 interface WhatsAppClient {
   id: string;
+  phone?: string | null;
   connected: boolean;
   connectedAt?: string;
   qrCode?: string;
@@ -34,6 +35,7 @@ interface WhatsAppWSMessage {
   projectId?: string;
   data?: {
     projectId: string;
+    phone?: string;
     connected?: boolean;
     connectedAt?: string;
     qrCode?: string;
@@ -51,6 +53,26 @@ export function WhatsAppSettings() {
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef<boolean>(false as boolean); // Track latest connection status from WebSocket
+
+  // Format phone number for display
+  const formatPhoneNumber = (phone: string | null | undefined): string => {
+    if (!phone) return "Unknown Device";
+
+    // Remove any non-digit characters
+    const digits = phone.replace(/\D/g, '');
+
+    // Format: +62 823 5063 4214
+    if (digits.startsWith('0')) {
+      // Local format: 0823 → 0823 5063 4214
+      return digits.replace(/(\d{4})(\d{4})(\d{4})/, '$1 $2 $3');
+    } else if (digits.startsWith('62')) {
+      // Indonesia format: 62823 → +62 823 5063 4214
+      return '+62 ' + digits.substring(2).replace(/(\d{3})(\d{4})(\d{4})/, '$1 $2 $3');
+    } else {
+      // International format
+      return '+' + digits;
+    }
+  };
 
   // Load WhatsApp client for current project
   const loadClient = useCallback(async () => {
@@ -254,6 +276,7 @@ export function WhatsAppSettings() {
 
               setClient({
                 id: message.data.projectId,
+                phone: message.data.phone,
                 connected: isConnected,
                 connectedAt: message.data.connectedAt,
                 deviceName: message.data.deviceName,
@@ -412,11 +435,9 @@ export function WhatsAppSettings() {
                     <div className="flex items-center gap-3">
                       <Smartphone className="h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">
-                          {client.deviceName || "WhatsApp Device"}
-                        </p>
+                        <p className="font-medium">WhatsApp Device</p>
                         <p className="text-sm text-muted-foreground">
-                          Client ID: {client.id}
+                          {formatPhoneNumber(client.phone)}
                         </p>
                       </div>
                     </div>
