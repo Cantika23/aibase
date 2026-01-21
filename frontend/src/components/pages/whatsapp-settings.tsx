@@ -213,6 +213,8 @@ export function WhatsAppSettings() {
   const deleteClient = useCallback(async () => {
     if (!currentProject || !client) return;
 
+    console.log('[WhatsApp Settings] Deleting client:', client.id);
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/whatsapp/client?clientId=${client.id}`,
@@ -225,15 +227,27 @@ export function WhatsAppSettings() {
         throw new Error("Failed to delete WhatsApp client");
       }
 
+      console.log('[WhatsApp Settings] Delete successful, clearing state');
+
+      // Reset all state
       setClient(null);
       setQrCodeImage(null);
+      wsConnectedRef.current = false;
+
       toast.success("WhatsApp client deleted successfully");
+
+      // Reload client after a short delay to verify deletion
+      setTimeout(() => {
+        console.log('[WhatsApp Settings] Reloading client to verify deletion');
+        loadClient();
+      }, 500);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to delete WhatsApp client";
+      console.error('[WhatsApp Settings] Delete failed:', errorMessage);
       toast.error(errorMessage);
     }
-  }, [currentProject, client]);
+  }, [currentProject, client, loadClient]);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
