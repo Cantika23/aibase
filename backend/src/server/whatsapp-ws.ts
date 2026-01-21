@@ -110,11 +110,46 @@ async function handleMessage(ws: any, message: string | Buffer) {
           }
           socketToProjects.get(ws)!.add(data.projectId);
 
-          // Send initial status
+          // Send subscribed confirmation
           ws.send(JSON.stringify({
             type: 'subscribed',
             projectId: data.projectId,
           }));
+
+          // Fetch and send current WhatsApp client status
+          try {
+            const WHATSAPP_API_URL = "http://localhost:7031/api/v1";
+            const response = await fetch(`${WHATSAPP_API_URL}/clients`);
+
+            if (response.ok) {
+              const clientsData = await response.json();
+              const clientsArray = Array.isArray(clientsData) ? clientsData : clientsData.clients;
+              const client = clientsArray?.find((c: any) => c.id === data.projectId);
+
+              if (client) {
+                console.log('[WhatsApp WS] Sending current status to new subscriber:', {
+                  projectId: data.projectId,
+                  connected: client.is_connected || false,
+                  deviceName: client.osName || 'WhatsApp Device',
+                });
+
+                // Send current status immediately
+                ws.send(JSON.stringify({
+                  type: 'status',
+                  data: {
+                    projectId: data.projectId,
+                    connected: client.is_connected || false,
+                    connectedAt: client.connectedAt,
+                    deviceName: client.osName || 'WhatsApp Device',
+                  },
+                }));
+              } else {
+                console.log('[WhatsApp WS] No client found for project:', data.projectId);
+              }
+            }
+          } catch (err) {
+            console.error('[WhatsApp WS] Error fetching client status:', err);
+          }
         }
         break;
 
