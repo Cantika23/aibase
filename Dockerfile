@@ -32,11 +32,18 @@ COPY backend/ ./
 WORKDIR /app
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
+# Copy .env file if it exists (optional)
+# This allows configuration without passing all env vars
+COPY .env* ./ 2>/dev/null || true
+
 # Expose only backend port (serves both API and frontend)
 EXPOSE 5040
 
-# Set environment to production
+# Set environment to production (can be overridden)
 ENV NODE_ENV=production
+
+# Default WhatsApp API URL (can be overridden with -e flag or .env file)
+ENV WHATSAPP_API_URL=http://localhost:7031/api/v1
 
 # Create data directory for persistent storage
 RUN mkdir -p /app/data
