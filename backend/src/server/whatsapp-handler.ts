@@ -54,10 +54,14 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
     }
 
     // Get client from aimeow API
-    const response = await fetch(`${WHATSAPP_API_URL}/clients`);
+    const url = `${WHATSAPP_API_URL}/clients`;
+    console.log("[WhatsApp] Fetching clients from:", url);
+    const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error("Failed to fetch clients from WhatsApp service");
+      const text = await response.text();
+      console.error("[WhatsApp] Failed to fetch clients, status:", response.status, "response:", text);
+      throw new Error(`Failed to fetch clients from WhatsApp service: ${response.status} ${text}`);
     }
 
     const data = await response.json();
