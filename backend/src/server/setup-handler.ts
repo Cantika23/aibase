@@ -10,6 +10,7 @@ import { createLogger } from "../utils/logger";
 import { AuthService } from "../services/auth-service";
 import { TenantStorage } from "../storage/tenant-storage";
 import { UserStorage } from "../storage/user-storage";
+import { PATHS } from "../config/paths";
 
 const authService = AuthService.getInstance();
 const tenantStorage = TenantStorage.getInstance();
@@ -17,7 +18,7 @@ const userStorage = UserStorage.getInstance();
 
 const logger = createLogger("Setup");
 
-const SETUP_FILE = "./data/setup.json";
+const SETUP_FILE = PATHS.SETUP_CONFIG;
 const LICENSE_COOKIE_NAME = "admin_license_key";
 
 interface SetupConfig {
@@ -190,7 +191,7 @@ export async function handleUpdateSetup(req: Request): Promise<Response> {
 
     // Handle logo upload
     if (logo) {
-      const logoPath = "./data/logo.png";
+      const logoPath = PATHS.LOGO;
       const buffer = await logo.arrayBuffer();
       await writeFile(logoPath, Buffer.from(buffer));
       setup.logoPath = logoPath;
@@ -205,7 +206,7 @@ export async function handleUpdateSetup(req: Request): Promise<Response> {
     // Since I cannot easily change the whole function logic structure in one chunk without conflict risk, I will assume `favicon` var is available or re-grab.
     // Actually, `var favicon` in the `if` block is function scoped.
     if (typeof favicon !== 'undefined' && favicon) {
-      const faviconPath = "./data/favicon.png";
+      const faviconPath = PATHS.FAVICON;
       const buffer = await favicon.arrayBuffer();
       await writeFile(faviconPath, Buffer.from(buffer));
       setup.faviconPath = faviconPath;

@@ -1,11 +1,12 @@
 /**
  * Tenant storage service using SQLite
- * Stores tenants in /data/users.db (same database as users and sessions)
+ * Stores tenants in data/app/databases/users.db (same database as users and sessions)
  */
 
 import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { PATHS } from '../config/paths';
 
 export interface Tenant {
   id: number;
@@ -32,8 +33,7 @@ export class TenantStorage {
   private dbPath: string;
 
   private constructor() {
-    const dataDir = path.join(process.cwd(), 'data');
-    this.dbPath = path.join(dataDir, 'users.db');
+    this.dbPath = PATHS.USERS_DB;
   }
 
   static getInstance(): TenantStorage {

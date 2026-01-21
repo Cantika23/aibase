@@ -1,6 +1,7 @@
 import pino from 'pino';
 import { join } from 'path';
 import { mkdir } from 'fs/promises';
+import { PATHS } from '../config/paths';
 
 // Get log level from environment variable (default: 'info')
 const logLevel = process.env.LOG_LEVEL || 'info';
@@ -9,7 +10,7 @@ const logLevel = process.env.LOG_LEVEL || 'info';
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // Create logs directory if it doesn't exist
-const logsDir = process.env.LOGS_DIR || './data/backend/logs';
+const logsDir = process.env.LOGS_DIR || PATHS.BACKEND_LOGS;
 
 // Ensure logs directory exists
 mkdir(logsDir, { recursive: true }).catch(() => {});

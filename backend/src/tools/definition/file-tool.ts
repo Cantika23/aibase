@@ -74,11 +74,11 @@ await file({ action: 'peek', path: 'large-file.log', offset: 0, limit: 100 });
 /**
  * File Tool - Built-in file operations
  * Actions: list, info, delete, rename, uploadUrl, write, read, peek
- * All operations are restricted to /data/{proj-id}/{conv-id}/files/ pattern
+ * All operations are restricted to data/projects/{proj-id}/conversations/{conv-id}/files/ pattern
  */
 export class FileTool extends Tool {
   name = "file";
-  description = "Perform file operations: list files in directory, get file info, delete file, rename/move file, upload file from URL, write content to file, read file content (max 8000 chars ~2000 tokens), or peek at file with pagination. All paths are relative to the project directory (/data/{proj-id}/) and must be within {conv-id}/files/ subdirectories.";
+  description = "Perform file operations: list files in directory, get file info, delete file, rename/move file, upload file from URL, write content to file, read file content (max 8000 chars ~2000 tokens), or peek at file with pagination. All paths are relative to the project directory (data/projects/{proj-id}/) and must be within conversations/{conv-id}/files/ subdirectories.";
   parameters = {
     type: "object",
     properties: {

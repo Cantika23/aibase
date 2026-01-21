@@ -1,10 +1,11 @@
 /**
  * File storage service for handling uploaded files
- * Stores files in /data/[proj-id]/[conv-id]/files/
+ * Stores files in data/projects/[proj-id]/conversations/[conv-id]/files/
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { getConversationFilesDir } from '../config/paths';
 
 export type FileScope = 'user' | 'public';
 
@@ -20,11 +21,9 @@ export interface StoredFile {
 
 export class FileStorage {
   private static instance: FileStorage;
-  private baseDir: string;
 
   private constructor() {
-    // Use absolute path from project root
-    this.baseDir = path.join(process.cwd(), 'data');
+    // No baseDir needed - using centralized path config
   }
 
   static getInstance(): FileStorage {
@@ -38,7 +37,7 @@ export class FileStorage {
    * Get the directory path for a conversation
    */
   private getConvDir(convId: string, projectId: string): string {
-    return path.join(this.baseDir, projectId, convId, 'files');
+    return getConversationFilesDir(projectId, convId);
   }
 
   /**

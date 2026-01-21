@@ -1,11 +1,12 @@
 /**
  * User storage service using SQLite
- * Stores users in /data/users.db
+ * Stores users in data/app/databases/users.db
  */
 
 import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { PATHS } from '../config/paths';
 
 export type UserRole = 'admin' | 'user';
 
@@ -42,8 +43,7 @@ export class UserStorage {
   private dbPath: string;
 
   private constructor() {
-    const dataDir = path.join(process.cwd(), 'data');
-    this.dbPath = path.join(dataDir, 'users.db');
+    this.dbPath = PATHS.USERS_DB;
   }
 
   static getInstance(): UserStorage {

@@ -1,11 +1,12 @@
 /**
  * Project storage service using SQLite
- * Stores projects in /data/projects.db
+ * Stores projects in data/app/databases/projects.db
  */
 
 import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { PATHS } from '../config/paths';
 
 export interface Project {
   id: string;
@@ -55,11 +56,9 @@ export class ProjectStorage {
   private static instance: ProjectStorage;
   private db: Database;
   private dbPath: string;
-  private baseDir: string;
 
   private constructor() {
-    this.baseDir = path.join(process.cwd(), 'data');
-    this.dbPath = path.join(this.baseDir, 'projects.db');
+    this.dbPath = PATHS.PROJECTS_DB;
   }
 
   static getInstance(): ProjectStorage {
@@ -74,7 +73,7 @@ export class ProjectStorage {
    */
   async initialize(): Promise<void> {
     // Ensure data directory exists
-    await fs.mkdir(this.baseDir, { recursive: true });
+    await fs.mkdir(PATHS.APP_DATABASES, { recursive: true });
 
     // Open database
     this.db = new Database(this.dbPath);

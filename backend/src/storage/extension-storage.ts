@@ -1,10 +1,11 @@
 /**
  * Extension storage service
- * Manages project-specific extensions stored in data/{projectId}/ext/{extensionId}/
+ * Manages project-specific extensions stored in data/projects/{projectId}/extensions/{extensionId}/
  */
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { getExtensionDir } from '../config/paths';
 
 export interface ExtensionMetadata {
   id: string;           // unique identifier (same as folder name)
@@ -44,24 +45,24 @@ export interface UpdateExtensionData {
 }
 
 export class ExtensionStorage {
-  private baseDir: string;
+  // No baseDir needed - using centralized path config
 
   constructor() {
-    this.baseDir = path.join(process.cwd(), 'data');
+    // No initialization needed
   }
 
   /**
    * Get extension directory path for a project
    */
   private getExtensionsDir(projectId: string): string {
-    return path.join(this.baseDir, projectId, 'ext');
+    return path.join(process.cwd(), 'data', 'projects', projectId, 'extensions');
   }
 
   /**
    * Get specific extension directory path
    */
   private getExtensionDir(projectId: string, extensionId: string): string {
-    return path.join(this.getExtensionsDir(projectId), extensionId);
+    return getExtensionDir(projectId, extensionId);
   }
 
   /**

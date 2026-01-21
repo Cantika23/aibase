@@ -7,6 +7,7 @@ import { ChatHistoryStorage } from "../storage/chat-history-storage";
 import { FileStorage } from "../storage/file-storage";
 import { generateConversationTitle, getConversationTitle, regenerateConversationTitle } from "../llm/conversation-title-generator";
 import { createLogger } from "../utils/logger";
+import { getConversationChatsDir } from "../config/paths";
 
 const logger = createLogger("Conversations");
 
@@ -216,7 +217,7 @@ export async function handleCreateNewChat(req: Request): Promise<Response> {
     const timestamp = Date.now();
 
     // Get the chat directory path
-    const chatDir = `${process.cwd()}/data/${projectId}/${convId}/chats`;
+    const chatDir = getConversationChatsDir(projectId, convId);
 
     // Ensure directory exists
     await fs.mkdir(chatDir, { recursive: true });

@@ -1,12 +1,13 @@
 import { writeFile, readFile, unlink, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
+import { PATHS } from "../../config/paths";
 
 // In-memory storage for smaller outputs (< 10MB)
 const memoryStorage = new Map<string, any>();
 
 // File storage directory for larger outputs
-const STORAGE_DIR = join(process.cwd(), "data/output-storage");
+const STORAGE_DIR = PATHS.OUTPUT_STORAGE;
 
 // Threshold for file vs memory storage (10MB)
 const FILE_STORAGE_THRESHOLD = 10 * 1024 * 1024;

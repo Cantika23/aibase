@@ -1,11 +1,12 @@
 /**
  * Session storage service using SQLite
- * Stores sessions in /data/users.db (same database as users)
+ * Stores sessions in data/app/databases/users.db (same database as users)
  */
 
 import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { PATHS } from '../config/paths';
 
 export interface Session {
   id: number;
@@ -25,8 +26,7 @@ export class SessionStorage {
   private readonly SESSION_DURATION = 7 * 24 * 60 * 60 * 1000;
 
   private constructor() {
-    const dataDir = path.join(process.cwd(), 'data');
-    this.dbPath = path.join(dataDir, 'users.db');
+    this.dbPath = PATHS.USERS_DB;
   }
 
   static getInstance(): SessionStorage {

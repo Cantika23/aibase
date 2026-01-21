@@ -46,10 +46,15 @@ func main() {
 
 	// Setup paths
 	dataDir := filepath.Join(projectRoot, "data")
-	bunBinPath := filepath.Join(dataDir, "bun")
-	qdrantBinDir := filepath.Join(dataDir, "qdrant")
+	runtimeDir := filepath.Join(projectRoot, "runtime")
+	bunBinPath := filepath.Join(runtimeDir, "bun")
+	qdrantBinDir := filepath.Join(runtimeDir, "qdrant")
 
 	// Create necessary directories
+	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
+		color.Red("Error creating runtime directory: %v\n", err)
+		os.Exit(1)
+	}
 	if err := os.MkdirAll(bunBinPath, 0755); err != nil {
 		color.Red("Error creating bun directory: %v\n", err)
 		os.Exit(1)
@@ -131,10 +136,10 @@ func main() {
 	orch := NewOrchestrator(projectRoot, bunExecutable)
 
 	// Add processes
-	// Qdrant service
-	qdrantDataDir := filepath.Join(dataDir, "qdrant")
+	// Qdrant service - using new organized structure: data/services/qdrant/
+	qdrantDataDir := filepath.Join(dataDir, "services", "qdrant")
 	qdrantStoragePath := filepath.Join(qdrantDataDir, "storage")
-	qdrantLogsPath := filepath.Join(qdrantDataDir, "logs")
+	qdrantLogsPath := filepath.Join(dataDir, "logs", "qdrant")
 
 	// Create qdrant directories
 	os.MkdirAll(qdrantStoragePath, 0755)
@@ -154,7 +159,8 @@ func main() {
 
 	// Backend serves the built frontend on port 5040
 	// Backend runs from project root so data/ is accessible
-	backendLogsPath := filepath.Join(dataDir, "backend", "logs")
+	// Logs go to data/logs/backend/
+	backendLogsPath := filepath.Join(dataDir, "logs", "backend")
 	os.MkdirAll(backendLogsPath, 0755)
 
 	// Load .env file from project root for backend environment variables
@@ -164,9 +170,10 @@ func main() {
 	}
 	orch.AddProcess("backend", projectRoot, bunExecutable, []string{"--env-file=" + envFile, "run", "backend/src/server/index.ts"}, backendEnv, backendLogsPath)
 
-	// WhatsApp service (aimeow)
-	whatsappLogsPath := filepath.Join(dataDir, "whatsapp", "logs")
-	whatsappDataDir := filepath.Join(dataDir, "whatsapp")
+	// WhatsApp service (aimeow) - using new structure: data/services/whatsapp/
+	// Logs go to data/logs/whatsapp/
+	whatsappLogsPath := filepath.Join(dataDir, "logs", "whatsapp")
+	whatsappDataDir := filepath.Join(dataDir, "services", "whatsapp")
 	whatsappFilesDir := filepath.Join(whatsappDataDir, "files")
 	os.MkdirAll(whatsappLogsPath, 0755)
 	os.MkdirAll(whatsappFilesDir, 0755)
@@ -175,7 +182,7 @@ func main() {
 		"PORT=" + whatsappPort,
 		"BASE_URL=http://localhost:" + whatsappPort,
 		"CALLBACK_URL=http://localhost:" + backendPort + "/api/whatsapp/webhook",
-		"DATA_DIR=.", // Use current working directory (data/whatsapp) for data storage
+		"DATA_DIR=.", // Use current working directory (data/services/whatsapp) for data storage
 	}
 	fmt.Printf("[DEBUG] Adding whatsapp process with %d env vars: %v\n", len(whatsappEnv), whatsappEnv)
 	orch.AddProcess("whatsapp", whatsappDataDir, aimeowBinary, []string{}, whatsappEnv, whatsappLogsPath)

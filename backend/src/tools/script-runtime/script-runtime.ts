@@ -10,6 +10,7 @@ import { createShowTableFunction } from "./show-table";
 import { createShowMermaidFunction } from "./show-mermaid";
 import { createConvertDocumentFunction } from "./convert-document";
 import { peek, peekInfo } from "./peek-output";
+import { getConversationFilesDir } from "../../config/paths";
 
 /**
  * Context documentation for core script runtime functionality
@@ -346,7 +347,7 @@ export class ScriptRuntime {
    */
   private createDuckDBFunction() {
     // Set working directory to the conversation's files directory
-    const cwd = `data/${this.context.projectId}/${this.context.convId}/files`;
+    const cwd = getConversationFilesDir(this.context.projectId, this.context.convId);
     // Return the DuckDB function from the modular implementation
     return createDuckDBFunction(cwd);
   }
@@ -380,7 +381,7 @@ export class ScriptRuntime {
    */
   private createPDFReaderFunction() {
     // Set working directory to the conversation's files directory
-    const cwd = `data/${this.context.projectId}/${this.context.convId}/files`;
+    const cwd = getConversationFilesDir(this.context.projectId, this.context.convId);
     // Return the PDF reader function
     return createPDFReaderFunction(cwd);
   }
@@ -468,7 +469,7 @@ export class ScriptRuntime {
    * Get the convertDocument function
    */
   private createConvertDocumentFunction() {
-    const cwd = `data/${this.context.projectId}/${this.context.convId}/files`;
+    const cwd = getConversationFilesDir(this.context.projectId, this.context.convId);
     return createConvertDocumentFunction(cwd);
   }
 
