@@ -1,4 +1,6 @@
 # Multi-stage Dockerfile for full-stack application
+
+# Stage 1: Build frontend
 FROM oven/bun:alpine AS frontend-build
 
 # Build frontend
@@ -8,7 +10,44 @@ RUN bun install
 COPY frontend/ ./
 RUN bun run build
 
-# Production stage
+# Stage 2: Build aimeow binary
+FROM golang:1.25-alpine AS aimeow-build
+
+# Install build dependencies
+RUN apk add --no-cache git gcc musl-dev
+
+# Set working directory for aimeow
+WORKDIR /app/bins/aimeow
+
+# Copy aimeow source files
+COPY bins/aimeow/go.mod bins/aimeow/go.sum ./
+RUN go mod download
+
+COPY bins/aimeow/ ./
+
+# Install swag and generate docs
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+RUN swag init
+
+# Build aimeow for Linux
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o aimeow.linux .
+
+# Stage 3: Build start binary
+FROM golang:1.25-alpine AS start-build
+
+# Install build dependencies
+RUN apk add --no-cache git gcc musl-dev
+
+# Set working directory for start
+WORKDIR /app/bins/start
+
+# Copy start source files
+COPY bins/start/ ./
+
+# Build start for Linux
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o start.linux .
+
+# Stage 4: Production stage
 FROM oven/bun:alpine
 
 # Install DuckDB and Pandoc
@@ -32,13 +71,24 @@ COPY backend/ ./
 WORKDIR /app
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
+# Copy aimeow binary from aimeow-build stage
+COPY --from=aimeow-build /app/bins/aimeow/aimeow.linux ./bins/aimeow/
+RUN chmod +x ./bins/aimeow/aimeow.linux
+
+# Copy aimeow docs from aimeow-build stage
+COPY --from=aimeow-build /app/bins/aimeow/docs ./bins/aimeow/docs
+
+# Copy start binary from start-build stage
+COPY --from=start-build /app/bins/start/start.linux ./
+RUN chmod +x ./start.linux
+
 # Copy .env file if it exists (for production configuration)
 # Note: This is optional. You can also use --env-file or -e flags at runtime.
 # Uncomment the next line if you want to bake .env into the image (NOT recommended for secrets)
 # COPY .env ./
 
-# Expose only backend port (serves both API and frontend)
-EXPOSE 5040
+# Expose backend port and WhatsApp API port
+EXPOSE 5040 7031
 
 # Set environment to production (can be overridden)
 ENV NODE_ENV=production
@@ -53,5 +103,5 @@ RUN mkdir -p /app/data
 # This includes: todos, memory, uploaded files, and conversation data
 VOLUME ["/app/data"]
 
-# Start backend server (serves frontend static files)
-CMD ["bun", "run", "backend/src/server/index.ts"]
+# Start all services via start.linux (which runs backend, Qdrant, and aimeow)
+CMD ["./start.linux"]
