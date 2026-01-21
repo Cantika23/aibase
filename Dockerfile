@@ -10,7 +10,29 @@ RUN bun install
 COPY frontend/ ./
 RUN bun run build
 
-# Stage 2: Production stage
+# Stage 2: Build aimeow binary (requires CGO for SQLite)
+FROM golang:1.25-alpine AS aimeow-build
+
+# Install build dependencies
+RUN apk add --no-cache git gcc musl-dev
+
+# Set working directory for aimeow
+WORKDIR /app/bins/aimeow
+
+# Copy aimeow source files
+COPY bins/aimeow/go.mod bins/aimeow/go.sum ./
+RUN go mod download
+
+COPY bins/aimeow/ ./
+
+# Install swag and generate docs
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+RUN swag init
+
+# Build aimeow for Linux (CGO required for SQLite)
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o aimeow.linux .
+
+# Stage 3: Production stage
 FROM oven/bun:alpine
 
 # Install DuckDB and Pandoc
@@ -34,14 +56,14 @@ COPY backend/ ./
 WORKDIR /app
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Copy pre-built aimeow binary (built locally: cd bins/aimeow && GOOS=linux go build -o aimeow.linux)
-COPY bins/aimeow/aimeow.linux ./bins/aimeow/
+# Copy aimeow binary from aimeow-build stage
+COPY --from=aimeow-build /app/bins/aimeow/aimeow.linux ./bins/aimeow/
 RUN chmod +x ./bins/aimeow/aimeow.linux
 
-# Copy aimeow docs
-COPY bins/aimeow/docs ./bins/aimeow/docs
+# Copy aimeow docs from aimeow-build stage
+COPY --from=aimeow-build /app/bins/aimeow/docs ./bins/aimeow/docs
 
-# Copy pre-built start binary (built locally: cd bins/start && go build -o start.linux)
+# Copy pre-built start binary (built locally: cd bins/start && CGO_ENABLED=0 GOOS=linux go build -o start.linux)
 COPY bins/start/start.linux ./
 RUN chmod +x ./start.linux
 
