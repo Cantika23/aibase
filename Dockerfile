@@ -26,7 +26,7 @@ COPY bins/aimeow/ ./
 
 # Install swag and generate swagger docs
 RUN go install github.com/swaggo/swag/cmd/swag@latest
-RUN /root/go/bin/swag init
+RUN $(go env GOPATH)/bin/swag init
 
 # Build aimeow for Linux with CGO (required for mattn/go-sqlite3)
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o aimeow.linux .
