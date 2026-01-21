@@ -50,6 +50,7 @@ export function WhatsAppSettings() {
   const [error, setError] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const wsConnectedRef = useRef<boolean>(false as boolean); // Track latest connection status from WebSocket
 
   // Load WhatsApp client for current project
   const loadClient = useCallback(async () => {
@@ -74,9 +75,16 @@ export function WhatsAppSettings() {
       const data = await response.json();
       setClient(data.client);
 
-      // If client exists but not connected, fetch QR code
-      if (data.client && !data.client.connected) {
+      // Only fetch QR code if:
+      // 1. Client exists
+      // 2. Client is not connected (from API response)
+      // 3. WebSocket hasn't told us we're connected yet
+      if (data.client && !data.client.connected && wsConnectedRef.current !== true) {
         fetchQRCode(data.client.id);
+      } else if (data.client && data.client.connected) {
+        // API says connected, update our WebSocket ref
+        wsConnectedRef.current = true;
+        setQrCodeImage(null);
       }
     } catch (err) {
       const errorMessage =
@@ -101,7 +109,19 @@ export function WhatsAppSettings() {
 
       const data = await response.json();
 
+      // Abort if device became connected while fetching
+      if (wsConnectedRef.current) {
+        setQrCodeImage(null);
+        return;
+      }
+
       if (!data.success || !data.qrCode) {
+        setQrCodeImage(null);
+        return;
+      }
+
+      // Abort if device became connected while processing
+      if (wsConnectedRef.current) {
         setQrCodeImage(null);
         return;
       }
@@ -116,7 +136,10 @@ export function WhatsAppSettings() {
         },
       });
 
-      setQrCodeImage(qrDataUrl);
+      // Final check before setting QR code
+      if (!wsConnectedRef.current) {
+        setQrCodeImage(qrDataUrl);
+      }
     } catch (err) {
       console.error("Failed to fetch QR code:", err);
       setQrCodeImage(null);
@@ -224,17 +247,27 @@ export function WhatsAppSettings() {
           case 'connected':
           case 'disconnected':
             if (message.data) {
+              const isConnected = message.data.connected || false;
+
+              // Track latest connection status from WebSocket
+              wsConnectedRef.current = isConnected;
+
               setClient({
                 id: message.data.projectId,
-                connected: message.data.connected || false,
+                connected: isConnected,
                 connectedAt: message.data.connectedAt,
                 deviceName: message.data.deviceName,
               });
 
+              // Clear QR code if device is connected
+              if (isConnected) {
+                setQrCodeImage(null);
+                setIsLoading(false);
+              }
+
               // Show notification on status change
               if (message.type === 'connected') {
                 toast.success('WhatsApp connected successfully!');
-                setQrCodeImage(null);
               } else if (message.type === 'disconnected') {
                 toast.error('WhatsApp disconnected');
               }
