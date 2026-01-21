@@ -64,8 +64,9 @@ export function notifyWhatsAppQRCode(projectId: string, qrCode: string) {
 // WebSocket upgrade handler for WhatsApp status
 export async function handleWhatsAppWebSocket(req: Request) {
   return upgradeWebSocket(req, {
-    onError: () => {
-      console.error('[WhatsApp WS] WebSocket error');
+    onError: (err) => {
+      console.error('[WhatsApp WS] WebSocket upgrade error:', err);
+      // Don't throw to allow graceful degradation
     },
     onMessage: (message, ws) => {
       try {
