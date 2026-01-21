@@ -305,32 +305,9 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       // Use format: wa_<phone_number> WITHOUT timestamp so messages from same number go to same conversation
       convId = `wa_${whatsappNumber}`;
       const title = `WhatsApp - ${messageData.pushName || whatsappNumber}`;
-      const now = Date.now();
 
-      // Create conversation info manually
-      const info = {
-        metadata: {
-          convId,
-          projectId,
-          title,
-          createdAt: now,
-          lastUpdatedAt: now,
-          totalMessages: 0,
-        },
-      };
-
-      // Save conversation files
-      const infoPath = `data/${projectId}/${convId}/info.json`;
-      const chatJsonlPath = `data/${projectId}/${convId}/chat.jsonl`;
-      const infoDir = `data/${projectId}/${convId}`;
-
-      // Create directory and save files
-      const fs = await import("fs/promises");
-      await fs.mkdir(infoDir, { recursive: true });
-      await fs.writeFile(infoPath, JSON.stringify(info, null, 2));
-      await fs.writeFile(chatJsonlPath, ""); // Create empty chat.jsonl
-
-      console.log("[WhatsApp] Created new conversation:", convId, "with title:", title);
+      console.log("[WhatsApp] Creating new conversation:", convId, "with title:", title);
+      // Note: Conversation will be created automatically when ChatHistoryStorage.saveChatHistory() is called
     }
 
     // Prepare message content based on type
