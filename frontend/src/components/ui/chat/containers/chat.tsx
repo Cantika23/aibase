@@ -55,6 +55,9 @@ export function Chat({
 }: ChatProps) {
   const isEmpty = messages.length === 0;
 
+  // Dynamic grid rows: auto-auto when empty (content size), 1fr-auto when has messages (expandable)
+  const gridRows = isEmpty ? "grid-rows-[auto_auto]" : "grid-rows-[1fr_auto]";
+
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
@@ -195,12 +198,12 @@ export function Chat({
   });
 
   return (
-    <ChatContainer className={className}>
+    <ChatContainer className={className} gridRows={gridRows}>
       {/* Global tool dialogs - single instance for entire chat */}
       <GlobalToolDialogs toolInvocations={allToolInvocations} />
 
       {isEmpty ? (
-        <div className="flex items-center justify-center min-h-0 md:flex-1">
+        <div className="flex items-center justify-center min-h-0">
           {isHistoryLoading ? (
             <div className="flex flex-col items-center gap-2">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -290,12 +293,12 @@ export function ChatMessages({
 
 export const ChatContainer = forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & { gridRows?: string }
+>(({ className, gridRows = "grid-rows-[1fr_auto]", ...props }, ref) => {
   return (
     <div
       ref={ref}
-      className={cn("grid max-h-full w-full grid-rows-[1fr_auto]", className)}
+      className={cn("grid max-h-full w-full", gridRows)}
       {...props}
     />
   );
