@@ -461,6 +461,23 @@ func envToSlice(envMap map[string]string) []string {
 
 // buildAimeow builds the aimeow WhatsApp service binary
 func buildAimeow(projectRoot string) (string, error) {
+	// Skip build if flag is set (for Docker where binary is pre-built)
+	if os.Getenv("SKIP_AIMEOW_BUILD") == "1" {
+		fmt.Println("  Skipping aimeow build (SKIP_AIMEOW_BUILD=1)")
+		aimeowDir := filepath.Join(projectRoot, "bins", "aimeow")
+		// Try platform-specific binaries first
+		platformBinary := "aimeow." + runtime.GOOS
+		if runtime.GOOS == "windows" {
+			platformBinary = "aimeow.exe"
+		}
+		// Check if platform binary exists
+		if _, err := os.Stat(filepath.Join(aimeowDir, platformBinary)); err == nil {
+			return filepath.Join(aimeowDir, platformBinary), nil
+		}
+		// Fall back to default binary name
+		return filepath.Join(aimeowDir, "aimeow"), nil
+	}
+
 	aimeowDir := filepath.Join(projectRoot, "bins", "aimeow")
 
 	// On Windows, Go automatically adds .exe extension, so we need to account for that

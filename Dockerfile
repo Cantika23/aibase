@@ -67,8 +67,9 @@ RUN mkdir -p /app/data
 # This includes: todos, memory, uploaded files, and conversation data
 VOLUME ["/app/data"]
 
-# Skip frontend dependency install (dist is pre-built in Docker)
+# Skip frontend dependency install and aimeow build (both are pre-built in Docker)
 ENV SKIP_FRONTEND_INSTALL=1
+ENV SKIP_AIMEOW_BUILD=1
 
 # Start all services via start.linux (which runs backend, Qdrant, and aimeow)
 CMD ["./start.linux"]
