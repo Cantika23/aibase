@@ -18,7 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
 	"github.com/google/uuid"
-	_ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/mdp/qrterminal/v3"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -2591,7 +2591,7 @@ func main() {
 	}
 
 	fmt.Printf("Initializing database container at: %s\n", dbPath)
-	container, err := sqlstore.New(ctx, "sqlite", fmt.Sprintf("file:%s", dbPath), dbLog)
+	container, err := sqlstore.New(ctx, "sqlite3", fmt.Sprintf("file:%s?_foreign_keys=on", dbPath), dbLog)
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database container: %w", err))
 	}
