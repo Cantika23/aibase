@@ -118,7 +118,7 @@ async function handleMessage(ws: any, message: string | Buffer) {
 
           // Fetch and send current WhatsApp client status
           try {
-            const WHATSAPP_API_URL = "http://localhost:7031/api/v1";
+            const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || "http://localhost:7031/api/v1";
             const response = await fetch(`${WHATSAPP_API_URL}/clients`);
 
             if (response.ok) {

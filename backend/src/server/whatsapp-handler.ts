@@ -5,7 +5,7 @@
 
 import { ProjectStorage } from "../storage/project-storage";
 
-const WHATSAPP_API_URL = "http://localhost:7031/api/v1";
+const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || "http://localhost:7031/api/v1";
 
 // Import notification functions for WebSocket broadcasts
 let notifyWhatsAppStatus: (projectId: string, status: any) => void = () => {};
@@ -556,7 +556,7 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
         // Client successfully connected to WhatsApp
         // Fetch phone number from aimeow API
         try {
-          const WHATSAPP_API_URL = "http://localhost:7031/api/v1";
+          const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || "http://localhost:7031/api/v1";
           const response = await fetch(`${WHATSAPP_API_URL}/clients`);
 
           if (response.ok) {
