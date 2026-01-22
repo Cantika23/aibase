@@ -170,8 +170,8 @@ describe('FileTool', () => {
         // Some may throw other errors (missing parameters, file not found, etc.)
         try {
           await fileTool.execute({ action: action as any });
-        } catch (error) {
-          expect(error).not.toContain(`Unknown action: ${action}`);
+        } catch (error: any) {
+          expect(error.message).not.toContain(`Unknown action: ${action}`);
         }
       }
     });

@@ -7,8 +7,8 @@ export default defineConfig({
     globals: true,
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', '.git'],
-    testTimeout: 30000, // 30 seconds for database and file operations
-    hookTimeout: 30000,
+    testTimeout: 60000, // 60 seconds for database and AI operations
+    hookTimeout: 60000,
     teardownTimeout: 10000,
     coverage: {
       provider: 'v8',

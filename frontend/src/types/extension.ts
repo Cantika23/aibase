@@ -8,6 +8,7 @@ export interface ExtensionMetadata {
   description: string;
   author?: string;
   version: string;
+  category: string;
   enabled: boolean;
   isDefault: boolean;
   createdAt: number;
