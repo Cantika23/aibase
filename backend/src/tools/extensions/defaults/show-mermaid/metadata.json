@@ -1,0 +1,12 @@
+{
+  "id": "show-mermaid",
+  "name": "Show Mermaid",
+  "description": "Display Mermaid diagrams (flowcharts, sequence diagrams, etc.)",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "category": "Visualization Tools",
+  "enabled": false,
+  "isDefault": false,
+  "createdAt": 0,
+  "updatedAt": 0
+}

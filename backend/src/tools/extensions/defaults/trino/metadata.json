@@ -1,0 +1,12 @@
+{
+  "id": "trino",
+  "name": "Trino Query",
+  "description": "Execute distributed SQL queries via Trino",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "category": "Database Tools",
+  "enabled": false,
+  "isDefault": false,
+  "createdAt": 0,
+  "updatedAt": 0
+}

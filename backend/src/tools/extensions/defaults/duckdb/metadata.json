@@ -1,7 +1,7 @@
 {
-  "id": "database-tools",
-  "name": "Database Tools",
-  "description": "Helper utilities for database operations (CSV queries, Excel reading)",
+  "id": "duckdb",
+  "name": "DuckDB Query",
+  "description": "Query CSV, Excel, Parquet, and JSON files using SQL via DuckDB",
   "author": "AIBase",
   "version": "1.0.0",
   "category": "Database Tools",

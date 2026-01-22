@@ -4,6 +4,7 @@
   "description": "Utilities for data processing, transformation, and analysis",
   "author": "AIBase",
   "version": "1.0.0",
+  "category": "Data Tools",
   "enabled": true,
   "isDefault": true,
   "createdAt": 0,

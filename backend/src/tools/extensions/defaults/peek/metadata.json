@@ -1,0 +1,12 @@
+{
+  "id": "peek",
+  "name": "Peek Output",
+  "description": "Paginated access to large stored outputs",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "category": "Utility Tools",
+  "enabled": true,
+  "isDefault": true,
+  "createdAt": 0,
+  "updatedAt": 0
+}
