@@ -1,16 +1,6 @@
 import type { Tool } from "../../llm/conversation";
-import { createDuckDBFunction } from "./duckdb";
-import { createPostgreSQLFunction } from "./postgresql";
-import { createClickHouseFunction } from "./clickhouse";
-import { createTrinoFunction } from "./trino";
-import { createPDFReaderFunction } from "./pdfreader";
-import { createWebSearchFunction, createImageSearchFunction } from "./web-search";
-import { createShowChartFunction } from "./show-chart";
-import { createShowTableFunction } from "./show-table";
-import { createShowMermaidFunction } from "./show-mermaid";
-import { createConvertDocumentFunction } from "./convert-document";
-import { peek, peekInfo } from "./peek-output";
 import { getConversationFilesDir } from "../../config/paths";
+import { peek, peekInfo } from "./peek-output";
 
 /**
  * Context documentation for core script runtime functionality
@@ -202,39 +192,6 @@ export class ScriptRuntime {
 
       // Inject memory object with read function
       memory: this.createMemoryObject(),
-
-      // Inject DuckDB query function
-      duckdb: this.createDuckDBFunction(),
-
-      // Inject PostgreSQL query function
-      postgresql: this.createPostgreSQLFunction(),
-
-      // Inject ClickHouse query function
-      clickhouse: this.createClickHouseFunction(),
-
-      // Inject Trino query function
-      trino: this.createTrinoFunction(),
-
-      // Inject PDF reader function
-      pdfReader: this.createPDFReaderFunction(),
-
-      // Inject web search function
-      webSearch: this.createWebSearchFunction(),
-
-      // Inject image search function
-      imageSearch: this.createImageSearchFunction(),
-
-      // Inject showChart function with visualization collection
-      showChart: this.createShowChartFunctionWithCollection(this.collectedVisualizations),
-
-      // Inject showTable function with visualization collection
-      showTable: this.createShowTableFunctionWithCollection(this.collectedVisualizations),
-
-      // Inject showMermaid function with visualization collection
-      showMermaid: this.createShowMermaidFunctionWithCollection(this.collectedVisualizations),
-
-      // Inject convertDocument function
-      convertDocument: this.createConvertDocumentFunction(),
 
       // Inject peek function for accessing stored large outputs
       peek: peek,
