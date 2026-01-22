@@ -10,7 +10,7 @@ import { createLogger } from "../utils/logger";
 import { AuthService } from "../services/auth-service";
 import { TenantStorage } from "../storage/tenant-storage";
 import { UserStorage } from "../storage/user-storage";
-import { PATHS } from "../config/paths";
+import { PATHS, ensureDirectories } from "../config/paths";
 
 const authService = AuthService.getInstance();
 const tenantStorage = TenantStorage.getInstance();
@@ -192,6 +192,8 @@ export async function handleUpdateSetup(req: Request): Promise<Response> {
     // Handle logo upload
     if (logo) {
       const logoPath = PATHS.LOGO;
+      // Ensure assets directory exists
+      await ensureDirectories();
       const buffer = await logo.arrayBuffer();
       await writeFile(logoPath, Buffer.from(buffer));
       setup.logoPath = logoPath;
@@ -207,6 +209,8 @@ export async function handleUpdateSetup(req: Request): Promise<Response> {
     // Actually, `var favicon` in the `if` block is function scoped.
     if (typeof favicon !== 'undefined' && favicon) {
       const faviconPath = PATHS.FAVICON;
+      // Ensure assets directory exists
+      await ensureDirectories();
       const buffer = await favicon.arrayBuffer();
       await writeFile(faviconPath, Buffer.from(buffer));
       setup.faviconPath = faviconPath;
@@ -230,7 +234,8 @@ export async function handleUpdateSetup(req: Request): Promise<Response> {
     });
   } catch (error) {
     logger.error({ error }, "Error updating setup");
-    return Response.json({ success: false, error: "Internal server error" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return Response.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
 
