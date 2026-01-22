@@ -14,6 +14,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useProjectStore } from "@/stores/project-store";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -70,6 +80,13 @@ export function ExtensionsSettings() {
     name: "",
     description: "",
   });
+
+  // Confirmation dialogs state
+  const [deleteCategoryDialog, setDeleteCategoryDialog] = useState<{
+    open: boolean;
+    categoryId: string;
+  }>({ open: false, categoryId: "" });
+  const [resetExtensionsDialog, setResetExtensionsDialog] = useState(false);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -205,14 +222,12 @@ export function ExtensionsSettings() {
   // Handle reset to defaults
   const handleResetToDefaults = async () => {
     if (!currentProject) return;
+    // Open confirmation dialog instead of browser confirm
+    setResetExtensionsDialog(true);
+  };
 
-    if (
-      !confirm(
-        "Are you sure you want to reset all extensions to defaults? This will delete all custom extensions."
-      )
-    ) {
-      return;
-    }
+  const confirmResetExtensions = async () => {
+    if (!currentProject) return;
 
     try {
       const defaults = await resetExtensionsToDefaults(currentProject.id);
@@ -225,6 +240,8 @@ export function ExtensionsSettings() {
           ? error.message
           : "Failed to reset extensions"
       );
+    } finally {
+      setResetExtensionsDialog(false);
     }
   };
 
@@ -314,23 +331,23 @@ export function ExtensionsSettings() {
 
   const handleDeleteCategory = async (categoryId: string) => {
     if (!currentProject) return;
+    // Open confirmation dialog instead of browser confirm
+    setDeleteCategoryDialog({ open: true, categoryId });
+  };
 
-    if (
-      !confirm(
-        "Are you sure you want to delete this category? Extensions in this category will become uncategorized."
-      )
-    ) {
-      return;
-    }
+  const confirmDeleteCategory = async () => {
+    if (!currentProject || !deleteCategoryDialog.categoryId) return;
 
     try {
-      await deleteCategoryApi(currentProject.id, categoryId);
+      await deleteCategoryApi(currentProject.id, deleteCategoryDialog.categoryId);
       await loadData();
       toast.success("Category deleted");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete category"
       );
+    } finally {
+      setDeleteCategoryDialog({ open: false, categoryId: "" });
     }
   };
 
@@ -640,10 +657,7 @@ export function ExtensionsSettings() {
             {categoryEditMode && editingCategory && (
               <Button
                 variant="destructive"
-                onClick={() => {
-                  handleDeleteCategory(editingCategory.id);
-                  setCategoryDialogOpen(false);
-                }}
+                onClick={() => handleDeleteCategory(editingCategory.id)}
               >
                 Delete
               </Button>
@@ -657,6 +671,56 @@ export function ExtensionsSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Category Confirmation Dialog */}
+      <AlertDialog
+        open={deleteCategoryDialog.open}
+        onOpenChange={(open) =>
+          setDeleteCategoryDialog({ open, categoryId: deleteCategoryDialog.categoryId })
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this category? Extensions in this category will become uncategorized.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteCategory}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Extensions Confirmation Dialog */}
+      <AlertDialog
+        open={resetExtensionsDialog}
+        onOpenChange={setResetExtensionsDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Extensions to Defaults</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reset all extensions to defaults? This will delete all custom extensions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmResetExtensions}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
