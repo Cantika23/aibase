@@ -233,6 +233,10 @@ export class WebSocketServer {
    * Start the server
    */
   async start(): Promise<void> {
+    // Ensure all required directories exist
+    const { ensureDirectories } = await import("../config/paths");
+    await ensureDirectories();
+
     // Run migration for embed conversations (async, don't wait)
     migrateEmbedConversations().catch((error) => {
       console.error('[Server] Migration failed:', error);

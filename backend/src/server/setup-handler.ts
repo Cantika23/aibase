@@ -219,6 +219,9 @@ export async function handleUpdateSetup(req: Request): Promise<Response> {
 
     setup.updatedAt = Date.now();
 
+    // Ensure config directory exists before saving
+    await ensureDirectories();
+
     // Save setup
     await writeFile(SETUP_FILE, JSON.stringify(setup, null, 2));
 
