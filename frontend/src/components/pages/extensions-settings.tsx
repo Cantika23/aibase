@@ -14,16 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useProjectStore } from "@/stores/project-store";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -673,54 +663,52 @@ export function ExtensionsSettings() {
       </Dialog>
 
       {/* Delete Category Confirmation Dialog */}
-      <AlertDialog
+      <Dialog
         open={deleteCategoryDialog.open}
         onOpenChange={(open: boolean) =>
           setDeleteCategoryDialog({ open, categoryId: deleteCategoryDialog.categoryId })
         }
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Category</AlertDialogTitle>
-            <AlertDialogDescription>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Category</DialogTitle>
+            <DialogDescription className="text-left">
               Are you sure you want to delete this category? Extensions in this category will become uncategorized.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteCategory}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCategoryDialog({ open: false, categoryId: "" })}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteCategory}>
               Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reset Extensions Confirmation Dialog */}
-      <AlertDialog
+      <Dialog
         open={resetExtensionsDialog}
         onOpenChange={setResetExtensionsDialog}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset Extensions to Defaults</AlertDialogTitle>
-            <AlertDialogDescription>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset Extensions to Defaults</DialogTitle>
+            <DialogDescription className="text-left">
               Are you sure you want to reset all extensions to defaults? This will delete all custom extensions.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmResetExtensions}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetExtensionsDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmResetExtensions}>
               Reset
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
