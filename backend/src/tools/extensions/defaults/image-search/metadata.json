@@ -4,7 +4,7 @@
   "description": "Search for images using Brave Search API",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "Web Tools",
+  "category": "web-tools",
   "enabled": false,
   "isDefault": false,
   "createdAt": 0,

@@ -4,7 +4,7 @@
   "description": "Extract text from PDF files with support for password-protected documents",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "Document Tools",
+  "category": "document-tools",
   "enabled": false,
   "isDefault": false,
   "createdAt": 0,

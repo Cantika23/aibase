@@ -392,7 +392,7 @@ export function ExtensionsSettings() {
             onClick={handleAICreator}
           >
             <Wand2 className="w-4 h-4 mr-2" />
-            AI Creator
+            New Extension
           </Button>
         </div>
       </div>

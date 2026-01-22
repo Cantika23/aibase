@@ -4,7 +4,7 @@
   "description": "Query CSV, Excel, Parquet, and JSON files using SQL via DuckDB",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "Database Tools",
+  "category": "database-tools",
   "enabled": true,
   "isDefault": true,
   "createdAt": 0,

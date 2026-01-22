@@ -4,7 +4,7 @@
   "description": "Display Mermaid diagrams (flowcharts, sequence diagrams, etc.)",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "Visualization Tools",
+  "category": "visualization-tools",
   "enabled": false,
   "isDefault": false,
   "createdAt": 0,

@@ -4,7 +4,7 @@
   "description": "Paginated access to large stored outputs",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "Utility Tools",
+  "category": "utility-tools",
   "enabled": true,
   "isDefault": true,
   "createdAt": 0,

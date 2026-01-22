@@ -4,7 +4,7 @@
   "description": "Utilities for web operations, API calls, and data fetching",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "Web Tools",
+  "category": "web-tools",
   "enabled": true,
   "isDefault": true,
   "createdAt": 0,
