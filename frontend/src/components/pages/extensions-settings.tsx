@@ -34,7 +34,6 @@ import type { Extension } from "@/types/extension";
 import type { Category } from "@/types/category";
 import {
   Trash2,
-  Edit,
   Plus,
   PowerIcon,
   RefreshCw,
@@ -232,22 +231,10 @@ export function ExtensionsSettings() {
     }
   };
 
-  // Handle create new extension
-  const handleCreate = () => {
-    if (!currentProject) return;
-    navigate(`/projects/${currentProject.id}/extensions/new`);
-  };
-
   // Handle AI extension creator
   const handleAICreator = () => {
     if (!currentProject) return;
     navigate(`/projects/${currentProject.id}/extensions/ai-create`);
-  };
-
-  // Handle edit extension
-  const handleEdit = (extensionId: string) => {
-    if (!currentProject) return;
-    navigate(`/projects/${currentProject.id}/extensions/${extensionId}`);
   };
 
   // Toggle category expanded state
@@ -414,10 +401,6 @@ export function ExtensionsSettings() {
             <Wand2 className="w-4 h-4 mr-2" />
             AI Creator
           </Button>
-          <Button size="sm" onClick={handleCreate}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Extension
-          </Button>
         </div>
       </div>
 
@@ -575,14 +558,6 @@ export function ExtensionsSettings() {
                                       : "text-muted-foreground"
                                   }`}
                                 />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(extension.metadata.id)}
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"

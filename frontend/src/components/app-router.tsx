@@ -11,7 +11,7 @@ import { AdminSetupPage } from "./pages/admin-setup";
 import { EmbedChatPage } from "./pages/embed-chat";
 import { EmbedSettings } from "./pages/embed-settings";
 import { ExtensionsSettings } from "./pages/extensions-settings";
-import { ExtensionEditor } from "./pages/extension-editor";
+import { ExtensionAICreator } from "./pages/extension-ai-creator";
 import { WhatsAppSettings } from "./pages/whatsapp-settings";
 import { ProjectRouteHandler } from "./project/project-route-handler";
 import { ProtectedRoute } from "./auth/protected-route";
@@ -209,11 +209,11 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
             }
           />
           <Route
-            path="/projects/:projectId/extensions/:extensionId"
+            path="/projects/:projectId/extensions/ai-create"
             element={
               <ProtectedRoute>
                 <ProjectRouteHandler>
-                  <ExtensionEditor />
+                  <ExtensionAICreator />
                 </ProjectRouteHandler>
               </ProtectedRoute>
             }
