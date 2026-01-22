@@ -233,6 +233,10 @@ export class WebSocketServer {
    * Start the server
    */
   async start(): Promise<void> {
+    // Ensure all required directories exist
+    const { ensureDirectories } = await import("../config/paths");
+    await ensureDirectories();
+
     // Run migration for embed conversations (async, don't wait)
     migrateEmbedConversations().catch((error) => {
       console.error('[Server] Migration failed:', error);
@@ -490,61 +494,66 @@ export class WebSocketServer {
           return handleToggleExtension(req, projectId, extensionId);
         }
 
-        // WhatsApp WebSocket endpoint for real-time status updates
-        if (pathname === "/api/whatsapp/ws") {
-          const wsModule = await import("./whatsapp-ws");
-          // Initialize notification functions so whatsapp-handler can use them
-          initWhatsAppNotifications(wsModule.notifyWhatsAppStatus, wsModule.notifyWhatsAppQRCode);
+        // WhatsApp endpoints (only enabled if AIMEOW=true)
+        const aimeowEnabled = process.env.AIMEOW === "true";
 
-          // Register WhatsApp handlers with the WebSocket server
-          this.wsServer.registerWhatsAppHandlers(wsModule.getWhatsAppWebSocketHandlers());
+        if (aimeowEnabled) {
+          // WhatsApp WebSocket endpoint for real-time status updates
+          if (pathname === "/api/whatsapp/ws") {
+            const wsModule = await import("./whatsapp-ws");
+            // Initialize notification functions so whatsapp-handler can use them
+            initWhatsAppNotifications(wsModule.notifyWhatsAppStatus, wsModule.notifyWhatsAppQRCode);
 
-          // Upgrade to WebSocket with WhatsApp flag
-          const upgraded = server.upgrade(req, {
-            data: { isWhatsAppWS: true }
-          });
+            // Register WhatsApp handlers with the WebSocket server
+            this.wsServer.registerWhatsAppHandlers(wsModule.getWhatsAppWebSocketHandlers());
 
-          if (upgraded) {
-            return undefined; // WebSocket connection established
+            // Upgrade to WebSocket with WhatsApp flag
+            const upgraded = server.upgrade(req, {
+              data: { isWhatsAppWS: true }
+            });
+
+            if (upgraded) {
+              return undefined; // WebSocket connection established
+            }
+            return new Response("WhatsApp WebSocket upgrade failed", { status: 400 });
           }
-          return new Response("WhatsApp WebSocket upgrade failed", { status: 400 });
-        }
 
-        // WhatsApp API endpoints
-        if (pathname === "/api/whatsapp/client" && req.method === "GET") {
-          return handleGetWhatsAppClient(req);
-        }
+          // WhatsApp API endpoints
+          if (pathname === "/api/whatsapp/client" && req.method === "GET") {
+            return handleGetWhatsAppClient(req);
+          }
 
-        if (pathname === "/api/whatsapp/client" && req.method === "POST") {
-          return handleCreateWhatsAppClient(req);
-        }
+          if (pathname === "/api/whatsapp/client" && req.method === "POST") {
+            return handleCreateWhatsAppClient(req);
+          }
 
-        if (pathname === "/api/whatsapp/client" && req.method === "DELETE") {
-          return handleDeleteWhatsAppClient(req);
-        }
+          if (pathname === "/api/whatsapp/client" && req.method === "DELETE") {
+            return handleDeleteWhatsAppClient(req);
+          }
 
-        if (pathname === "/api/whatsapp/qr" && req.method === "GET") {
-          return handleGetWhatsAppQRCode(req);
-        }
+          if (pathname === "/api/whatsapp/qr" && req.method === "GET") {
+            return handleGetWhatsAppQRCode(req);
+          }
 
-        if (pathname === "/api/whatsapp/webhook" && req.method === "POST") {
-          return handleWhatsAppWebhook(req);
-        }
+          if (pathname === "/api/whatsapp/webhook" && req.method === "POST") {
+            return handleWhatsAppWebhook(req);
+          }
 
-        if (pathname === "/api/whatsapp/webhook/status" && req.method === "POST") {
-          return handleWhatsAppConnectionStatus(req);
-        }
+          if (pathname === "/api/whatsapp/webhook/status" && req.method === "POST") {
+            return handleWhatsAppConnectionStatus(req);
+          }
 
-        if (pathname === "/api/whatsapp/status" && req.method === "POST") {
-          return handleWhatsAppConnectionStatus(req);
-        }
+          if (pathname === "/api/whatsapp/status" && req.method === "POST") {
+            return handleWhatsAppConnectionStatus(req);
+          }
 
-        if (pathname === "/api/whatsapp/conversations" && req.method === "GET") {
-          return handleGetWhatsAppConversations(req);
-        }
+          if (pathname === "/api/whatsapp/conversations" && req.method === "GET") {
+            return handleGetWhatsAppConversations(req);
+          }
 
-        if (pathname === "/api/whatsapp/conversations/delete" && req.method === "DELETE") {
-          return handleDeleteWhatsAppConversation(req);
+          if (pathname === "/api/whatsapp/conversations/delete" && req.method === "DELETE") {
+            return handleDeleteWhatsAppConversation(req);
+          }
         }
 
         // Embed Authentication endpoint

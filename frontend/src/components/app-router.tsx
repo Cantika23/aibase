@@ -32,6 +32,7 @@ interface AppRouterProps {
 export function AppRouter({ wsUrl }: AppRouterProps) {
   const location = useLocation();
   const appName = import.meta.env.APP_NAME || "AI Base";
+  const aimeowEnabled = import.meta.env.VITE_AIMEOW === "true";
 
   const { currentProject } = useProjectStore();
   const { loadConversations } = useConversationStore();
@@ -175,16 +176,18 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/projects/:projectId/whatsapp"
-            element={
-              <ProtectedRoute>
-                <ProjectRouteHandler>
-                  <WhatsAppSettings />
-                </ProjectRouteHandler>
-              </ProtectedRoute>
-            }
-          />
+          {aimeowEnabled && (
+            <Route
+              path="/projects/:projectId/whatsapp"
+              element={
+                <ProtectedRoute>
+                  <ProjectRouteHandler>
+                    <WhatsAppSettings />
+                  </ProjectRouteHandler>
+                </ProtectedRoute>
+              }
+            />
+          )}
           <Route
             path="/projects/:projectId/embed"
             element={
