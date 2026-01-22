@@ -158,8 +158,9 @@ export function AdminSetupPage() {
 
       if (data.success) {
         // Filter users by tenant_id
+        // Use == for type coercion since tenant_id might be string or number from API
         const tenantUsers = data.users.filter((u: User) => {
-          return u.tenant_id === tenantId;
+          return u.tenant_id == tenantId;
         });
         setUsers(tenantUsers);
       } else {
