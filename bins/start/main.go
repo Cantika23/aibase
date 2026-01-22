@@ -16,11 +16,35 @@ import (
 const version = "1.0.0"
 
 func showProgress(step int, total int, description string) {
+	// Guard against invalid inputs
+	if total <= 0 {
+		total = 1
+	}
+	if step < 0 {
+		step = 0
+	}
+	if step > total {
+		step = total
+	}
+
 	percentage := (step * 100) / total
 	barWidth := 40
 	filled := (percentage * barWidth) / 100
 
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+	// Ensure filled and empty are within valid range
+	if filled < 0 {
+		filled = 0
+	}
+	if filled > barWidth {
+		filled = barWidth
+	}
+
+	empty := barWidth - filled
+	if empty < 0 {
+		empty = 0
+	}
+
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", empty)
 
 	// Clear line and print progress with cyan color (ANSI code: \033[36m)
 	fmt.Printf("\r\033[K\033[36m[%s] %d%% - %s\033[0m", bar, percentage, description)
