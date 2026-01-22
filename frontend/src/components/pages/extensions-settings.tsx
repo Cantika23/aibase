@@ -675,7 +675,7 @@ export function ExtensionsSettings() {
       {/* Delete Category Confirmation Dialog */}
       <AlertDialog
         open={deleteCategoryDialog.open}
-        onOpenChange={(open) =>
+        onOpenChange={(open: boolean) =>
           setDeleteCategoryDialog({ open, categoryId: deleteCategoryDialog.categoryId })
         }
       >
