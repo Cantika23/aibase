@@ -34,6 +34,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = currentUser?.role === "admin"
   const appName = import.meta.env.APP_NAME || "AI Base"
+  const aimeowEnabled = import.meta.env.VITE_AIMEOW === "true"
 
   // Generate the URL for the current project
   const getUrl = (path: string) => {
@@ -74,11 +75,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   ]
 
   const developer = [
-    {
+    ...(aimeowEnabled ? [{
       title: "WhatsApp",
       url: getUrl("whatsapp"),
       icon: MessageCircle,
-    },
+    }] : []),
     {
       title: "Embed",
       url: getUrl("embed"),
