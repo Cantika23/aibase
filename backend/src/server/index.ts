@@ -65,6 +65,8 @@ import {
   handleDeleteExtension,
   handleToggleExtension,
   handleResetExtensions,
+  handleGenerateExtension,
+  handlePreviewExtension,
 } from "./extensions-handler";
 import {
   handleGetConversations,
@@ -472,6 +474,17 @@ export class WebSocketServer {
         if (extensionResetMatch && req.method === "POST") {
           const projectId = extensionResetMatch[1];
           return handleResetExtensions(req, projectId);
+        }
+
+        const extensionGenerateMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/generate$/);
+        if (extensionGenerateMatch && req.method === "POST") {
+          const projectId = extensionGenerateMatch[1];
+          return handleGenerateExtension(req, projectId);
+        }
+
+        const extensionPreviewMatch = pathname.match(/^\/api\/extensions\/preview$/);
+        if (extensionPreviewMatch && req.method === "POST") {
+          return handlePreviewExtension(req);
         }
 
         const extensionIdMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/([^\/]+)$/);

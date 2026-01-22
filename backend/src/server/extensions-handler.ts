@@ -3,6 +3,10 @@ import { ExtensionLoader } from "../tools/extensions/extension-loader";
 import { authenticateRequest } from "./auth-handler";
 import { ProjectStorage } from "../storage/project-storage";
 import { createLogger } from "../utils/logger";
+import {
+  handleExtensionGeneratorRequest,
+  handleExtensionPreviewRequest,
+} from "./extension-generator-handler";
 
 const logger = createLogger("Extensions");
 const projectStorage = ProjectStorage.getInstance();
@@ -375,6 +379,69 @@ export async function handleResetExtensions(req: Request, projectId: string): Pr
       {
         success: false,
         error: error instanceof Error ? error.message : "Failed to reset extensions",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/projects/:projectId/extensions/generate - Generate extension using AI
+ */
+export async function handleGenerateExtension(req: Request, projectId: string): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has access to the project
+    if (auth.user.role !== 'root') {
+      const hasAccess = projectStorage.userHasAccess(projectId, auth.user.id, auth.user.tenant_id);
+      if (!hasAccess) {
+        return Response.json(
+          { success: false, error: "Access denied" },
+          { status: 403 }
+        );
+      }
+    }
+
+    return await handleExtensionGeneratorRequest(req, { projectId });
+  } catch (error) {
+    logger.error({ error }, "Error generating extension");
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to generate extension",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/extensions/preview - Preview extension without saving
+ */
+export async function handlePreviewExtension(req: Request): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    return await handleExtensionPreviewRequest(req);
+  } catch (error) {
+    logger.error({ error }, "Error previewing extension");
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to preview extension",
       },
       { status: 500 }
     );
