@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { Link } from "react-router-dom"
 
+import { getAppName, getLogoUrl } from "@/lib/setup"
 import { NavSection } from "@/components/nav-section"
 import {
   Sidebar,
@@ -35,10 +36,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const currentUser = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = currentUser?.role === "admin"
-  const appName = import.meta.env.APP_NAME || "AI Base"
+  const [appName, setAppName] = React.useState<string>("")
+  const [logoUrl, setLogoUrl] = React.useState<string | null>(null)
   const aimeowEnabled = import.meta.env.VITE_AIMEOW === "true"
 
   const { isMobile, setOpenMobile } = useSidebar()
+
+  React.useEffect(() => {
+    const loadConfig = async () => {
+      const [name, logo] = await Promise.all([getAppName(), getLogoUrl()])
+      setAppName(name)
+      setLogoUrl(logo)
+    }
+    loadConfig()
+  }, [])
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -109,19 +120,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar variant="inset" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="h-[60px]">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link to="/" onClick={handleLinkClick}>
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Command className="size-4" />
+              {appName && <Link to="/" onClick={handleLinkClick}>
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={appName} className="size-full object-cover" />
+                  ) : (
+                    <Command className="size-4" />
+                  )}
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{appName}</span>
                   <span className="truncate text-xs">{currentProject?.name || "Select Project"}</span>
                 </div>
-              </Link>
+              </Link>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

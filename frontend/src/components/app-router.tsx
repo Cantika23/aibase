@@ -24,6 +24,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { AppSidebar } from "./app-sidebar";
 import { UserAccountMenu } from "./user-account-menu";
 import { SidebarProvider, SidebarTrigger } from "./ui/sidebar";
+import { getAppName } from "@/lib/setup";
+import * as React from "react";
 
 interface AppRouterProps {
   wsUrl: string;
@@ -31,18 +33,24 @@ interface AppRouterProps {
 
 export function AppRouter({ wsUrl }: AppRouterProps) {
   const location = useLocation();
-  const appName = import.meta.env.APP_NAME || "AI Base";
+  const [appName, setAppName] = React.useState<string>("AI Base");
   const aimeowEnabled = import.meta.env.VITE_AIMEOW === "true";
 
   const { currentProject } = useProjectStore();
   const { loadConversations } = useConversationStore();
   const { user, logout, needsSetup, checkSetup, setupChecked } = useAuthStore();
 
-  // Check setup status on mount
+  // Check setup status and load app name on mount
   useEffect(() => {
     if (!setupChecked) {
       checkSetup();
     }
+
+    const loadAppName = async () => {
+      const name = await getAppName();
+      setAppName(name);
+    };
+    loadAppName();
   }, [checkSetup, setupChecked]);
 
   // Load conversations when project changes
