@@ -6,7 +6,7 @@
 /**
  * Trino extension
  */
-export default {
+const trinoExtension = {
   /**
    * Query Trino database
    *
@@ -201,7 +201,7 @@ export default {
     password?: string;
   }): Promise<{ connected: boolean; version?: string; error?: string }> {
     try {
-      const result = await this.trino!({
+      const result = await trinoExtension.trino({
         query: "SELECT version()",
         serverUrl,
         catalog: options?.catalog,
@@ -222,3 +222,5 @@ export default {
     }
   },
 };
+
+export default trinoExtension;

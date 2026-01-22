@@ -6,7 +6,7 @@
 /**
  * ClickHouse extension
  */
-export default {
+const clickhouseExtension = {
   /**
    * Query ClickHouse database
    *
@@ -180,7 +180,7 @@ export default {
     password?: string;
   }): Promise<{ connected: boolean; version?: string; error?: string }> {
     try {
-      const result = await this.clickhouse!({
+      const result = await clickhouseExtension.clickhouse({
         query: "SELECT version()",
         serverUrl,
         database: options?.database,
@@ -200,3 +200,5 @@ export default {
     }
   },
 };
+
+export default clickhouseExtension;

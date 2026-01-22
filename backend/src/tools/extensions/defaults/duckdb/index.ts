@@ -36,7 +36,7 @@ export interface DuckDBResult {
 /**
  * DuckDB extension function
  */
-export default {
+const duckdbExtension = {
   /**
    * Query data files using DuckDB SQL
    *
@@ -153,7 +153,7 @@ export default {
    */
   readCSV: async (filePath: string, options?: { limit?: number }): Promise<DuckDBResult> => {
     const limit = options?.limit ? `LIMIT ${options.limit}` : "";
-    return this.duckdb({
+    return duckdbExtension.duckdb({
       query: `SELECT * FROM '${filePath}' ${limit}`.trim(),
       format: "json",
     });
@@ -198,9 +198,11 @@ export default {
     // Excel extension auto-loads, no need to install/load
     const query = `SELECT * FROM read_xlsx('${filePath}'${paramsStr}) ${limit}`.trim();
 
-    return this.duckdb!({
+    return duckdbExtension.duckdb({
       query,
       format: "json",
     });
   },
 };
+
+export default duckdbExtension;

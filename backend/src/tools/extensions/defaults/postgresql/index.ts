@@ -38,7 +38,7 @@ export interface PostgreSQLResult {
 /**
  * PostgreSQL extension
  */
-export default {
+const postgresqlExtension = {
   /**
    * Query PostgreSQL database
    *
@@ -149,7 +149,7 @@ export default {
    */
   testConnection: async (connectionUrl: string): Promise<{ connected: boolean; version?: string; error?: string }> => {
     try {
-      const result = await this.postgresql({
+      const result = await postgresqlExtension.postgresql({
         query: "SELECT version()",
         connectionUrl,
       });
@@ -184,9 +184,11 @@ export default {
 
     const query = `SELECT * FROM ${table} ${where} ${orderBy} ${limit}`.trim();
 
-    return this.postgresql!({
+    return postgresqlExtension.postgresql({
       query,
       connectionUrl,
     });
   },
 };
+
+export default postgresqlExtension;

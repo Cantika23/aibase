@@ -9,7 +9,7 @@ import * as path from "path";
 /**
  * PDF reader extension
  */
-export default {
+const pdfReaderExtension = {
   /**
    * Extract text from PDF
    *
@@ -74,7 +74,7 @@ export default {
    * Read PDF from file path
    */
   readPDF: async (filePath: string, options?: { password?: string; maxPages?: number }) => {
-    return this.pdfReader({
+    return pdfReaderExtension.pdfReader({
       filePath,
       password: options?.password,
       maxPages: options?.maxPages,
