@@ -4,6 +4,8 @@
  */
 
 import { ProjectStorage } from "../storage/project-storage";
+import { Conversation } from "../llm/conversation";
+import { ChatHistoryStorage } from "../storage/chat-history-storage";
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || "http://localhost:7031/api/v1";
 
@@ -428,12 +430,7 @@ async function processWhatsAppMessageWithAI(
   try {
     console.log("[WhatsApp] Starting AI processing for message:", messageText);
 
-    console.log("[WhatsApp] Loading Conversation module...");
-    // Load conversation and process message through AI
-    const { Conversation } = await import("../llm/conversation");
-    console.log("[WhatsApp] Loading ChatHistoryStorage module...");
-    const { ChatHistoryStorage } = await import("../storage/chat-history-storage");
-    console.log("[WhatsApp] Getting ChatHistoryStorage instance...");
+    // Get ChatHistoryStorage instance (singleton, already imported)
     const chatHistoryStorage = ChatHistoryStorage.getInstance();
 
     // Load existing conversation history
