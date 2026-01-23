@@ -227,6 +227,7 @@ export class ExtensionStorage {
       description: updates.description !== undefined ? updates.description : existing.metadata.description,
       author: updates.author !== undefined ? updates.author : existing.metadata.author,
       version: updates.version !== undefined ? updates.version : existing.metadata.version,
+      category: updates.category !== undefined ? updates.category : existing.metadata.category,
       enabled: updates.enabled !== undefined ? updates.enabled : existing.metadata.enabled,
       updatedAt: now,
     };
