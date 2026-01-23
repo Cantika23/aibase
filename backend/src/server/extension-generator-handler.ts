@@ -107,13 +107,23 @@ export async function handleExtensionPreviewRequest(req: Request): Promise<Respo
       category: category || 'Uncategorized',
     });
 
+    // Add timestamp fields that frontend expects
+    const now = Date.now();
+    const preview = {
+      metadata: {
+        ...extension.metadata,
+        enabled: false,
+        isDefault: false,
+        createdAt: now,
+        updatedAt: now,
+      },
+      code: extension.code,
+    };
+
     return Response.json({
       success: true,
       data: {
-        preview: {
-          metadata: extension.metadata,
-          code: extension.code,
-        }
+        preview
       }
     });
 

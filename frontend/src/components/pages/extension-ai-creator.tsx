@@ -76,7 +76,7 @@ export function ExtensionAICreator() {
       }
 
       const data = await response.json();
-      setGeneratedExtension(data.data.extension);
+      setGeneratedExtension(data.data.preview);
       toast.success("Extension generated successfully!");
     } catch (error) {
       console.error("Failed to generate extension:", error);
