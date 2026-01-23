@@ -64,57 +64,16 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: (id) => {
             if (id.includes("node_modules")) {
-              // 1. Core Visualizations & Large Libraries
-              // Group large, specialized libraries into their own chunks.
-              // We include their React adapters in the same chunk to avoid cross-chunk initializers.
-
+              // 1. Core UI and Icons - Used across most pages
               if (
-                id.includes("node_modules/shiki/") ||
-                id.includes("node_modules/@shikijs/") ||
-                id.includes("node_modules/vscode-oniguruma/") ||
-                id.includes("node_modules/vscode-textmate/")
+                id.includes("node_modules/@radix-ui/") ||
+                id.includes("node_modules/lucide-react/") ||
+                id.includes("node_modules/framer-motion/")
               ) {
-                return "shiki-vendor";
-              }
-
-              if (
-                id.includes("node_modules/mermaid/") ||
-                id.includes("node_modules/khroma/") ||
-                id.includes("node_modules/stylis/") ||
-                id.includes("node_modules/dagre-d3-es/") ||
-                id.includes("node_modules/d3-")
-              ) {
-                return "mermaid-vendor";
-              }
-
-              if (
-                id.includes("node_modules/@codemirror/") ||
-                id.includes("node_modules/@uiw/") ||
-                id.includes("node_modules/@lezer/") ||
-                id.includes("node_modules/codemirror") ||
-                id.includes("node_modules/react-codemirror")
-              ) {
-                return "codemirror-vendor";
-              }
-
-              if (
-                id.includes("node_modules/echarts") ||
-                id.includes("node_modules/zrender/") ||
-                id.includes("node_modules/echarts-for-react")
-              ) {
-                return "charts-vendor";
-              }
-
-              if (id.includes("node_modules/framer-motion/")) {
-                return "framer-motion-vendor";
-              }
-
-              // 2. UI and Icons
-              if (id.includes("node_modules/@radix-ui/") || id.includes("node_modules/lucide-react/")) {
                 return "ui-vendor";
               }
 
-              // 3. Content Processing
+              // 2. Content Processing - Used in Chat and Editors
               if (
                 id.includes("node_modules/react-markdown/") ||
                 id.includes("node_modules/remark-") ||
@@ -127,13 +86,16 @@ export default defineConfig(({ mode }) => {
                 return "markdown-vendor";
               }
 
-              // 4. Misc Utils
+              // 3. Misc Utils
               if (id.includes("node_modules/html2canvas/") || id.includes("node_modules/qrcode/")) {
                 return "utils-vendor";
               }
 
-              // Everything else (React, Router, Zustand, etc.) goes to main vendor chunk
-              // This ensures higher stability for core libraries.
+              // Everything else (React, Router, Zustand, and specialized libs like ECharts/Mermaid/Shiki)
+              // Note: ECharts, Mermaid, and Shiki are already lazy-loaded in the source code via 
+              // dynamic imports (e.g., await import('shiki') or React.lazy()).
+              // Removing them from manualChunks lets Vite's default dynamic import logic 
+              // handle their bundling correctly, which avoids initialization order issues.
               return "vendor";
             }
           },
