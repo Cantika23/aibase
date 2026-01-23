@@ -26,6 +26,7 @@ export interface CreateExtensionData {
   description: string;
   author?: string;
   version?: string;
+  category?: string;
   code: string;
   enabled?: boolean;
 }
