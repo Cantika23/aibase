@@ -64,18 +64,10 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: (id) => {
             if (id.includes("node_modules")) {
-              // 1. Core React & Router - Ensure these are together and matched specifically
-              if (
-                id.includes("node_modules/react/") ||
-                id.includes("node_modules/react-dom/") ||
-                id.includes("node_modules/scheduler/") ||
-                id.includes("node_modules/react-router/") ||
-                id.includes("node_modules/react-router-dom/")
-              ) {
-                return "react-vendor";
-              }
+              // 1. Core Visualizations & Large Libraries
+              // Group large, specialized libraries into their own chunks.
+              // We include their React adapters in the same chunk to avoid cross-chunk initializers.
 
-              // 2. Large specialized vendors
               if (
                 id.includes("node_modules/shiki/") ||
                 id.includes("node_modules/@shikijs/") ||
@@ -99,12 +91,17 @@ export default defineConfig(({ mode }) => {
                 id.includes("node_modules/@codemirror/") ||
                 id.includes("node_modules/@uiw/") ||
                 id.includes("node_modules/@lezer/") ||
-                id.includes("node_modules/codemirror")
+                id.includes("node_modules/codemirror") ||
+                id.includes("node_modules/react-codemirror")
               ) {
                 return "codemirror-vendor";
               }
 
-              if (id.includes("node_modules/echarts/") || id.includes("node_modules/zrender/")) {
+              if (
+                id.includes("node_modules/echarts") ||
+                id.includes("node_modules/zrender/") ||
+                id.includes("node_modules/echarts-for-react")
+              ) {
                 return "charts-vendor";
               }
 
@@ -112,12 +109,12 @@ export default defineConfig(({ mode }) => {
                 return "framer-motion-vendor";
               }
 
-              // 3. UI and Icons
+              // 2. UI and Icons
               if (id.includes("node_modules/@radix-ui/") || id.includes("node_modules/lucide-react/")) {
                 return "ui-vendor";
               }
 
-              // 4. Content Processing
+              // 3. Content Processing
               if (
                 id.includes("node_modules/react-markdown/") ||
                 id.includes("node_modules/remark-") ||
@@ -130,12 +127,13 @@ export default defineConfig(({ mode }) => {
                 return "markdown-vendor";
               }
 
-              // 5. Misc Utils
+              // 4. Misc Utils
               if (id.includes("node_modules/html2canvas/") || id.includes("node_modules/qrcode/")) {
                 return "utils-vendor";
               }
 
-              // Everything else goes to catch-all vendor chunk
+              // Everything else (React, Router, Zustand, etc.) goes to main vendor chunk
+              // This ensures higher stability for core libraries.
               return "vendor";
             }
           },
