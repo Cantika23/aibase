@@ -585,7 +585,6 @@ export function ExtensionsSettings() {
                                 size="sm"
                                 onClick={() => handleDelete(extension.metadata.id)}
                                 title="Delete"
-                                disabled={extension.metadata.isDefault}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
