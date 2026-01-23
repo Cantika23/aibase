@@ -64,7 +64,8 @@ Each extension MUST have:
 - name: Display name (e.g., 'My Extension')
 - description: Clear description of what it does
 - version: Semantic version (e.g., '1.0.0')
-- category: Category for grouping (e.g., 'Data Tools', 'Database Tools', 'Web Tools', 'Utility Tools', or empty string '' for uncategorized)
+- category: Category for grouping (e.g., 'Data Tools', 'Database Tools', 'Web Tools', 'Utility Tools')
+  - IMPORTANT: If no specific category is needed, use empty string '' NOT the word "Uncategorized"
 
 ## Important Rules
 
@@ -287,6 +288,13 @@ Generate the complete extension code following the structure specified above.`;
     throw new Error('Invalid AI response: missing required fields (id, name, description, or code)');
   }
 
+  // Normalize category: convert 'Uncategorized' string to empty string
+  let normalizedCategory = parsed.category || category || '';
+  if (normalizedCategory === 'Uncategorized') {
+    normalizedCategory = '';
+    console.log('[ExtensionGenerator] Normalized category from "Uncategorized" to empty string');
+  }
+
   // Construct extension
   const extension: GeneratedExtension = {
     metadata: {
@@ -294,7 +302,7 @@ Generate the complete extension code following the structure specified above.`;
       name: parsed.name,
       description: parsed.description,
       version: parsed.version || '1.0.0',
-      category: parsed.category || category,
+      category: normalizedCategory,
       author: 'AI Generated',
     },
     code: parsed.code,
