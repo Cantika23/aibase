@@ -37,4 +37,5 @@ export interface UpdateExtensionData {
   version?: string;
   code?: string;
   enabled?: boolean;
+  category?: string;
 }

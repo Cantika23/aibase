@@ -22,6 +22,7 @@ import {
   getExtensions,
   toggleExtension,
   deleteExtension,
+  updateExtension,
   resetExtensionsToDefaults,
 } from "@/lib/api/extensions";
 import {
@@ -44,6 +45,7 @@ import {
   FolderOpen,
   Check,
   X,
+  ArrowUpDown,
 } from "lucide-react";
 
 interface CategoryGroup {
@@ -77,6 +79,21 @@ export function ExtensionsSettings() {
     categoryId: string;
   }>({ open: false, categoryId: "" });
   const [resetExtensionsDialog, setResetExtensionsDialog] = useState(false);
+
+  // Change category dialog state
+  const [changeCategoryDialog, setChangeCategoryDialog] = useState<{
+    open: boolean;
+    extensionId: string;
+    extensionName: string;
+    currentCategory: string;
+    newCategory: string;
+  }>({
+    open: false,
+    extensionId: "",
+    extensionName: "",
+    currentCategory: "",
+    newCategory: "",
+  });
 
   // Load data
   const loadData = useCallback(async () => {
@@ -258,6 +275,39 @@ export function ExtensionsSettings() {
   const handleAICreator = () => {
     if (!currentProject) return;
     navigate(`/projects/${currentProject.id}/extensions/ai-create`);
+  };
+
+  // Open change category dialog
+  const openChangeCategoryDialog = (extension: Extension) => {
+    setChangeCategoryDialog({
+      open: true,
+      extensionId: extension.metadata.id,
+      extensionName: extension.metadata.name,
+      currentCategory: extension.metadata.category || "",
+      newCategory: extension.metadata.category || "",
+    });
+  };
+
+  // Handle change category
+  const handleChangeCategory = async () => {
+    if (!currentProject || !changeCategoryDialog.extensionId) return;
+
+    try {
+      await updateExtension(
+        currentProject.id,
+        changeCategoryDialog.extensionId,
+        {
+          category: changeCategoryDialog.newCategory,
+        }
+      );
+      await loadData();
+      toast.success(`Moved '${changeCategoryDialog.extensionName}' to new category`);
+      setChangeCategoryDialog({ ...changeCategoryDialog, open: false });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to change category"
+      );
+    }
   };
 
   // Toggle category expanded state
@@ -583,6 +633,14 @@ export function ExtensionsSettings() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => openChangeCategoryDialog(extension)}
+                                title="Change category"
+                              >
+                                <ArrowUpDown className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleDelete(extension.metadata.id)}
                                 title="Delete"
                               >
@@ -725,6 +783,53 @@ export function ExtensionsSettings() {
             </Button>
             <Button variant="destructive" onClick={confirmResetExtensions}>
               Reset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Category Dialog */}
+      <Dialog
+        open={changeCategoryDialog.open}
+        onOpenChange={(open: boolean) => setChangeCategoryDialog({ ...changeCategoryDialog, open })}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Extension Category</DialogTitle>
+            <DialogDescription>
+              Move "{changeCategoryDialog.extensionName}" to a different category
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Label htmlFor="category-select">Select Category</Label>
+            <select
+              id="category-select"
+              className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={changeCategoryDialog.newCategory}
+              onChange={(e) => setChangeCategoryDialog({ ...changeCategoryDialog, newCategory: e.target.value })}
+            >
+              <option value="">Uncategorized</option>
+              {categoryGroups.map((group) => (
+                <option key={group.category.id} value={group.category.id}>
+                  {group.category.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground mt-2">
+              Current category: {changeCategoryDialog.currentCategory || "Uncategorized"}
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setChangeCategoryDialog({ ...changeCategoryDialog, open: false })}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleChangeCategory}>
+              Move
             </Button>
           </DialogFooter>
         </DialogContent>

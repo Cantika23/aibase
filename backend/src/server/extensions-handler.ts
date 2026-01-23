@@ -202,7 +202,7 @@ export async function handleUpdateExtension(
     }
 
     const body = await req.json();
-    const { name, description, author, version, code, enabled } = body;
+    const { name, description, author, version, code, enabled, category } = body;
 
     const extension = await extensionStorage.update(projectId, extensionId, {
       name,
@@ -211,6 +211,7 @@ export async function handleUpdateExtension(
       version,
       code,
       enabled,
+      category,
     });
 
     if (!extension) {
