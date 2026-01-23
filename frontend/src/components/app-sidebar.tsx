@@ -107,6 +107,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: MessageCircle,
     }] : []),
     {
+      title: "API",
+      url: getUrl("api"),
+      icon: Terminal,
+    },
+    {
       title: "Embed",
       url: getUrl("embed"),
       icon: Terminal,

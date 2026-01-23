@@ -21,6 +21,7 @@ const EmbedSettings = lazy(() => import("./pages/embed-settings").then(module =>
 const ExtensionsSettings = lazy(() => import("./pages/extensions-settings").then(module => ({ default: module.ExtensionsSettings })));
 const ExtensionEditor = lazy(() => import("./pages/extension-editor").then(module => ({ default: module.ExtensionEditor })));
 const WhatsAppSettings = lazy(() => import("./pages/whatsapp-settings").then(module => ({ default: module.WhatsAppSettings })));
+const DeveloperAPIPage = lazy(() => import("./pages/developer-api").then(module => ({ default: module.DeveloperAPIPage })));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -210,6 +211,16 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
                     }
                   />
                 )}
+                <Route
+                  path="/projects/:projectId/api"
+                  element={
+                    <ProtectedRoute>
+                      <ProjectRouteHandler>
+                        <DeveloperAPIPage />
+                      </ProjectRouteHandler>
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/projects/:projectId/embed"
                   element={
