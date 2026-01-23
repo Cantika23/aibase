@@ -338,4 +338,23 @@ export class ExtensionStorage {
 
     return grouped;
   }
+
+  /**
+   * Remove category from all extensions in a specific category
+   * Used when a category is deleted
+   */
+  async uncategorizeByCategory(projectId: string, categoryId: string): Promise<void> {
+    const extensions = await this.getByCategory(projectId, categoryId);
+
+    for (const ext of extensions) {
+      try {
+        await this.update(projectId, ext.metadata.id, {
+          category: "",
+        });
+        console.log(`[ExtensionStorage] Uncategorized extension '${ext.metadata.id}' from deleted category '${categoryId}'`);
+      } catch (error) {
+        console.error(`[ExtensionStorage] Failed to uncategorize extension '${ext.metadata.id}':`, error);
+      }
+    }
+  }
 }

@@ -98,6 +98,25 @@ export function ExtensionsSettings() {
         ),
         expanded: true, // Default expanded
       }));
+
+      // Add uncategorized extensions group (extensions with empty/undefined category)
+      const uncategorizedExtensions = extData.filter(
+        (ext) => !ext.metadata.category || ext.metadata.category === ""
+      );
+      if (uncategorizedExtensions.length > 0) {
+        groups.push({
+          category: {
+            id: "",
+            name: "Uncategorized",
+            description: "Extensions without a category",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          extensions: uncategorizedExtensions,
+          expanded: true,
+        });
+      }
+
       setCategoryGroups(groups);
     } catch (error) {
       console.error("Failed to load data:", error);

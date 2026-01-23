@@ -1,11 +1,13 @@
 import { CategoryStorage } from "../storage/category-storage";
 import { authenticateRequest } from "./auth-handler";
 import { ProjectStorage } from "../storage/project-storage";
+import { ExtensionStorage } from "../storage/extension-storage";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("Categories");
 const projectStorage = ProjectStorage.getInstance();
 const categoryStorage = new CategoryStorage();
+const extensionStorage = new ExtensionStorage();
 
 /**
  * Handle GET /api/projects/:projectId/categories - Get all categories
@@ -257,6 +259,9 @@ export async function handleDeleteCategory(
         { status: 404 }
       );
     }
+
+    // Uncategorized all extensions that were in this category
+    await extensionStorage.uncategorizeByCategory(projectId, categoryId);
 
     return Response.json({
       success: true,
