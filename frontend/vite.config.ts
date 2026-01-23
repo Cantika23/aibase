@@ -91,12 +91,12 @@ export default defineConfig(({ mode }) => {
                 return "utils-vendor";
               }
 
-              // Everything else (React, Router, Zustand, and specialized libs like ECharts/Mermaid/Shiki)
-              // Note: ECharts, Mermaid, and Shiki are already lazy-loaded in the source code via 
-              // dynamic imports (e.g., await import('shiki') or React.lazy()).
-              // Removing them from manualChunks lets Vite's default dynamic import logic 
-              // handle their bundling correctly, which avoids initialization order issues.
-              return "vendor";
+              // 4. Everything else (React, Router, Zustand, etc.)
+              // We return undefined for these to let Vite/Rollup handle them with default logic.
+              // This is critical for libraries that are lazy-loaded via dynamic imports (Shiki, Mermaid, ECharts).
+              // If we force them into "vendor", they get loaded on initial page load, which is slow 
+              // and can cause initialization errors like "this.clear is not a function".
+              return undefined;
             }
           },
         },
