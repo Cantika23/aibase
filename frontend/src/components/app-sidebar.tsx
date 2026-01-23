@@ -166,9 +166,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Workspace - project data/content */}
         <NavSection title="Workspace" items={workspace} />
         {/* Management - setup and governance */}
-        {management.length > 0 && <NavSection title="Management" items={management} />}
+        {isAdmin && management.length > 0 && <NavSection title="Management" items={management} />}
         {/* Developer - integration/dev tools */}
-        <NavSection title="Developer" items={developer} />
+        {isAdmin && <NavSection title="Developer" items={developer} />}
       </SidebarContent>
       {/* User account menu at bottom of sidebar */}
       {currentUser && (

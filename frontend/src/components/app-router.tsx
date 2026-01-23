@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from "react-router-dom";
 import { ProjectRouteHandler } from "./project/project-route-handler";
 import { ProtectedRoute } from "./auth/protected-route";
+import { AdminRoute } from "./auth/admin-route";
 import { Toaster } from "./ui/sonner";
 import { SetupRequired } from "./setup-required";
 import { useEffect, Suspense, lazy } from "react";
@@ -140,9 +141,9 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
                 <Route
                   path="/admin/users"
                   element={
-                    <ProtectedRoute>
+                    <AdminRoute>
                       <UserManagementPage />
-                    </ProtectedRoute>
+                    </AdminRoute>
                   }
                 />
                 <Route
@@ -202,52 +203,52 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
                   <Route
                     path="/projects/:projectId/whatsapp"
                     element={
-                      <ProtectedRoute>
+                      <AdminRoute>
                         <ProjectRouteHandler>
                           <WhatsAppSettings />
                         </ProjectRouteHandler>
-                      </ProtectedRoute>
+                      </AdminRoute>
                     }
                   />
                 )}
                 <Route
                   path="/projects/:projectId/api"
                   element={
-                    <ProtectedRoute>
+                    <AdminRoute>
                       <ProjectRouteHandler>
                         <DeveloperAPIPage />
                       </ProjectRouteHandler>
-                    </ProtectedRoute>
+                    </AdminRoute>
                   }
                 />
                 <Route
                   path="/projects/:projectId/embed"
                   element={
-                    <ProtectedRoute>
+                    <AdminRoute>
                       <ProjectRouteHandler>
                         <EmbedSettings />
                       </ProjectRouteHandler>
-                    </ProtectedRoute>
+                    </AdminRoute>
                   }
                 />
                 <Route
                   path="/projects/:projectId/extensions"
                   element={
-                    <ProtectedRoute>
+                    <AdminRoute>
                       <ProjectRouteHandler>
                         <ExtensionsSettings />
                       </ProjectRouteHandler>
-                    </ProtectedRoute>
+                    </AdminRoute>
                   }
                 />
                 <Route
                   path="/projects/:projectId/extensions/:extensionId"
                   element={
-                    <ProtectedRoute>
+                    <AdminRoute>
                       <ProjectRouteHandler>
                         <ExtensionEditor />
                       </ProjectRouteHandler>
-                    </ProtectedRoute>
+                    </AdminRoute>
                   }
                 />
                 {/* Catch-all route - redirect to root */}
