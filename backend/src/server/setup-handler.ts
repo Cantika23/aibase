@@ -291,6 +291,7 @@ export async function handleGetPublicSetup(req: Request): Promise<Response> {
         setup: {
           appName: null,
           hasLogo: false,
+          aimeowEnabled: process.env.AIMEOW === "true",
         },
       });
     }
