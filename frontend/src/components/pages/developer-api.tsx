@@ -22,11 +22,10 @@ import {
     Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { buildApiUrl } from "@/lib/base-path";
-
-const API_BASE_URL = buildApiUrl("");
 
 export function DeveloperAPIPage() {
+    const API_BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
+
     const [context, setContext] = useState("");
     const [prompt, setPrompt] = useState("");
     const [response, setResponse] = useState<any>(null);
@@ -130,7 +129,7 @@ console.log(data.response);`;
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2">
                                         <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold rounded">POST</span>
-                                        <code className="text-sm font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/api/llm/completion</code>
+                                        <code className="text-sm font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{API_BASE_URL}/api/llm/completion</code>
                                     </div>
 
                                     <div className="space-y-3">

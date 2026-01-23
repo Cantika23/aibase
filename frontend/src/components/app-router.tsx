@@ -34,7 +34,7 @@ import { useConversationStore } from "@/stores/conversation-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { AppSidebar } from "./app-sidebar";
 import { UserAccountMenu } from "./user-account-menu";
-import { SidebarProvider, SidebarTrigger } from "./ui/sidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "./ui/sidebar";
 import { getAppName, isWhatsAppEnabled } from "@/lib/setup";
 import * as React from "react";
 
@@ -95,11 +95,10 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
       {/* AppSidebar includes the sidebar-gap div that reserves space */}
       {/* Only show sidebar when inside a project */}
       {shouldShowSidebar && <AppSidebar />}
-      {/* Content area - the sidebar's gap div reserves the necessary space */}
-      <div className="flex flex-1 flex-col bg-background min-h-screen">
+      <SidebarInset className="flex flex-col bg-background min-h-screen">
         {/* Top header bar with user account - Show only when NOT inside a project */}
         {shouldShowTopAccountMenu && (
-          <div className="absolute cursor-pointer top-5 right-5">
+          <div className="absolute cursor-pointer top-5 right-5 z-20">
             <UserAccountMenu
               user={{
                 username: user.username,
@@ -111,14 +110,14 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
         )}
         {/* Sidebar Trigger for mobile - Show only when sidebar is visible */}
         {shouldShowSidebar && (
-          <header className="flex z-1 bg-white absolute top-0 left-0 right-0 items-center gap-2 border-b px-4 py-2 md:hidden">
+          <header className="flex z-20 bg-background/80 backdrop-blur-sm sticky top-0 left-0 right-0 items-center gap-2 border-b px-4 py-2 md:hidden h-[60px]">
             <SidebarTrigger />
-            <span className="font-semibold">{currentProject?.name || appName}</span>
+            <span className="font-semibold truncate">{currentProject?.name || appName}</span>
           </header>
         )}
 
         {/* Content Area */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden relative">
           {shouldShowSetupRequired ? (
             <SetupRequired />
           ) : (
@@ -260,7 +259,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
 
         {/* Toast Notifications */}
         <Toaster />
-      </div>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

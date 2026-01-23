@@ -33,11 +33,11 @@ import { useAuthStore } from "@/stores/auth-store"
 import { UserAccountMenu } from "@/components/user-account-menu"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { currentProject } = useProjectStore()
+  const { currentProject, initializeProject } = useProjectStore()
   const currentUser = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = currentUser?.role === "admin"
-  const [appName, setAppName] = React.useState<string>("")
+  const [appName, setAppName] = React.useState<string>("AI Base")
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null)
   const [aimeowEnabled, setAimeowEnabled] = React.useState<boolean>(false)
 
@@ -55,6 +55,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       setAimeowEnabled(whatsappEnabled)
     }
     loadConfig()
+
+    // Initialize project if none is selected
+    if (!currentProject) {
+      initializeProject()
+    }
   }, [])
 
   const handleLinkClick = () => {
@@ -138,7 +143,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              {appName && <Link to="/" onClick={handleLinkClick}>
+              <Link to="/" onClick={handleLinkClick}>
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
                   {logoUrl ? (
                     <img src={logoUrl} alt={appName} className="size-full object-cover" />
@@ -150,7 +155,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <span className="truncate font-medium">{appName}</span>
                   <span className="truncate text-xs">{currentProject?.name || "Select Project"}</span>
                 </div>
-              </Link>}
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
