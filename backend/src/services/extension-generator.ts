@@ -200,23 +200,20 @@ Generate the complete extension code following the structure specified above.`;
 
   // Strategy 2: Try to extract JSON from markdown code blocks with json tag
   if (!jsonStr) {
-    let jsonMatch = content.match(/```json\\s*([\\s\\S]*?)(?:```|$)/);
+    // Match from ```json to end, then remove opening ```json if present
+    let jsonMatch = content.match(/```json\s*([\s\S]*)$/);
     if (jsonMatch && jsonMatch[1]) {
-      jsonStr = jsonMatch[1].trim(); // Trim whitespace
-      console.log('[ExtensionGenerator] Found JSON in ```json block, length:', jsonStr.length);
-    } else {
-      console.log('[ExtensionGenerator] Strategy 2 (```json block): No match');
+      jsonStr = jsonMatch[1].trim();
+      console.log('[ExtensionGenerator] Found JSON in ```json block (no closing), length:', jsonStr.length);
     }
   }
 
   // Strategy 3: Try to extract JSON from markdown code blocks without json tag
   if (!jsonStr) {
-    let jsonMatch = content.match(/```\\s*([\\s\\S]*?)(?:```|$)/);
+    let jsonMatch = content.match(/```\s*([\s\S]*)$/);
     if (jsonMatch && jsonMatch[1]) {
-      jsonStr = jsonMatch[1].trim(); // Trim whitespace
-      console.log('[ExtensionGenerator] Found JSON in ``` block, length:', jsonStr.length);
-    } else {
-      console.log('[ExtensionGenerator] Strategy 3 (``` block): No match');
+      jsonStr = jsonMatch[1].trim();
+      console.log('[ExtensionGenerator] Found JSON in ``` block (no closing), length:', jsonStr.length);
     }
   }
 
