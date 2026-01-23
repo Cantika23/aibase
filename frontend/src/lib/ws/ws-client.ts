@@ -339,7 +339,7 @@ export class WSClient extends WSEventEmitter {
 
       this.ws!.onerror = () => {
         this.setState("error");
-        this.emit("error", new Error("WebSocket connection error"));
+        this.emit("error", new Error("Connection lost. Reconnecting..."));
       };
     });
   }
