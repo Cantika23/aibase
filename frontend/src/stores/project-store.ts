@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ProjectManager } from "@/lib/project-manager";
 import { buildApiUrl } from "@/lib/base-path";
+import { useAuthStore } from "./auth-store";
 
 // Use buildApiUrl to support base path
 const API_BASE_URL = buildApiUrl("");
@@ -114,6 +115,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/projects`);
+
+      if (response.status === 401) {
+        useAuthStore.getState().logout();
+        throw new Error("Session expired");
+      }
+
       const data = await response.json();
 
       if (data.success) {
@@ -139,6 +146,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description, is_shared }),
       });
+
+      if (response.status === 401) {
+        useAuthStore.getState().logout();
+        throw new Error("Session expired");
+      }
 
       const data = await response.json();
 
@@ -169,6 +181,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description }),
       });
+
+      if (response.status === 401) {
+        useAuthStore.getState().logout();
+        throw new Error("Session expired");
+      }
 
       const data = await response.json();
 
@@ -201,6 +218,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         method: "DELETE",
       });
 
+      if (response.status === 401) {
+        useAuthStore.getState().logout();
+        throw new Error("Session expired");
+      }
+
       const data = await response.json();
 
       if (data.success) {
@@ -224,13 +246,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // Fetch all projects
     await state.fetchProjects();
 
+    // If there was an error (like 401 or fetch error), stop here to preserve the error message
+    if (get().error) return;
+
     // Get stored project ID from localStorage
     const storedProjectId = ProjectManager.getCurrentProjectId();
 
     const { projects } = get();
 
     if (projects.length === 0) {
-      state.setError("No projects available. Please contact support.");
+      // No projects available, just return and let UI handle it (e.g. show create button)
       return;
     }
 
