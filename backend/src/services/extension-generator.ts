@@ -202,8 +202,10 @@ Generate the complete extension code following the structure specified above.`;
   if (!jsonStr) {
     let jsonMatch = content.match(/```json\\s*([\\s\\S]*?)(?:```|$)/);
     if (jsonMatch && jsonMatch[1]) {
-      jsonStr = jsonMatch[1];
-      console.log('[ExtensionGenerator] Found JSON in ```json block');
+      jsonStr = jsonMatch[1].trim(); // Trim whitespace
+      console.log('[ExtensionGenerator] Found JSON in ```json block, length:', jsonStr.length);
+    } else {
+      console.log('[ExtensionGenerator] Strategy 2 (```json block): No match');
     }
   }
 
@@ -211,8 +213,10 @@ Generate the complete extension code following the structure specified above.`;
   if (!jsonStr) {
     let jsonMatch = content.match(/```\\s*([\\s\\S]*?)(?:```|$)/);
     if (jsonMatch && jsonMatch[1]) {
-      jsonStr = jsonMatch[1];
-      console.log('[ExtensionGenerator] Found JSON in ``` block');
+      jsonStr = jsonMatch[1].trim(); // Trim whitespace
+      console.log('[ExtensionGenerator] Found JSON in ``` block, length:', jsonStr.length);
+    } else {
+      console.log('[ExtensionGenerator] Strategy 3 (``` block): No match');
     }
   }
 
@@ -221,10 +225,14 @@ Generate the complete extension code following the structure specified above.`;
   if (!jsonStr) {
     let jsonMatch = content.match(/\\{[\\s\\S]*\\}/);
     if (jsonMatch && jsonMatch[0]) {
-      jsonStr = jsonMatch[0];
-      console.log('[ExtensionGenerator] Found JSON object directly (may fail with nested braces)');
+      jsonStr = jsonMatch[0].trim(); // Trim whitespace
+      console.log('[ExtensionGenerator] Found JSON object directly, length:', jsonStr.length);
+    } else {
+      console.log('[ExtensionGenerator] Strategy 4 (direct JSON): No match');
     }
   }
+
+  console.log('[ExtensionGenerator] Final jsonStr after all strategies:', jsonStr ? jsonStr.substring(0, 100) + '...' : 'NULL');
 
   if (!jsonStr) {
     console.error('[ExtensionGenerator] Failed to extract JSON. Full response:', content);
