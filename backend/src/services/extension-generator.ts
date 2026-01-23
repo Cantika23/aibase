@@ -200,32 +200,54 @@ Generate the complete extension code following the structure specified above.`;
 
   // Strategy 2: Try to extract JSON from markdown code blocks with json tag
   if (!jsonStr) {
-    // Match from ```json to end, then remove opening ```json if present
-    let jsonMatch = content.match(/```json\s*([\s\S]*)$/);
+    // Match from ```json to closing ``` or end
+    let jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch && jsonMatch[1]) {
       jsonStr = jsonMatch[1].trim();
-      // Remove leading ```json if present at the start
-      if (jsonStr.startsWith('```json')) {
-        jsonStr = jsonStr.substring(8).trim();
-      }
-      console.log('[ExtensionGenerator] Found JSON in ```json block, length:', jsonStr.length);
+      console.log('[ExtensionGenerator] Found JSON in ```json block with closing ```, length:', jsonStr.length);
     } else {
-      console.log('[ExtensionGenerator] Strategy 2 (```json block): No match');
+      console.log('[ExtensionGenerator] Strategy 2a (```json block with closing ```): No match');
     }
   }
 
-  // Strategy 3: Try to extract JSON from markdown code blocks without json tag
+  // Strategy 2b: Try without closing ``` (match to end of content)
+  if (!jsonStr) {
+    let jsonMatch = content.match(/```json\s*([\s\S]*)$/);
+    if (jsonMatch && jsonMatch[1]) {
+      jsonStr = jsonMatch[1].trim();
+      // Remove trailing ``` if present
+      if (jsonStr.endsWith('```')) {
+        jsonStr = jsonStr.substring(0, jsonStr.length - 3).trim();
+      }
+      console.log('[ExtensionGenerator] Found JSON in ```json block (no closing ```), length:', jsonStr.length);
+    } else {
+      console.log('[ExtensionGenerator] Strategy 2b (```json block without closing ```): No match');
+    }
+  }
+
+  // Strategy 3: Try to extract JSON from markdown code blocks without json tag (with closing ```)
+  if (!jsonStr) {
+    let jsonMatch = content.match(/```\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      jsonStr = jsonMatch[1].trim();
+      console.log('[ExtensionGenerator] Found JSON in ``` block with closing ```, length:', jsonStr.length);
+    } else {
+      console.log('[ExtensionGenerator] Strategy 3a (``` block with closing ```): No match');
+    }
+  }
+
+  // Strategy 3b: Try without closing ``` (match to end of content)
   if (!jsonStr) {
     let jsonMatch = content.match(/```\s*([\s\S]*)$/);
     if (jsonMatch && jsonMatch[1]) {
       jsonStr = jsonMatch[1].trim();
-      // Remove leading ``` if present at the start
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr.substring(3).trim();
+      // Remove trailing ``` if present
+      if (jsonStr.endsWith('```')) {
+        jsonStr = jsonStr.substring(0, jsonStr.length - 3).trim();
       }
-      console.log('[ExtensionGenerator] Found JSON in ``` block, length:', jsonStr.length);
+      console.log('[ExtensionGenerator] Found JSON in ``` block (no closing ```), length:', jsonStr.length);
     } else {
-      console.log('[ExtensionGenerator] Strategy 3 (``` block): No match');
+      console.log('[ExtensionGenerator] Strategy 3b (``` block without closing ```): No match');
     }
   }
 
