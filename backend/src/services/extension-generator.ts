@@ -151,7 +151,7 @@ Generate the complete extension code following the structure specified above.`;
       { role: 'user', content: userMessage }
     ],
     temperature: 0.7,
-    max_tokens: 2000,
+    max_tokens: parseInt(process.env.OPENAI_MAX_TOKEN || '4000', 10),
   });
 
   // Parse response
