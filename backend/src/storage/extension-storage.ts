@@ -116,7 +116,7 @@ export class ExtensionStorage {
       description: data.description,
       author: data.author,
       version: data.version || '1.0.0',
-      category: data.category || 'Uncategorized',
+      category: data.category ?? '',  // Use ?? instead of || to allow empty string
       enabled: data.enabled !== undefined ? data.enabled : true,
       isDefault: data.isDefault || false,
       createdAt: now,
