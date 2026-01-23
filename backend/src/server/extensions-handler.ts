@@ -137,7 +137,7 @@ export async function handleCreateExtension(req: Request, projectId: string): Pr
     }
 
     const body = await req.json();
-    const { id, name, description, author, version, code, enabled } = body;
+    const { id, name, description, author, version, category, code, enabled } = body;
 
     if (!id || !name || !description || !code) {
       return Response.json(
@@ -152,6 +152,7 @@ export async function handleCreateExtension(req: Request, projectId: string): Pr
       description,
       author,
       version,
+      category: category || '',
       code,
       enabled,
       isDefault: false,

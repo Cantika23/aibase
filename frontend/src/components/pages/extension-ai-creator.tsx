@@ -99,6 +99,7 @@ export function ExtensionAICreator() {
         description: generatedExtension.metadata.description,
         author: generatedExtension.metadata.author,
         version: generatedExtension.metadata.version,
+        category: generatedExtension.metadata.category,
         code: generatedExtension.code,
         enabled: true,
       });
