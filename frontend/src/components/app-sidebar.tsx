@@ -12,6 +12,7 @@ import {
   Puzzle,
   Users,
   MessageCircle,
+  Code,
 } from "lucide-react"
 import { Link } from "react-router-dom"
 
@@ -100,12 +101,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ]
 
-  const developer = [
+  const management = [
     ...(aimeowEnabled ? [{
       title: "WhatsApp",
       url: getUrl("whatsapp"),
       icon: MessageCircle,
     }] : []),
+    ...(isAdmin ? [{
+      title: "Users",
+      url: "/admin/users",
+      icon: Users,
+    }] : []),
+  ]
+
+  const developer = [
     {
       title: "API",
       url: getUrl("api"),
@@ -114,18 +123,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       title: "Embed",
       url: getUrl("embed"),
-      icon: Terminal,
+      icon: Code,
     },
     {
       title: "Extensions",
       url: getUrl("extensions"),
       icon: Puzzle,
     },
-    ...(isAdmin ? [{
-      title: "Users",
-      url: "/admin/users",
-      icon: Users,
-    }] : []),
   ]
 
   return (
@@ -156,6 +160,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSection items={primaryActions} />
         {/* Workspace - project data/content */}
         <NavSection title="Workspace" items={workspace} />
+        {/* Management - setup and governance */}
+        {management.length > 0 && <NavSection title="Management" items={management} />}
         {/* Developer - integration/dev tools */}
         <NavSection title="Developer" items={developer} />
       </SidebarContent>

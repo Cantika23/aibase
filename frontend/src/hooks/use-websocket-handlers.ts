@@ -71,8 +71,8 @@ export function useWebSocketHandlers({
       setIsLoading(false);
     };
 
-    const handleReconnecting = () => {
-      // Reconnecting state
+    const handleReconnecting = (data: { attempt: number; maxAttempts: number }) => {
+      setError(`Connection lost. Reconnecting (attempt ${data.attempt}/${data.maxAttempts})...`);
     };
 
     const handleError = (error: Error) => {
@@ -199,11 +199,11 @@ export function useWebSocketHandlers({
               const updatedMessages = prev.map((msg, idx) =>
                 idx === existingIndex
                   ? {
-                      ...msg,
-                      id: messageId,
-                      content: data.chunk,
-                      ...(toolInvocations && { toolInvocations }),
-                    }
+                    ...msg,
+                    id: messageId,
+                    content: data.chunk,
+                    ...(toolInvocations && { toolInvocations }),
+                  }
                   : msg
               );
 
@@ -242,8 +242,7 @@ export function useWebSocketHandlers({
               currentMessageRef.current = data.chunk;
 
               console.log(
-                `[Chunk-Accumulated] Returning ${
-                  prev.length + 1
+                `[Chunk-Accumulated] Returning ${prev.length + 1
                 } messages (added new)`
               );
               const resultArray = [...prev, newMessage];
@@ -356,8 +355,7 @@ export function useWebSocketHandlers({
                 `[Chunk] Appending "${data.chunk.substring(
                   0,
                   20
-                )}..." (chunk size: ${data.chunk.length}) -> total: ${
-                  newContent.length
+                )}..." (chunk size: ${data.chunk.length}) -> total: ${newContent.length
                 } chars`
               );
 
@@ -1201,67 +1199,89 @@ export function useWebSocketHandlers({
       // Use flushSync to ensure immediate rendering, especially for errors
       flushSync(() => {
         setMessages((prev) => {
-        const toolInvocations = Array.from(
-          currentToolInvocationsRef.current.values()
-        );
-        const parts = currentPartsRef.current.length > 0
-          ? [...currentPartsRef.current]
-          : undefined;
+          const toolInvocations = Array.from(
+            currentToolInvocationsRef.current.values()
+          );
+          const parts = currentPartsRef.current.length > 0
+            ? [...currentPartsRef.current]
+            : undefined;
 
-        // Check if any tools are currently executing
-        const hasExecutingTools = toolInvocations.some(
-          inv => inv.state === "executing" || inv.state === "call"
-        );
-
-        console.log("[Tool Call] Tool invocations array:", toolInvocations);
-        console.log("[Tool Call] Parts array:", parts);
-        console.log("[Tool Call] Has executing tools:", hasExecutingTools);
-
-        // Separate thinking indicator from other messages
-        const thinkingMsg = prev.find((m) => m.isThinking);
-        const otherMessages = prev.filter((m) => !m.isThinking);
-
-        // If tools are executing, ensure we have a thinking indicator with updated text
-        let thinkingIndicator = thinkingMsg;
-        if (hasExecutingTools) {
-          // Get the first executing tool name for display
-          const executingTool = toolInvocations.find(
+          // Check if any tools are currently executing
+          const hasExecutingTools = toolInvocations.some(
             inv => inv.state === "executing" || inv.state === "call"
           );
-          const toolName = executingTool?.toolName || "tool";
 
-          // Create or update thinking indicator for tool execution
-          thinkingIndicator = {
-            id: `thinking_${Date.now()}`,
-            role: "assistant",
-            content: `Running ${toolName}...`,
-            createdAt: new Date(),
-            isThinking: true,
-          };
+          console.log("[Tool Call] Tool invocations array:", toolInvocations);
+          console.log("[Tool Call] Parts array:", parts);
+          console.log("[Tool Call] Has executing tools:", hasExecutingTools);
 
-          console.log("[Tool Call] Creating tool thinking indicator:", thinkingIndicator.content);
-        }
+          // Separate thinking indicator from other messages
+          const thinkingMsg = prev.find((m) => m.isThinking);
+          const otherMessages = prev.filter((m) => !m.isThinking);
 
-        // Look for message with matching ID if provided
-        if (data.assistantMessageId) {
-          const existingIndex = otherMessages.findIndex(
-            (m) => m.id === data.assistantMessageId
-          );
-          console.log(
-            "[Tool Call] Looking for message with ID:",
-            data.assistantMessageId,
-            "found at index:",
-            existingIndex
-          );
+          // If tools are executing, ensure we have a thinking indicator with updated text
+          let thinkingIndicator = thinkingMsg;
+          if (hasExecutingTools) {
+            // Get the first executing tool name for display
+            const executingTool = toolInvocations.find(
+              inv => inv.state === "executing" || inv.state === "call"
+            );
+            const toolName = executingTool?.toolName || "tool";
 
-          if (existingIndex !== -1) {
-            // Update existing message
+            // Create or update thinking indicator for tool execution
+            thinkingIndicator = {
+              id: `thinking_${Date.now()}`,
+              role: "assistant",
+              content: `Running ${toolName}...`,
+              createdAt: new Date(),
+              isThinking: true,
+            };
+
+            console.log("[Tool Call] Creating tool thinking indicator:", thinkingIndicator.content);
+          }
+
+          // Look for message with matching ID if provided
+          if (data.assistantMessageId) {
+            const existingIndex = otherMessages.findIndex(
+              (m) => m.id === data.assistantMessageId
+            );
             console.log(
-              "[Tool Call] Updating existing message at index:",
+              "[Tool Call] Looking for message with ID:",
+              data.assistantMessageId,
+              "found at index:",
               existingIndex
             );
+
+            if (existingIndex !== -1) {
+              // Update existing message
+              console.log(
+                "[Tool Call] Updating existing message at index:",
+                existingIndex
+              );
+              const updated = otherMessages.map((msg, idx) =>
+                idx === existingIndex
+                  ? { ...msg, toolInvocations, ...(parts && { parts }) }
+                  : msg
+              );
+              // FIX: Only add thinking indicator if one doesn't already exist in the result
+              const hasThinkingIndicator = updated.some((m) => "isThinking" in m && m.isThinking);
+              return !hasThinkingIndicator && thinkingIndicator
+                ? [...updated, thinkingIndicator]
+                : updated;
+            }
+          }
+
+          // Try to find message by currentMessageIdRef (from streaming chunks)
+          const currentMsgIndex = otherMessages.findIndex(
+            (m) => m.id === currentMessageIdRef.current
+          );
+          if (currentMsgIndex !== -1) {
+            console.log(
+              "[Tool Call] Found message by currentMessageIdRef:",
+              currentMessageIdRef.current
+            );
             const updated = otherMessages.map((msg, idx) =>
-              idx === existingIndex
+              idx === currentMsgIndex
                 ? { ...msg, toolInvocations, ...(parts && { parts }) }
                 : msg
             );
@@ -1271,68 +1291,46 @@ export function useWebSocketHandlers({
               ? [...updated, thinkingIndicator]
               : updated;
           }
-        }
 
-        // Try to find message by currentMessageIdRef (from streaming chunks)
-        const currentMsgIndex = otherMessages.findIndex(
-          (m) => m.id === currentMessageIdRef.current
-        );
-        if (currentMsgIndex !== -1) {
-          console.log(
-            "[Tool Call] Found message by currentMessageIdRef:",
-            currentMessageIdRef.current
-          );
-          const updated = otherMessages.map((msg, idx) =>
-            idx === currentMsgIndex
-              ? { ...msg, toolInvocations, ...(parts && { parts }) }
-              : msg
-          );
+          // Check if last non-thinking message is assistant
+          const lastMsg = otherMessages[otherMessages.length - 1];
+          if (lastMsg && lastMsg.role === "assistant") {
+            console.log(
+              "[Tool Call] Updating last assistant message:",
+              lastMsg.id
+            );
+            const updated = otherMessages.map((msg, idx) =>
+              idx === otherMessages.length - 1
+                ? { ...msg, toolInvocations, ...(parts && { parts }) }
+                : msg
+            );
+            // FIX: Only add thinking indicator if one doesn't already exist in the result
+            const hasThinkingIndicator = updated.some((m) => "isThinking" in m && m.isThinking);
+            return !hasThinkingIndicator && thinkingIndicator
+              ? [...updated, thinkingIndicator]
+              : updated;
+          }
+
+          // Otherwise, create a placeholder assistant message using the ID from backend
+          const messageId =
+            data.assistantMessageId ||
+            currentMessageIdRef.current ||
+            `msg_${Date.now()}_assistant`;
+          currentMessageIdRef.current = messageId;
+          console.log("[Tool Call] Creating new message with ID:", messageId);
+          const newMessage = {
+            id: messageId,
+            role: "assistant" as const,
+            content: "",
+            createdAt: new Date(),
+            toolInvocations,
+          };
+          const updated = [...otherMessages, newMessage];
           // FIX: Only add thinking indicator if one doesn't already exist in the result
           const hasThinkingIndicator = updated.some((m) => "isThinking" in m && m.isThinking);
           return !hasThinkingIndicator && thinkingIndicator
             ? [...updated, thinkingIndicator]
             : updated;
-        }
-
-        // Check if last non-thinking message is assistant
-        const lastMsg = otherMessages[otherMessages.length - 1];
-        if (lastMsg && lastMsg.role === "assistant") {
-          console.log(
-            "[Tool Call] Updating last assistant message:",
-            lastMsg.id
-          );
-          const updated = otherMessages.map((msg, idx) =>
-            idx === otherMessages.length - 1
-              ? { ...msg, toolInvocations, ...(parts && { parts }) }
-              : msg
-          );
-          // FIX: Only add thinking indicator if one doesn't already exist in the result
-          const hasThinkingIndicator = updated.some((m) => "isThinking" in m && m.isThinking);
-          return !hasThinkingIndicator && thinkingIndicator
-            ? [...updated, thinkingIndicator]
-            : updated;
-        }
-
-        // Otherwise, create a placeholder assistant message using the ID from backend
-        const messageId =
-          data.assistantMessageId ||
-          currentMessageIdRef.current ||
-          `msg_${Date.now()}_assistant`;
-        currentMessageIdRef.current = messageId;
-        console.log("[Tool Call] Creating new message with ID:", messageId);
-        const newMessage = {
-          id: messageId,
-          role: "assistant" as const,
-          content: "",
-          createdAt: new Date(),
-          toolInvocations,
-        };
-        const updated = [...otherMessages, newMessage];
-        // FIX: Only add thinking indicator if one doesn't already exist in the result
-        const hasThinkingIndicator = updated.some((m) => "isThinking" in m && m.isThinking);
-        return !hasThinkingIndicator && thinkingIndicator
-          ? [...updated, thinkingIndicator]
-          : updated;
         });
       });
     };
