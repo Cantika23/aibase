@@ -200,7 +200,7 @@ Generate the complete extension code following the structure specified above.`;
 
   // Strategy 2: Try to extract JSON from markdown code blocks with json tag
   if (!jsonStr) {
-    let jsonMatch = content.match(/```json\\s*([\\s\\S]*?)\\s*```/);
+    let jsonMatch = content.match(/```json\\s*([\\s\\S]*?)(?:```|$)/);
     if (jsonMatch && jsonMatch[1]) {
       jsonStr = jsonMatch[1];
       console.log('[ExtensionGenerator] Found JSON in ```json block');
@@ -209,7 +209,7 @@ Generate the complete extension code following the structure specified above.`;
 
   // Strategy 3: Try to extract JSON from markdown code blocks without json tag
   if (!jsonStr) {
-    let jsonMatch = content.match(/```\\s*([\\s\\S]*?)\\s*```/);
+    let jsonMatch = content.match(/```\\s*([\\s\\S]*?)(?:```|$)/);
     if (jsonMatch && jsonMatch[1]) {
       jsonStr = jsonMatch[1];
       console.log('[ExtensionGenerator] Found JSON in ``` block');
