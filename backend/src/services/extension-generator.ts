@@ -136,12 +136,20 @@ Requirements:
 Generate the complete extension code following the structure specified above.`;
 
   console.log('[ExtensionGenerator] Calling OpenAI API...');
+  console.log('[ExtensionGenerator] Using model:', process.env.OPENAI_MODEL);
+  console.log('[ExtensionGenerator] Base URL:', process.env.OPENAI_BASE_URL);
 
   // Initialize OpenAI client
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_BASE_URL,
   });
+
+  // Parse max_tokens from env, but cap at reasonable limit
+  // Z.AI and other providers may have limits on max_tokens
+  const configuredMaxTokens = parseInt(process.env.OPENAI_MAX_TOKEN || '4000', 10);
+  const maxTokens = Math.min(configuredMaxTokens, 8000); // Cap at 8000 for compatibility
+  console.log('[ExtensionGenerator] Using max_tokens:', maxTokens, '(configured:', configuredMaxTokens, ')');
 
   // Call OpenAI API
   const response = await openai.chat.completions.create({
@@ -151,7 +159,7 @@ Generate the complete extension code following the structure specified above.`;
       { role: 'user', content: userMessage }
     ],
     temperature: 0.7,
-    max_tokens: parseInt(process.env.OPENAI_MAX_TOKEN || '4000', 10),
+    max_tokens: maxTokens,
   });
 
   // Parse response
