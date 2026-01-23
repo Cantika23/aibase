@@ -64,33 +64,78 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: (id) => {
             if (id.includes("node_modules")) {
-              if (id.includes("react") || id.includes("react-dom") || id.includes("react-router-dom")) {
+              // 1. Core React & Router - Ensure these are together and matched specifically
+              if (
+                id.includes("node_modules/react/") ||
+                id.includes("node_modules/react-dom/") ||
+                id.includes("node_modules/scheduler/") ||
+                id.includes("node_modules/react-router/") ||
+                id.includes("node_modules/react-router-dom/")
+              ) {
                 return "react-vendor";
               }
-              if (id.includes("shiki") || id.includes("vscode-oniguruma") || id.includes("vscode-textmate")) {
+
+              // 2. Large specialized vendors
+              if (
+                id.includes("node_modules/shiki/") ||
+                id.includes("node_modules/@shikijs/") ||
+                id.includes("node_modules/vscode-oniguruma/") ||
+                id.includes("node_modules/vscode-textmate/")
+              ) {
                 return "shiki-vendor";
               }
-              if (id.includes("mermaid") || id.includes("khroma") || id.includes("stylis")) {
+
+              if (
+                id.includes("node_modules/mermaid/") ||
+                id.includes("node_modules/khroma/") ||
+                id.includes("node_modules/stylis/") ||
+                id.includes("node_modules/dagre-d3-es/") ||
+                id.includes("node_modules/d3-")
+              ) {
                 return "mermaid-vendor";
               }
-              if (id.includes("@codemirror") || id.includes("@uiw") || id.includes("@lezer")) {
+
+              if (
+                id.includes("node_modules/@codemirror/") ||
+                id.includes("node_modules/@uiw/") ||
+                id.includes("node_modules/@lezer/") ||
+                id.includes("node_modules/codemirror")
+              ) {
                 return "codemirror-vendor";
               }
-              if (id.includes("echarts") || id.includes("zrender")) {
+
+              if (id.includes("node_modules/echarts/") || id.includes("node_modules/zrender/")) {
                 return "charts-vendor";
               }
-              if (id.includes("framer-motion")) {
+
+              if (id.includes("node_modules/framer-motion/")) {
                 return "framer-motion-vendor";
               }
-              if (id.includes("@radix-ui") || id.includes("lucide-react")) {
+
+              // 3. UI and Icons
+              if (id.includes("node_modules/@radix-ui/") || id.includes("node_modules/lucide-react/")) {
                 return "ui-vendor";
               }
-              if (id.includes("react-markdown") || id.includes("remark-gfm") || id.includes("micromark") || id.includes("mdast") || id.includes("unist")) {
+
+              // 4. Content Processing
+              if (
+                id.includes("node_modules/react-markdown/") ||
+                id.includes("node_modules/remark-") ||
+                id.includes("node_modules/micromark") ||
+                id.includes("node_modules/mdast") ||
+                id.includes("node_modules/unist") ||
+                id.includes("node_modules/hast-") ||
+                id.includes("node_modules/vfile")
+              ) {
                 return "markdown-vendor";
               }
-              if (id.includes("html2canvas") || id.includes("qrcode")) {
+
+              // 5. Misc Utils
+              if (id.includes("node_modules/html2canvas/") || id.includes("node_modules/qrcode/")) {
                 return "utils-vendor";
               }
+
+              // Everything else goes to catch-all vendor chunk
               return "vendor";
             }
           },
