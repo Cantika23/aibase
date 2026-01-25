@@ -10,6 +10,7 @@ import { MemoryTool } from "./definition/memory-tool";
 export function getBuiltinTools(
   convId: string = "A1",
   projectId: string = "A1",
+  tenantId: number | string = "default",
   userId?: string
 ): Tool[] {
   const fileTool = new FileTool();
@@ -19,6 +20,7 @@ export function getBuiltinTools(
   const todoTool = new TodoTool();
   todoTool.setConvId(convId);
   todoTool.setProjectId(projectId);
+  todoTool.setTenantId(tenantId);
 
   const scriptTool = new ScriptTool();
   scriptTool.setConvId(convId);

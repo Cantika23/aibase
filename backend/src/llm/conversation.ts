@@ -194,6 +194,11 @@ export interface ConversationOptions {
   projectId?: string;
 
   /**
+   * Tenant ID for loading context-specific data
+   */
+  tenantId?: number | string;
+
+  /**
    * URL parameters for placeholder replacement in context (e.g., { hewan: "burung" })
    * Use {{param_name}} in context template to reference these values
    */
@@ -219,6 +224,7 @@ export class Conversation {
   private currentAbortController: AbortController | null = null;
   private convId: string = "default";
   private projectId: string = "A1";
+  private tenantId: number | string = "default";
   private urlParams: Record<string, string> | undefined;
 
   /**
@@ -245,6 +251,7 @@ export class Conversation {
     // Set conversation identifiers
     this.convId = options.convId || "default";
     this.projectId = options.projectId || "A1";
+    this.tenantId = options.tenantId || "default";
 
     // Store URL parameters for context replacement
     this.urlParams = options.urlParams;
@@ -267,7 +274,7 @@ export class Conversation {
     if (!hasSystemMessage) {
       // Initialize history with system prompt
       // Start with default context and append custom systemPrompt if provided
-      const baseContext = await defaultContext(this.convId, this.projectId, this.urlParams);
+      const baseContext = await defaultContext(this.convId, this.projectId, this.tenantId, this.urlParams);
       const systemPrompt = options.systemPrompt
         ? `${baseContext}\n\n${options.systemPrompt}`
         : baseContext;
@@ -650,7 +657,7 @@ export class Conversation {
         totalTokens: usage.total_tokens,
       });
       try {
-        await updateTokenUsage(this.convId, this.projectId, {
+        await updateTokenUsage(this.convId, this.projectId, this.tenantId, {
           promptTokens: usage.prompt_tokens,
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,

@@ -5,6 +5,7 @@
 import * as fs from 'fs/promises';
 import { ChatHistoryStorage } from "../storage/chat-history-storage";
 import { FileStorage } from "../storage/file-storage";
+import { ProjectStorage } from "../storage/project-storage";
 import { generateConversationTitle, getConversationTitle, regenerateConversationTitle } from "../llm/conversation-title-generator";
 import { createLogger } from "../utils/logger";
 import { getConversationChatsDir } from "../config/paths";
@@ -13,6 +14,7 @@ const logger = createLogger("Conversations");
 
 const chatHistoryStorage = ChatHistoryStorage.getInstance();
 const fileStorage = FileStorage.getInstance();
+const projectStorage = ProjectStorage.getInstance();
 
 /**
  * Handle GET /api/conversations?projectId={id} - Get all conversations for a project
@@ -35,12 +37,16 @@ export async function handleGetConversations(req: Request): Promise<Response> {
     // Get all conversation metadata
     const conversations = await chatHistoryStorage.listAllConversations(projectId);
 
+    // Get tenantId from project
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
     // Enrich with cached titles only - don't generate on list to avoid slow LLM calls
     const enrichedConversations = await Promise.all(
       conversations.map(async (conv) => {
         // Only get title if it already exists (cached in info.json)
         // Don't generate titles here to avoid blocking with LLM calls
-        const title = await getConversationTitle(conv.convId, conv.projectId);
+        const title = await getConversationTitle(conv.convId, conv.projectId, tenantId);
 
         return {
           ...conv,
@@ -86,14 +92,18 @@ export async function handleGetConversationMessages(
       );
     }
 
+    // Get tenantId from project
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
     // Load conversation messages
-    const messages = await chatHistoryStorage.loadChatHistory(convId, projectId);
+    const messages = await chatHistoryStorage.loadChatHistory(convId, projectId, tenantId);
 
     // Filter out system messages - they should never be sent to client
     const clientMessages = messages.filter((msg) => msg.role !== "system");
 
     // Get metadata
-    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId);
+    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId, tenantId);
 
     if (!metadata) {
       return Response.json(
@@ -106,11 +116,11 @@ export async function handleGetConversationMessages(
     }
 
     // Get title
-    let title = await getConversationTitle(convId, projectId);
+    let title = await getConversationTitle(convId, projectId, tenantId);
 
     // If no title exists, generate one
     if (!title && messages.length > 0) {
-      title = await generateConversationTitle(messages, convId, projectId);
+      title = await generateConversationTitle(messages, convId, projectId, tenantId);
     }
 
     return Response.json({
@@ -289,8 +299,12 @@ export async function handleRegenerateConversationTitle(
       );
     }
 
+    // Get tenantId from project
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
     // Check if conversation exists
-    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId);
+    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId, tenantId);
 
     if (!metadata) {
       return Response.json(
@@ -303,7 +317,7 @@ export async function handleRegenerateConversationTitle(
     }
 
     // Regenerate the title
-    const newTitle = await regenerateConversationTitle(convId, projectId);
+    const newTitle = await regenerateConversationTitle(convId, projectId, tenantId);
 
     logger.info({ convId, projectId, newTitle }, "Conversation title regenerated");
 
@@ -342,6 +356,10 @@ export async function handleGetEmbedUserConversations(req: Request): Promise<Res
       );
     }
 
+    // Get tenantId from project
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
     // Get all conversation metadata for this user
     const conversations = await chatHistoryStorage.listUserConversations(projectId, userId);
 
@@ -350,7 +368,7 @@ export async function handleGetEmbedUserConversations(req: Request): Promise<Res
       conversations.map(async (conv) => {
         // Only get title if it already exists (cached in info.json)
         // Don't generate titles here to avoid blocking with LLM calls
-        const title = await getConversationTitle(conv.convId, conv.projectId, userId);
+        const title = await getConversationTitle(conv.convId, conv.projectId, tenantId);
 
         return {
           ...conv,
@@ -397,8 +415,12 @@ export async function handleDeleteEmbedConversation(
       );
     }
 
+    // Get tenantId from project
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
     // Check if conversation exists
-    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId, userId);
+    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId, tenantId);
 
     if (!metadata) {
       return Response.json(
@@ -411,10 +433,10 @@ export async function handleDeleteEmbedConversation(
     }
 
     // Delete conversation chat history (with userId)
-    await chatHistoryStorage.deleteChatHistory(convId, projectId, userId);
+    await chatHistoryStorage.deleteChatHistory(convId, projectId, tenantId);
 
     // Also delete all associated files
-    await fileStorage.deleteAllFiles(convId, projectId);
+    await fileStorage.deleteAllFiles(convId, projectId, tenantId);
 
     logger.info({ convId, projectId, userId }, "Embed conversation deleted");
 

@@ -44,6 +44,7 @@ export async function handleChatCompletion(req: Request): Promise<Response> {
         const conversation = await Conversation.create({
             systemPrompt: context,
             projectId: "default",
+            tenantId: "default",
             temperature,
             maxTokens,
             topP: topP,

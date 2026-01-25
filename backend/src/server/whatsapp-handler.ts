@@ -517,16 +517,20 @@ async function processWhatsAppMessageWithAI(
 
     // Get ChatHistoryStorage instance (singleton, already imported)
     const chatHistoryStorage = ChatHistoryStorage.getInstance();
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
 
     // Load existing conversation history
     console.log("[WhatsApp] Loading client history...");
-    const existingHistory = await chatHistoryStorage.loadChatHistory(convId, projectId, uid);
+    const existingHistory = await chatHistoryStorage.loadChatHistory(convId, projectId, tenantId);
     console.log("[WhatsApp] Loaded history, messages:", existingHistory?.length || 0);
 
     // Create conversation instance
     console.log("[WhatsApp] Creating conversation instance...");
     const conversation = await Conversation.create({
       projectId,
+      tenantId,
       convId,
       urlParams: { CURRENT_UID: uid },
     });

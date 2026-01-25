@@ -932,9 +932,13 @@ export class WSServer extends WSEventEmitter {
         assistantMsgId
       );
 
+      // Get tenantId for title generation and compaction
+      const project = projectStorage.getById(connectionInfo.projectId);
+      const tenantId = project?.tenant_id ?? 'default';
+
       // Generate conversation title asynchronously after first assistant response
       // Don't wait for it to complete - let it run in the background
-      this.generateTitleIfNeeded(connectionInfo.convId, connectionInfo.projectId, historyWithIds)
+      this.generateTitleIfNeeded(connectionInfo.convId, connectionInfo.projectId, tenantId, historyWithIds)
         .catch((error) => {
           console.error(`[TitleGeneration] Error generating title for ${connectionInfo.convId}:`, error);
         });
@@ -1343,6 +1347,10 @@ Always be helpful and conversational.`;
       (msg) => msg.role === "system"
     );
 
+    // Get tenantId from project
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
     // Read thinking mode from environment (default: disabled)
     const thinkingMode = process.env.OPENAI_THINKING_MODE?.toLowerCase() === "enabled"
       ? { type: "enabled" as const }
@@ -1354,6 +1362,7 @@ Always be helpful and conversational.`;
       tools,
       convId,
       projectId,
+      tenantId,
       urlParams, // Pass URL parameters for context replacement
       thinking: thinkingMode,
       hooks: {
@@ -1449,7 +1458,11 @@ Always be helpful and conversational.`;
   }
 
   private async getDefaultTools(convId: string, projectId: string, userId?: string): Promise<Tool[]> {
-    const tools = getBuiltinTools(convId, projectId, userId);
+    // Get tenantId from project
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
+    const tools = getBuiltinTools(convId, projectId, tenantId, userId);
 
     // Set up broadcast callback for TodoTool
     const todoTool = tools.find(t => t.name === "todo");
@@ -1499,11 +1512,12 @@ Always be helpful and conversational.`;
   private async generateTitleIfNeeded(
     convId: string,
     projectId: string,
+    tenantId: number | string,
     history: any[]
   ): Promise<void> {
     try {
       // Check if title already exists
-      const existingTitle = await getConversationTitle(convId, projectId);
+      const existingTitle = await getConversationTitle(convId, projectId, tenantId);
       if (existingTitle) {
         console.log(`[TitleGeneration] Title already exists for ${convId}: "${existingTitle}"`);
         return;
@@ -1517,7 +1531,7 @@ Always be helpful and conversational.`;
         console.log(`[TitleGeneration] Generating title for ${convId} with ${nonSystemMessages.length} messages...`);
 
         // Generate title using AI
-        const title = await generateConversationTitle(history, convId, projectId);
+        const title = await generateConversationTitle(history, convId, projectId, tenantId);
 
         console.log(`[TitleGeneration] Generated title for ${convId}: "${title}"`);
         // Title is automatically saved to info.json by generateConversationTitle
