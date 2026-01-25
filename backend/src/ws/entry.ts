@@ -1459,7 +1459,7 @@ Always be helpful and conversational.`;
 
   private async getDefaultTools(convId: string, projectId: string, userId?: string): Promise<Tool[]> {
     // Get tenantId from project
-    const project = projectStorage.getById(projectId);
+    const project = ProjectStorage.getInstance().getById(projectId);
     const tenantId = project?.tenant_id ?? 'default';
 
     const tools = getBuiltinTools(convId, projectId, tenantId, userId);
