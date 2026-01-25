@@ -1,6 +1,6 @@
 import type { Tool } from "../../llm/conversation";
-import { getConversationFilesDir } from "../../config/paths";
 import { peek, peekInfo } from "./peek-output";
+import { ProjectStorage } from "../../storage/project-storage";
 
 /**
  * Context documentation for core script runtime functionality
@@ -178,10 +178,21 @@ export class ScriptRuntime {
    * Build the execution scope with injected tools, functions, and context
    */
   private buildScope(): Record<string, any> {
+    // Get tenant_id for the project
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(this.context.projectId);
+    const tenantId = project?.tenant_id ?? 'default';
+
+    // Set context on globalThis for extensions to access
+    (globalThis as any).convId = this.context.convId;
+    (globalThis as any).projectId = this.context.projectId;
+    (globalThis as any).tenantId = tenantId;
+
     const scope: Record<string, any> = {
       // Context variables
       convId: this.context.convId,
       projectId: this.context.projectId,
+      tenantId: tenantId,
       CURRENT_UID: this.context.userId,
 
       // Allow console for debugging
@@ -201,6 +212,9 @@ export class ScriptRuntime {
 
       // Inject peekInfo function for getting output metadata
       peekInfo: peekInfo,
+
+      // Inject inspection broadcast function for extensions
+      __broadcastInspection: this.createInspectionBroadcastFunction(),
     };
 
     // Inject all registered tools as callable functions
@@ -236,12 +250,38 @@ export class ScriptRuntime {
   }
 
   /**
+   * Create the inspection broadcast function for extensions
+   * Allows extensions to broadcast inspection data for the UI
+   */
+  private createInspectionBroadcastFunction() {
+    return (extensionId: string, data: any) => {
+      this.context.broadcast("tool_call", {
+        toolCallId: this.context.toolCallId,
+        toolName: "script",
+        args: { purpose: this.context.purpose, code: this.context.code },
+        status: "inspection",
+        result: {
+          __inspectionData: {
+            extensionId,
+            data,
+          }
+        },
+      });
+    };
+  }
+
+  /**
    * Create the memory object with read function for accessing stored credentials
    * Also makes memory callable for set/remove actions via the memory tool
    */
   private createMemoryObject() {
     const projectId = this.context.projectId;
     const context = this.context;
+
+    // Get tenant_id for the project
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? 'default';
 
     // Create the read function (synchronous)
     const read = (category: string, key: string): any => {
@@ -252,6 +292,8 @@ export class ScriptRuntime {
       const memoryPath = path.join(
         process.cwd(),
         "data",
+        "projects",
+        String(tenantId),
         projectId,
         "memory.json"
       );

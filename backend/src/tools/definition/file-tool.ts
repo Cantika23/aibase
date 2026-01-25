@@ -3,11 +3,13 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { extractTextFromFile, isDocxFile, isPdfFile, isExcelFile, isPowerPointFile } from "../../utils/document-extractor";
 import { getConversationFilesDir } from "../../config/paths";
+import { ProjectStorage } from "../../storage/project-storage";
 
 type FileScope = 'user' | 'public';
 
 interface FileMeta {
   scope: FileScope;
+  description?: string;
 }
 
 /**
@@ -180,10 +182,7 @@ export class FileTool extends Tool {
 
   private convId: string = "default";
   private projectId: string = "A1";
-
-  // File list cache: Map<convId, { files: string, timestamp: number }>
-  private static fileCache = new Map<string, { files: string; timestamp: number }>();
-  private static CACHE_TTL = 5000; // 5 seconds cache TTL
+  private tenantId: number | string = 'default';
 
   /**
    * Set the conversation ID for this tool instance
@@ -197,70 +196,26 @@ export class FileTool extends Tool {
    */
   setProjectId(projectId: string): void {
     this.projectId = projectId;
-  }
-
-  /**
-   * Get cache key for current conversation
-   */
-  private getCacheKey(): string {
-    return `${this.projectId}:${this.convId}`;
-  }
-
-  /**
-   * Get cached file list if still valid
-   */
-  private getCachedList(scope?: FileScope): string | null {
-    const key = this.getCacheKey();
-    const cached = FileTool.fileCache.get(key);
-
-    if (cached && Date.now() - cached.timestamp < FileTool.CACHE_TTL) {
-      // Parse and filter by scope if needed
-      if (scope) {
-        const data = JSON.parse(cached.files);
-        data.files = data.files.filter((f: any) => f.scope === scope);
-        data.scope = scope;
-        data.totalFiles = data.files.length;
-        return JSON.stringify(data, null, 2);
-      }
-      return cached.files;
-    }
-
-    return null;
-  }
-
-  /**
-   * Set cached file list
-   */
-  private setCachedList(files: string): void {
-    const key = this.getCacheKey();
-    FileTool.fileCache.set(key, {
-      files,
-      timestamp: Date.now(),
-    });
-  }
-
-  /**
-   * Invalidate cache for current conversation
-   */
-  private invalidateCache(): void {
-    const key = this.getCacheKey();
-    FileTool.fileCache.delete(key);
+    // Also fetch and store tenant_id
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(projectId);
+    this.tenantId = project?.tenant_id ?? 'default';
   }
 
   /**
    * Get the base directory for file operations
-   * Returns: data/projects/{projectId}/
+   * Returns: data/projects/{tenantId}/{projectId}/
    */
   private getBaseDir(): string {
-    return path.join(process.cwd(), "data", "projects", this.projectId);
+    return path.join(process.cwd(), "data", "projects", String(this.tenantId), this.projectId);
   }
 
   /**
    * Get the conversation files directory
-   * Returns: data/projects/{projectId}/conversations/{convId}/files/
+   * Returns: data/projects/{tenantId}/{projectId}/conversations/{convId}/files/
    */
   private getConvFilesDir(): string {
-    return getConversationFilesDir(this.projectId, this.convId);
+    return getConversationFilesDir(this.projectId, this.convId, this.tenantId);
   }
 
   /**
@@ -469,16 +424,7 @@ ${frontmatter}
 
     // If no path provided, list all files in all */files/* directories
     if (!dirPath) {
-      // Check cache first
-      const cached = this.getCachedList(scope);
-      if (cached) {
-        console.log(`[FileTool] Using cached file list for ${this.getCacheKey()}`);
-        return cached;
-      }
-
-      const result = await this.listAllProjectFiles(scope);
-      this.setCachedList(result);
-      return result;
+      return await this.listAllProjectFiles(scope);
     }
 
     // If path provided, list files in that specific directory
@@ -612,6 +558,7 @@ ${frontmatter}
           sizeHuman: this.formatBytes(stats.size),
           modified: stats.mtime.toISOString(),
           scope: meta.scope,
+          description: meta.description,
         });
       }
     }
@@ -765,6 +712,7 @@ ${frontmatter}
         sizeHuman: this.formatBytes(stats.size),
         modified: stats.mtime.toISOString(),
         scope: meta.scope,
+        description: meta.description,
       }, null, 2);
     } catch (error) {
       return JSON.stringify({
@@ -795,6 +743,7 @@ ${frontmatter}
         accessed: stats.atime.toISOString(),
         permissions: stats.mode.toString(8).slice(-3),
         scope: meta.scope,
+        description: meta.description,
       },
       null,
       2
@@ -821,9 +770,6 @@ ${frontmatter}
       }
     }
 
-    // Invalidate cache after deletion
-    this.invalidateCache();
-
     return JSON.stringify({
       success: true,
       message: stats.isDirectory() ? `Directory deleted: ${relativePath}` : `File deleted: ${relativePath}`,
@@ -847,9 +793,6 @@ ${frontmatter}
     } catch (error) {
       // Metadata file might not exist, ignore
     }
-
-    // Invalidate cache after rename
-    this.invalidateCache();
 
     const relativeOldPath = path.relative(baseDir, resolvedOldPath);
     const relativeNewPath = path.relative(baseDir, resolvedNewPath);
@@ -886,9 +829,6 @@ ${frontmatter}
 
     // Save metadata with default 'user' scope
     await this.saveFileMeta(resolvedPath, { scope: 'user' });
-
-    // Invalidate cache after upload
-    this.invalidateCache();
 
     // Get file stats
     const stats = await fs.stat(resolvedPath);
@@ -928,9 +868,6 @@ ${frontmatter}
     } catch (error) {
       // File might already have metadata, ignore
     }
-
-    // Invalidate cache after write
-    this.invalidateCache();
 
     // Get file stats
     const stats = await fs.stat(resolvedPath);

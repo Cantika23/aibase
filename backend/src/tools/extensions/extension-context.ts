@@ -3,7 +3,7 @@
  * Generates AI context from extension metadata and code
  */
 
-import { ExtensionStorage, type Extension } from "../../storage/extension-storage";
+import { ExtensionStorage, type Extension, type ExampleEntry } from "../../storage/extension-storage";
 import { CategoryStorage } from "../../storage/category-storage";
 
 /**
@@ -50,6 +50,56 @@ function generateParamDocs(params: string): string {
   }).filter(Boolean);
 
   return docs.length > 0 ? docs.join('\n') : 'No parameters';
+}
+
+/**
+ * Extract examples from JSDoc comments in the code
+ */
+function extractExamplesFromJSDoc(code: string): ExampleEntry[] {
+  const examples: ExampleEntry[] = [];
+
+  // Match JSDoc blocks with @example tags
+  // Pattern: /** ... @example ... */
+  const jsDocPattern = /\/\*\*[\s\S]*?\*\//g;
+  const matches = code.matchAll(jsDocPattern);
+
+  for (const match of matches) {
+    const comment = match[0];
+
+    // Check if it contains @example
+    if (comment.includes('@example')) {
+      // Extract the example content
+      const exampleMatch = comment.match(/@example\s+(.+?)(?=\s*\*\/|\s*@|\s*$)/s);
+      if (exampleMatch) {
+        const exampleContent = exampleMatch[1].trim();
+
+        // Try to parse structured example
+        // Format: @example Title - Description
+        // ```typescript
+        // code
+        // ```
+        // Result: ...
+        const titleMatch = exampleContent.match(/^([^\n-]+)(?:\s*-\s*(.+?))?\s*\n([\s\S]+)/);
+        if (titleMatch) {
+          const title = titleMatch[1].trim();
+          const description = titleMatch[2]?.trim();
+          const body = titleMatch[3].trim();
+
+          // Extract code block
+          const codeBlockMatch = body.match(/```(?:typescript|ts|javascript|js)?\s*\n([\s\S]+?)```/);
+          const code = codeBlockMatch ? codeBlockMatch[1].trim() : body;
+
+          // Extract result if present
+          const resultMatch = body.match(/(?:Result|Output):\s*(.+?)(?:\n|$)/i);
+          const result = resultMatch ? resultMatch[1].trim() : undefined;
+
+          examples.push({ title, description, code, result });
+        }
+      }
+    }
+  }
+
+  return examples;
 }
 
 /**
@@ -120,6 +170,29 @@ export function generateExtensionContext(extension: Extension): string {
   }
   context += `\`\`\`\n`;
 
+  // NEW: Add examples section
+  const examples: ExampleEntry[] = metadata.examples || extractExamplesFromJSDoc(code);
+
+  if (examples.length > 0) {
+    context += `\n**Examples**:\n\n`;
+
+    for (const example of examples) {
+      context += `##### ${example.title}\n`;
+
+      if (example.description) {
+        context += `${example.description}\n\n`;
+      }
+
+      context += `\`\`\`typescript\n${example.code}\n\`\`\`\n`;
+
+      if (example.result) {
+        context += `**Result**: ${example.result}\n`;
+      }
+
+      context += `\n`;
+    }
+  }
+
   return context;
 }
 
@@ -129,9 +202,15 @@ export function generateExtensionContext(extension: Extension): string {
 export async function generateExtensionsContext(projectId: string): Promise<string> {
   const extensionStorage = new ExtensionStorage();
   const categoryStorage = new CategoryStorage();
+  const { ProjectStorage } = await import('../../storage/project-storage');
+  const projectStorage = ProjectStorage.getInstance();
+
+  // Get tenant_id for the project
+  const project = projectStorage.getById(projectId);
+  const tenantId = project?.tenant_id ?? 'default';
 
   // Get all enabled extensions
-  const extensions = await extensionStorage.getEnabled(projectId);
+  const extensions = await extensionStorage.getEnabled(projectId, tenantId);
 
   if (extensions.length === 0) {
     return '';

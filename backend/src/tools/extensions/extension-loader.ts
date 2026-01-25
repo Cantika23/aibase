@@ -6,27 +6,40 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { ExtensionStorage, type Extension, type ExtensionMetadata } from '../../storage/extension-storage';
+import { ProjectStorage } from '../../storage/project-storage';
 import { CategoryStorage } from '../../storage/category-storage';
+import { extensionHookRegistry } from './extension-hooks';
 
 export class ExtensionLoader {
   private extensionStorage: ExtensionStorage;
   private categoryStorage: CategoryStorage;
+  private projectStorage: ProjectStorage;
   private defaultsPath: string;
 
   constructor() {
     this.extensionStorage = new ExtensionStorage();
     this.categoryStorage = new CategoryStorage();
+    this.projectStorage = ProjectStorage.getInstance();
     this.defaultsPath = path.join(__dirname, 'defaults');
+  }
+
+  /**
+   * Get tenant_id for a project
+   */
+  private getTenantId(projectId: string): number | string {
+    const project = this.projectStorage.getById(projectId);
+    return project?.tenant_id ?? 'default';
   }
 
   /**
    * Initialize extensions for a project by copying defaults if needed
    */
   async initializeProject(projectId: string): Promise<void> {
-    await this.extensionStorage.ensureExtensionsDir(projectId);
+    const tenantId = this.getTenantId(projectId);
+    await this.extensionStorage.ensureExtensionsDir(projectId, tenantId);
 
     // Check if defaults have already been copied
-    const existingExtensions = await this.extensionStorage.getAll(projectId);
+    const existingExtensions = await this.extensionStorage.getAll(projectId, tenantId);
 
     // If project already has extensions, don't overwrite
     if (existingExtensions.length > 0) {
@@ -42,6 +55,7 @@ export class ExtensionLoader {
    * Copy default extensions to a project
    */
   private async copyDefaultExtensions(projectId: string): Promise<void> {
+    const tenantId = this.getTenantId(projectId);
     try {
       // Read default extensions directory
       const entries = await fs.readdir(this.defaultsPath, { withFileTypes: true });
@@ -64,7 +78,7 @@ export class ExtensionLoader {
           const metadata = JSON.parse(metadataContent) as ExtensionMetadata;
 
           // Create extension in project
-          await this.extensionStorage.create(projectId, {
+          await this.extensionStorage.create(projectId, tenantId, {
             id: metadata.id,
             name: metadata.name,
             description: metadata.description,
@@ -89,13 +103,25 @@ export class ExtensionLoader {
 
   /**
    * Load all enabled extensions for a project and return their exports
+   *
+   * @param projectId - Project ID
+   * @param useDefaults - If true, load from defaults directory instead of project directory
    */
-  async loadExtensions(projectId: string): Promise<Record<string, any>> {
-    // Initialize project extensions if needed
-    await this.initializeProject(projectId);
-
+  async loadExtensions(projectId: string, useDefaults: boolean = false): Promise<Record<string, any>> {
+    const tenantId = this.getTenantId(projectId);
     // Get all enabled extensions
-    const extensions = await this.extensionStorage.getEnabled(projectId);
+    let extensions: Extension[];
+
+    if (useDefaults) {
+      // Load directly from defaults directory
+      console.log(`[ExtensionLoader] Loading extensions from defaults directory (ignoring project extensions)`);
+      extensions = await this.loadDefaults();
+    } else {
+      // Initialize project extensions if needed
+      await this.initializeProject(projectId);
+      // Get all enabled extensions from project
+      extensions = await this.extensionStorage.getEnabled(projectId, tenantId);
+    }
 
     if (extensions.length === 0) {
       console.log(`[ExtensionLoader] No enabled extensions for project ${projectId}`);
@@ -124,6 +150,51 @@ export class ExtensionLoader {
   }
 
   /**
+   * Load extensions directly from defaults directory
+   */
+  private async loadDefaults(): Promise<Extension[]> {
+    try {
+      const entries = await fs.readdir(this.defaultsPath, { withFileTypes: true });
+      const extensionDirs = entries.filter(entry => entry.isDirectory());
+
+      const extensions: Extension[] = [];
+
+      for (const dir of extensionDirs) {
+        try {
+          const extensionId = dir.name;
+          const metadataPath = path.join(this.defaultsPath, extensionId, 'metadata.json');
+          const codePath = path.join(this.defaultsPath, extensionId, 'index.ts');
+
+          // Read metadata and code
+          const [metadataContent, code] = await Promise.all([
+            fs.readFile(metadataPath, 'utf-8'),
+            fs.readFile(codePath, 'utf-8'),
+          ]);
+
+          const metadata = JSON.parse(metadataContent) as ExtensionMetadata;
+
+          // Only load enabled extensions
+          if (!metadata.enabled) {
+            continue;
+          }
+
+          extensions.push({
+            metadata,
+            code,
+          });
+        } catch (error) {
+          console.warn(`[ExtensionLoader] Failed to load default extension ${dir.name}:`, error);
+        }
+      }
+
+      return extensions;
+    } catch (error) {
+      console.error('[ExtensionLoader] Failed to load defaults:', error);
+      return [];
+    }
+  }
+
+  /**
    * Evaluate an extension's TypeScript code and return its exports
    */
   private async evaluateExtension(extension: Extension): Promise<Record<string, any>> {
@@ -135,17 +206,18 @@ export class ExtensionLoader {
 
       const jsCode = transpiler.transformSync(extension.code);
 
-      // Wrap code to capture exports
+      // Wrap code to capture exports and provide globals
       // Extensions should export default an object with their functions
       const wrappedCode = `
+        const extensionHookRegistry = arguments[0];
         ${jsCode}
         return (typeof module !== 'undefined' && module.exports) || {};
       `;
 
-      // Execute in isolated context
+      // Execute in isolated context with hook registry
       const AsyncFunction = (async function () {}).constructor as any;
       const fn = new AsyncFunction(wrappedCode);
-      const result = await fn();
+      const result = await fn(extensionHookRegistry);
 
       // Handle different export patterns
       if (result.default) {
@@ -163,12 +235,13 @@ export class ExtensionLoader {
    * Reset extensions for a project (copy defaults again)
    */
   async resetToDefaults(projectId: string): Promise<void> {
+    const tenantId = this.getTenantId(projectId);
     // Get all existing extensions
-    const existingExtensions = await this.extensionStorage.getAll(projectId);
+    const existingExtensions = await this.extensionStorage.getAll(projectId, tenantId);
 
     // Delete all extensions
     for (const ext of existingExtensions) {
-      await this.extensionStorage.delete(projectId, ext.metadata.id);
+      await this.extensionStorage.delete(projectId, ext.metadata.id, tenantId);
     }
 
     // Reset categories to defaults (recreate categories.json)
