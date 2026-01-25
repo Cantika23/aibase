@@ -1,6 +1,7 @@
 import { Tool } from "../../llm/conversation";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { getConversationDir } from "../../config/paths";
 
 /**
  * Context for the Todo tool
@@ -93,6 +94,7 @@ export class TodoTool extends Tool {
 
   private convId: string = "default";
   private projectId: string = "A1";
+  private tenantId: number | string = "default";
   private broadcastCallback?: (convId: string, todos: TodoList) => void;
 
   /**
@@ -110,6 +112,13 @@ export class TodoTool extends Tool {
   }
 
   /**
+   * Set the tenant ID for this tool instance
+   */
+  setTenantId(tenantId: number | string): void {
+    this.tenantId = tenantId;
+  }
+
+  /**
    * Set the broadcast callback for sending todo updates
    */
   setBroadcastCallback(callback: (convId: string, todos: TodoList) => void): void {
@@ -120,20 +129,14 @@ export class TodoTool extends Tool {
    * Get the path to the todos file
    */
   private getTodosFilePath(): string {
-    return path.join(
-      process.cwd(),
-      "data",
-      this.projectId,
-      this.convId,
-      "todos.json"
-    );
+    return path.join(getConversationDir(this.projectId, this.convId, this.tenantId), "todos.json");
   }
 
   /**
    * Get the directory containing the todos file
    */
   private getTodosDir(): string {
-    return path.join(process.cwd(), "data", this.projectId, this.convId);
+    return getConversationDir(this.projectId, this.convId, this.tenantId);
   }
 
   /**

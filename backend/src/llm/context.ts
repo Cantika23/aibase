@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import { getConversationDir, getProjectDir, getConversationFilesDir } from "../config/paths";
 
 interface TodoItem {
   id: string;
@@ -33,8 +34,8 @@ interface FileInfo {
 /**
  * Get the path to the todos file
  */
-function getTodosFilePath(convId: string, projectId: string): string {
-  return path.join(process.cwd(), "data", projectId, convId, "todos.json");
+function getTodosFilePath(convId: string, projectId: string, tenantId: number | string): string {
+  return path.join(getConversationDir(projectId, convId, tenantId), "todos.json");
 }
 
 /**
@@ -42,9 +43,10 @@ function getTodosFilePath(convId: string, projectId: string): string {
  */
 async function loadTodos(
   convId: string,
-  projectId: string
+  projectId: string,
+  tenantId: number | string
 ): Promise<TodoList | null> {
-  const todosPath = getTodosFilePath(convId, projectId);
+  const todosPath = getTodosFilePath(convId, projectId, tenantId);
 
   try {
     const content = await fs.readFile(todosPath, "utf-8");
@@ -84,15 +86,15 @@ function formatTodosForContext(todoList: TodoList): string {
 /**
  * Get the path to the memory file
  */
-function getMemoryFilePath(projectId: string): string {
-  return path.join(process.cwd(), "data", projectId, "memory.json");
+function getMemoryFilePath(projectId: string, tenantId: number | string): string {
+  return path.join(getProjectDir(projectId, tenantId), "memory.json");
 }
 
 /**
  * Load memory from file
  */
-async function loadMemory(projectId: string): Promise<MemoryStore | null> {
-  const memoryPath = getMemoryFilePath(projectId);
+async function loadMemory(projectId: string, tenantId: number | string): Promise<MemoryStore | null> {
+  const memoryPath = getMemoryFilePath(projectId, tenantId);
 
   try {
     const content = await fs.readFile(memoryPath, "utf-8");
@@ -146,16 +148,16 @@ const DEFAULT_TEMPLATE = `# AI Assistant Context
 /**
  * Get the path to the context template file for a project
  */
-function getContextTemplatePath(projectId: string): string {
+function getContextTemplatePath(projectId: string, tenantId: number | string): string {
   // Store context per-project in data directory
-  return path.join(process.cwd(), "data", projectId, "context.md");
+  return path.join(getProjectDir(projectId, tenantId), "context.md");
 }
 
 /**
  * Ensure the context template file exists, create it with default content if missing
  */
-async function ensureContextTemplate(projectId: string): Promise<void> {
-  const templatePath = getContextTemplatePath(projectId);
+async function ensureContextTemplate(projectId: string, tenantId: number | string): Promise<void> {
+  const templatePath = getContextTemplatePath(projectId, tenantId);
   const projectDir = path.dirname(templatePath);
 
   try {
@@ -182,11 +184,11 @@ async function ensureContextTemplate(projectId: string): Promise<void> {
 /**
  * Load context template from file
  */
-async function loadContextTemplate(projectId: string): Promise<string> {
-  const templatePath = getContextTemplatePath(projectId);
+async function loadContextTemplate(projectId: string, tenantId: number | string): Promise<string> {
+  const templatePath = getContextTemplatePath(projectId, tenantId);
 
   // Ensure template exists before loading
-  await ensureContextTemplate(projectId);
+  await ensureContextTemplate(projectId, tenantId);
 
   try {
     const content = await fs.readFile(templatePath, "utf-8");
@@ -201,7 +203,7 @@ async function loadContextTemplate(projectId: string): Promise<string> {
 /**
  * Load tool examples from tool definition files
  */
-async function loadToolExamples(projectId?: string): Promise<string> {
+async function loadToolExamples(projectId?: string, tenantId?: number | string): Promise<string> {
   try {
     // Import context functions from tool definition files
     const scriptTool = await import("../tools/definition/script-tool");
@@ -233,9 +235,9 @@ async function loadToolExamples(projectId?: string): Promise<string> {
     }
 
     // Extension contexts (project-specific)
-    if (projectId) {
+    if (projectId && tenantId) {
       const { generateExtensionsContext } = await import("../tools/extensions/extension-context");
-      const extensionsContext = await generateExtensionsContext(projectId);
+      const extensionsContext = await generateExtensionsContext(projectId, tenantId);
       if (extensionsContext) {
         examples.push(extensionsContext);
       }
@@ -257,7 +259,8 @@ async function injectDynamicContent(
   memory: MemoryStore | null,
   todoList: TodoList | null,
   urlParams: Record<string, string> | null = null,
-  projectId?: string
+  projectId?: string,
+  tenantId?: number | string
 ): Promise<string> {
   let context = template;
 
@@ -280,7 +283,7 @@ async function injectDynamicContent(
   }
 
   // Replace tool context placeholder (now includes extensions if projectId provided)
-  const toolContext = await loadToolExamples(projectId);
+  const toolContext = await loadToolExamples(projectId, tenantId);
   context = context.replace("{{TOOL_CONTEXT}}", toolContext);
 
   // Append memory if it exists
@@ -301,8 +304,8 @@ async function injectDynamicContent(
 /**
  * Get the path to the files directory for a conversation
  */
-function getFilesDirectory(convId: string, projectId: string): string {
-  return path.join(process.cwd(), "data", "projects", projectId, "conversations", convId, "files");
+function getFilesDirectory(convId: string, projectId: string, tenantId: number | string): string {
+  return getConversationFilesDir(projectId, convId, tenantId);
 }
 
 /**
@@ -310,9 +313,10 @@ function getFilesDirectory(convId: string, projectId: string): string {
  */
 async function loadFiles(
   convId: string,
-  projectId: string
+  projectId: string,
+  tenantId: number | string
 ): Promise<FileInfo[] | null> {
-  const filesDir = getFilesDirectory(convId, projectId);
+  const filesDir = getFilesDirectory(convId, projectId, tenantId);
 
   try {
     const entries = await fs.readdir(filesDir, { withFileTypes: true });
@@ -418,28 +422,30 @@ function formatFilesForContext(files: FileInfo[]): string {
  *
  * @param convId - Conversation ID
  * @param projectId - Project ID
+ * @param tenantId - Tenant ID
  * @param urlParams - Optional URL parameters for placeholder replacement (e.g., { hewan: "burung" })
  */
 export const defaultContext = async (
   convId: string,
   projectId: string,
+  tenantId: number | string,
   urlParams?: Record<string, string>
 ): Promise<string> => {
   // Load the context template from per-project markdown file
-  const template = await loadContextTemplate(projectId);
+  const template = await loadContextTemplate(projectId, tenantId);
 
   // Load project memory (shared across all conversations)
-  const memory = await loadMemory(projectId);
+  const memory = await loadMemory(projectId, tenantId);
 
   // Load conversation-specific todos (currently disabled)
-  // const todoList = await loadTodos(convId, projectId);
+  // const todoList = await loadTodos(convId, projectId, tenantId);
   const todoList = null;
 
   // Load conversation-specific files
-  const files = await loadFiles(convId, projectId);
+  const files = await loadFiles(convId, projectId, tenantId);
 
   // Inject dynamic content into template (URL params, tool context, memory, todos, extensions)
-  let context = await injectDynamicContent(template, memory, todoList, urlParams || null, projectId);
+  let context = await injectDynamicContent(template, memory, todoList, urlParams || null, projectId, tenantId);
 
   // Append files if they exist
   if (files && files.length > 0) {
