@@ -645,8 +645,42 @@ export function useWebSocketHandlers({
       });
     };
 
-    const handleStatus = (_data: { status?: string }) => {
-      // Status update
+    const handleStatus = (data: { status?: string; message?: string }) => {
+      console.log('[handleStatus] Status message received:', data);
+
+      // Connection-related status
+      if (data.status === 'connected' || data.status === 'disconnected' || data.status === 'reconnecting') {
+        setConnectionStatus(data.status);
+      }
+
+      // Processing-related status (file uploads, extension processing, etc.)
+      if (data.status === 'processing' || data.status === 'complete') {
+        const { setProcessingStatus } = useChatStore.getState();
+        setProcessingStatus(data.message || null);
+        console.log('[handleStatus] Processing status updated:', data.message);
+
+        // Auto-clear processing status after 5 seconds if it's 'complete'
+        if (data.status === 'complete') {
+          setTimeout(() => {
+            setProcessingStatus(null);
+          }, 5000);
+        }
+      }
+
+      // File update status - when an extension finishes processing a file
+      if (data.status === 'file_updated') {
+        try {
+          const update = JSON.parse(data.message || '{}');
+          const { setFiles } = useFileStore.getState();
+          setFiles((prevFiles) =>
+            prevFiles.map((f) =>
+              f.name === update.fileName ? { ...f, description: update.description } : f
+            )
+          );
+        } catch (e) {
+          console.error('[handleStatus] Failed to parse file update:', data.message);
+        }
+      }
     };
 
     const handleHistoryResponse = (data: { messages?: any[]; hasActiveStream?: boolean; maxTokens?: number; tokenUsage?: any }) => {
