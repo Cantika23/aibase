@@ -65,7 +65,16 @@ import {
   handleDeleteExtension,
   handleToggleExtension,
   handleResetExtensions,
+  handleGenerateExtension,
+  handlePreviewExtension,
 } from "./extensions-handler";
+import {
+  handleGetCategories,
+  handleGetCategory,
+  handleCreateCategory,
+  handleUpdateCategory,
+  handleDeleteCategory,
+} from "./categories-handler";
 import {
   handleGetConversations,
   handleGetConversationMessages,
@@ -483,6 +492,17 @@ export class WebSocketServer {
           return handleResetExtensions(req, projectId!);
         }
 
+        const extensionGenerateMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/generate$/);
+        if (extensionGenerateMatch && req.method === "POST") {
+          const projectId = extensionGenerateMatch[1];
+          return handleGenerateExtension(req, projectId);
+        }
+
+        const extensionPreviewMatch = pathname.match(/^\/api\/extensions\/preview$/);
+        if (extensionPreviewMatch && req.method === "POST") {
+          return handlePreviewExtension(req);
+        }
+
         const extensionIdMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/([^\/]+)$/);
         if (extensionIdMatch) {
           const projectId = extensionIdMatch[1];
@@ -501,6 +521,30 @@ export class WebSocketServer {
           const projectId = extensionToggleMatch[1];
           const extensionId = extensionToggleMatch[2];
           return handleToggleExtension(req, projectId!, extensionId!);
+        }
+
+        // Categories API endpoints
+        const categoriesMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/categories$/);
+        if (categoriesMatch) {
+          const projectId = categoriesMatch[1];
+          if (req.method === "GET") {
+            return handleGetCategories(req, projectId);
+          } else if (req.method === "POST") {
+            return handleCreateCategory(req, projectId);
+          }
+        }
+
+        const categoryIdMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/categories\/([^\/]+)$/);
+        if (categoryIdMatch) {
+          const projectId = categoryIdMatch[1];
+          const categoryId = categoryIdMatch[2];
+          if (req.method === "GET") {
+            return handleGetCategory(req, projectId, categoryId);
+          } else if (req.method === "PUT") {
+            return handleUpdateCategory(req, projectId, categoryId);
+          } else if (req.method === "DELETE") {
+            return handleDeleteCategory(req, projectId, categoryId);
+          }
         }
 
         // WhatsApp endpoints (only enabled if AIMEOW=true)

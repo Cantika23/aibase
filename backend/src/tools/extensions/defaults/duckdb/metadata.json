@@ -1,0 +1,12 @@
+{
+  "id": "duckdb",
+  "name": "DuckDB Query",
+  "description": "Query CSV, Excel, Parquet, and JSON files using SQL via DuckDB",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "category": "database-tools",
+  "enabled": true,
+  "isDefault": true,
+  "createdAt": 0,
+  "updatedAt": 0
+}

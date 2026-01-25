@@ -1,0 +1,54 @@
+{
+  "testProject": {
+    "id": "test-project-123",
+    "name": "Test Project",
+    "conversation": "test-conv-456"
+  },
+  "testTodos": [
+    {
+      "id": "todo-1",
+      "text": "Test FileTool functionality",
+      "completed": false
+    },
+    {
+      "id": "todo-2", 
+      "text": "Test TodoTool broadcasting",
+      "completed": true
+    },
+    {
+      "id": "todo-3",
+      "text": "Test MemoryTool persistence",
+      "completed": false
+    }
+  ],
+  "testMemory": {
+    "credentials": {
+      "postgres": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "test_db",
+        "username": "test_user",
+        "password": "test_password"
+      },
+      "duckdb": {
+        "path": ":memory:"
+      }
+    },
+    "configurations": {
+      "file_limit": "10MB",
+      "timeout": "30000ms"
+    }
+  },
+  "testFiles": [
+    {
+      "name": "sample.md",
+      "type": "text/markdown",
+      "size": 1024
+    },
+    {
+      "name": "sample.csv",
+      "type": "text/csv", 
+      "size": 512
+    }
+  ]
+}

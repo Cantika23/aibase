@@ -1,0 +1,12 @@
+{
+  "id": "web-search",
+  "name": "Web Search",
+  "description": "Search the web for information using Brave Search API",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "category": "web-tools",
+  "enabled": true,
+  "isDefault": true,
+  "createdAt": 0,
+  "updatedAt": 0
+}

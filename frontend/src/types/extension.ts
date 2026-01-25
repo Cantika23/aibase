@@ -8,6 +8,7 @@ export interface ExtensionMetadata {
   description: string;
   author?: string;
   version: string;
+  category: string;
   enabled: boolean;
   isDefault: boolean;
   createdAt: number;
@@ -25,6 +26,7 @@ export interface CreateExtensionData {
   description: string;
   author?: string;
   version?: string;
+  category?: string;
   code: string;
   enabled?: boolean;
 }
@@ -36,4 +38,5 @@ export interface UpdateExtensionData {
   version?: string;
   code?: string;
   enabled?: boolean;
+  category?: string;
 }

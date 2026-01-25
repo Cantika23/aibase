@@ -6,6 +6,14 @@ import { Toaster } from "./ui/sonner";
 import { SetupRequired } from "./setup-required";
 import { useEffect, Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
+import { getAppName, isWhatsAppEnabled } from "@/lib/setup";
+import * as React from "react";
+import { useProjectStore } from "@/stores/project-store";
+import { useConversationStore } from "@/stores/conversation-store";
+import { useAuthStore } from "@/stores/auth-store";
+import { AppSidebar } from "./app-sidebar";
+import { UserAccountMenu } from "./user-account-menu";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "./ui/sidebar";
 
 // Lazy load page components
 const MainChat = lazy(() => import("./pages/main-chat").then(module => ({ default: module.MainChat })));
@@ -21,6 +29,7 @@ const EmbedChatPage = lazy(() => import("./pages/embed-chat").then(module => ({ 
 const EmbedSettings = lazy(() => import("./pages/embed-settings").then(module => ({ default: module.EmbedSettings })));
 const ExtensionsSettings = lazy(() => import("./pages/extensions-settings").then(module => ({ default: module.ExtensionsSettings })));
 const ExtensionEditor = lazy(() => import("./pages/extension-editor").then(module => ({ default: module.ExtensionEditor })));
+const ExtensionAICreator = lazy(() => import("./pages/extension-ai-creator").then(module => ({ default: module.ExtensionAICreator })));
 const WhatsAppSettings = lazy(() => import("./pages/whatsapp-settings").then(module => ({ default: module.WhatsAppSettings })));
 const DeveloperAPIPage = lazy(() => import("./pages/developer-api").then(module => ({ default: module.DeveloperAPIPage })));
 const ProfilePage = lazy(() => import("./pages/profile").then(module => ({ default: module.ProfilePage })));
@@ -31,14 +40,6 @@ const LoadingFallback = () => (
     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
   </div>
 );
-import { useProjectStore } from "@/stores/project-store";
-import { useConversationStore } from "@/stores/conversation-store";
-import { useAuthStore } from "@/stores/auth-store";
-import { AppSidebar } from "./app-sidebar";
-import { UserAccountMenu } from "./user-account-menu";
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "./ui/sidebar";
-import { getAppName, isWhatsAppEnabled } from "@/lib/setup";
-import * as React from "react";
 
 interface AppRouterProps {
   wsUrl: string;
@@ -82,9 +83,10 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
   const isEmbedRoute = location.pathname === "/embed";
   const isRootRoute = location.pathname === "/";
   const isAdminSetupRoute = location.pathname === "/admin-setup";
+  const isAdminRoute = location.pathname === "/admin/users";
 
-  // Show sidebar only when inside a project or on admin pages
-  const shouldShowSidebar = !isLoginRoute && !isEmbedRoute && !isRootRoute && !isAdminSetupRoute;
+  // Show sidebar only when inside a project
+  const shouldShowSidebar = !isLoginRoute && !isEmbedRoute && !isRootRoute && !isAdminSetupRoute && !isAdminRoute;
 
   // Show top header account menu only when NOT inside a project (root/home or admin pages)
   const shouldShowTopAccountMenu = !isLoginRoute && user && !shouldShowSidebar;
@@ -100,7 +102,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
       <SidebarInset className="flex flex-col bg-background min-h-screen">
         {/* Top header bar with user account - Show only when NOT inside a project */}
         {shouldShowTopAccountMenu && (
-          <div className="absolute cursor-pointer top-5 right-5 z-20">
+          <header className="flex items-center justify-end border-b px-4 py-2 bg-background">
             <UserAccountMenu
               user={{
                 username: user.username,
@@ -108,7 +110,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               }}
               onLogout={logout}
             />
-          </div>
+          </header>
         )}
         {/* Sidebar Trigger for mobile - Show only when sidebar is visible */}
         {shouldShowSidebar && (
@@ -258,6 +260,16 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
                         <ExtensionEditor />
                       </ProjectRouteHandler>
                     </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/projects/:projectId/extensions/ai-create"
+                  element={
+                    <ProtectedRoute>
+                      <ProjectRouteHandler>
+                        <ExtensionAICreator />
+                      </ProjectRouteHandler>
+                    </ProtectedRoute>
                   }
                 />
                 {/* Catch-all route - redirect to root */}

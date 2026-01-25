@@ -1,0 +1,12 @@
+{
+  "id": "clickhouse",
+  "name": "ClickHouse Query",
+  "description": "Query ClickHouse columnar databases for fast analytics",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "category": "database-tools",
+  "enabled": false,
+  "isDefault": false,
+  "createdAt": 0,
+  "updatedAt": 0
+}

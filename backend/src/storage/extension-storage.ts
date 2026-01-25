@@ -13,6 +13,7 @@ export interface ExtensionMetadata {
   description: string;  // what the extension does
   author?: string;      // who created it
   version: string;      // semantic version
+  category: string;     // category for grouping (e.g., "Database Tools", "Web Tools")
   enabled: boolean;     // whether it's active
   isDefault: boolean;   // whether it came from defaults
   createdAt: number;    // timestamp
@@ -30,6 +31,7 @@ export interface CreateExtensionData {
   description: string;
   author?: string;
   version?: string;
+  category?: string;
   code: string;
   enabled?: boolean;
   isDefault?: boolean;
@@ -114,6 +116,7 @@ export class ExtensionStorage {
       description: data.description,
       author: data.author,
       version: data.version || '1.0.0',
+      category: data.category ?? '',  // Use ?? instead of || to allow empty string
       enabled: data.enabled !== undefined ? data.enabled : true,
       isDefault: data.isDefault || false,
       createdAt: now,
@@ -224,6 +227,7 @@ export class ExtensionStorage {
       description: updates.description !== undefined ? updates.description : existing.metadata.description,
       author: updates.author !== undefined ? updates.author : existing.metadata.author,
       version: updates.version !== undefined ? updates.version : existing.metadata.version,
+      category: updates.category !== undefined ? updates.category : existing.metadata.category,
       enabled: updates.enabled !== undefined ? updates.enabled : existing.metadata.enabled,
       updatedAt: now,
     };
@@ -293,6 +297,65 @@ export class ExtensionStorage {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Get extensions by category
+   */
+  async getByCategory(projectId: string, category: string): Promise<Extension[]> {
+    const allExtensions = await this.getAll(projectId);
+    return allExtensions.filter(ext => ext.metadata.category === category);
+  }
+
+  /**
+   * Get all unique categories for a project
+   */
+  async getCategories(projectId: string): Promise<string[]> {
+    const allExtensions = await this.getAll(projectId);
+    const categories = new Set(allExtensions.map(ext => ext.metadata.category));
+    return Array.from(categories).sort();
+  }
+
+  /**
+   * Get extensions grouped by category (for UI tree view)
+   */
+  async getByCategoryGrouped(projectId: string): Promise<Record<string, Extension[]>> {
+    const allExtensions = await this.getAll(projectId);
+    const grouped: Record<string, Extension[]> = {};
+
+    for (const ext of allExtensions) {
+      const category = ext.metadata.category;
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(ext);
+    }
+
+    // Sort extensions within each category by name
+    for (const category in grouped) {
+      grouped[category].sort((a, b) => a.metadata.name.localeCompare(b.metadata.name));
+    }
+
+    return grouped;
+  }
+
+  /**
+   * Remove category from all extensions in a specific category
+   * Used when a category is deleted
+   */
+  async uncategorizeByCategory(projectId: string, categoryId: string): Promise<void> {
+    const extensions = await this.getByCategory(projectId, categoryId);
+
+    for (const ext of extensions) {
+      try {
+        await this.update(projectId, ext.metadata.id, {
+          category: "",
+        });
+        console.log(`[ExtensionStorage] Uncategorized extension '${ext.metadata.id}' from deleted category '${categoryId}'`);
+      } catch (error) {
+        console.error(`[ExtensionStorage] Failed to uncategorize extension '${ext.metadata.id}':`, error);
+      }
     }
   }
 }

@@ -1,0 +1,104 @@
+/**
+ * Image Search Extension
+ * Search for images using Brave Search API
+ */
+
+/**
+ * Get API key from environment
+ */
+function getBraveApiKey(): string {
+  const apiKey = process.env.BRAVE_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "BRAVE_API_KEY environment variable is not set. Get your API key from https://brave.com/search/api/"
+    );
+  }
+  return apiKey;
+}
+
+/**
+ * Image search extension
+ */
+export default {
+  /**
+   * Search for images
+   *
+   * Usage:
+   * const images = await imageSearch({ search_query: 'cute cats', count: 10 });
+   */
+  imageSearch: async (options: {
+    search_query: string;
+    count?: number;
+    country?: string;
+    safesearch?: "off" | "moderate" | "strict";
+    spellcheck?: boolean;
+  }) {
+    if (!options || typeof options !== "object") {
+      throw new Error(
+        "imageSearch requires an options object. Usage: await imageSearch({ search_query: 'your query' })"
+      );
+    }
+
+    if (!options.search_query) {
+      throw new Error(
+        "imageSearch requires 'search_query' parameter"
+      );
+    }
+
+    try {
+      const params = new URLSearchParams({
+        q: options.search_query,
+        count: String(options.count ?? 20),
+      });
+
+      if (options.country) {
+        params.append("country", options.country);
+      }
+
+      if (options.safesearch) {
+        params.append("safesearch", options.safesearch);
+      }
+
+      if (options.spellcheck !== undefined) {
+        params.append("spellcheck", String(options.spellcheck));
+      }
+
+      const response = await fetch(
+        `https://api.search.brave.com/res/v1/images/search?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "X-Subscription-Token": getBraveApiKey(),
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Brave image search failed: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const data = await response.json() as any;
+
+      const imageResults = data.results || [];
+      const transformedResults = imageResults.map((item: any) => ({
+        title: item.title || "",
+        url: item.properties?.url || item.url || "",
+        thumbnail: item.thumbnail?.src || "",
+        source: item.source || "",
+        width: item.properties?.width,
+        height: item.properties?.height,
+      }));
+
+      return {
+        results: transformedResults,
+        total: transformedResults.length,
+      };
+    } catch (error: any) {
+      throw new Error(`Image search failed: ${error.message}`);
+    }
+  },
+};

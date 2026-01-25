@@ -1,0 +1,12 @@
+{
+  "id": "image-search",
+  "name": "Image Search",
+  "description": "Search for images using Brave Search API",
+  "author": "AIBase",
+  "version": "1.0.0",
+  "category": "web-tools",
+  "enabled": false,
+  "isDefault": false,
+  "createdAt": 0,
+  "updatedAt": 0
+}
