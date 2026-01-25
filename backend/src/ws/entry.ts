@@ -933,7 +933,7 @@ export class WSServer extends WSEventEmitter {
       );
 
       // Get tenantId for title generation and compaction
-      const project = projectStorage.getById(connectionInfo.projectId);
+      const project = ProjectStorage.getInstance().getById(connectionInfo.projectId);
       const tenantId = project?.tenant_id ?? 'default';
 
       // Generate conversation title asynchronously after first assistant response
