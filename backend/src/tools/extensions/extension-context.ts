@@ -112,9 +112,16 @@ export function generateExtensionContext(extension: Extension): string {
   // This matches the namespace used in extension-loader.ts
   const namespace = metadata.id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
-  // Try to extract the exported context from the code
-  // Pattern: export const context = () => `...` (multi-line template literal)
-  const contextMatch = code.match(/export\s+const\s+context\s*=\s*\(\)\s*=>\s*`([\s\S]+?)`/);
+  // Try to extract the context from the code
+  // Pattern: const context = () => `...` or export const context = () => `...` (multi-line string concatenation)
+  // First try the exported version (for backwards compatibility)
+  let contextMatch = code.match(/export\s+const\s+context\s*=\s*\(\)\s*=>\s*`([\s\S]+?)`/);
+
+  // If not found, try the non-exported version
+  if (!contextMatch) {
+    // Match const context = () => '...' + '...'  (string concatenation format)
+    contextMatch = code.match(/const\s+context\s*=\s*\(\)\s*=>\s*'([^']*(?:'\s*\+\s*'[^']*)*)'/);
+  }
 
   if (contextMatch) {
     // Extension has its own context - use it directly
