@@ -349,7 +349,7 @@ async function loadFiles(
         }
 
         // Extract description from body (everything after the second ---)
-        const bodyMatch = metaContent.match(/\n---\n([\s\S]*)$/);
+        const bodyMatch = metaContent.match(/\n---\s*\n([\s\S]*)$/);
         if (bodyMatch) {
           description = bodyMatch[1].trim();
         }
