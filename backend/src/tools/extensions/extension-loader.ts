@@ -213,7 +213,7 @@ export class ExtensionLoader {
       // Wrap code to capture exports and provide globals
       // Extensions should export default an object with their functions
       const wrappedCode = `
-        const extensionHookRegistry = arguments[0];
+        globalThis.extensionHookRegistry = arguments[0];
         ${jsCode}
         return (typeof module !== 'undefined' && module.exports) || {};
       `;
