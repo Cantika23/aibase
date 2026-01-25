@@ -1348,7 +1348,7 @@ Always be helpful and conversational.`;
     );
 
     // Get tenantId from project
-    const project = projectStorage.getById(projectId);
+    const project = ProjectStorage.getInstance().getById(projectId);
     const tenantId = project?.tenant_id ?? 'default';
 
     // Read thinking mode from environment (default: disabled)
