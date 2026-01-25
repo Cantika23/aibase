@@ -11,6 +11,7 @@ import * as path from 'path';
 import { extensionHookRegistry } from '../tools/extensions/extension-hooks';
 import type { WSServer } from '../ws/entry';
 import { FileTool } from '../tools/definition/file-tool';
+import { getConversationFilesDir } from '../config/paths';
 
 const logger = createLogger('Upload');
 
@@ -87,7 +88,17 @@ async function generateThumbnail(
     const ext = path.extname(fileName);
     const baseName = path.basename(fileName, ext);
     const thumbnailFileName = `${baseName}.thumb${ext}`;
-    const thumbnailPath = path.join(process.cwd(), 'data', projectId, convId, 'files', thumbnailFileName);
+
+    // Get tenantId for this project
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(projectId);
+    if (!project) {
+      return null;
+    }
+    const tenantId = project.tenant_id ?? 'default';
+
+    // Use centralized path config to ensure consistency
+    const thumbnailPath = path.join(getConversationFilesDir(projectId, convId, tenantId), thumbnailFileName);
 
     // Resize and save thumbnail
     await image
@@ -231,7 +242,8 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
 
       // Call extension hooks AFTER response is sent (fire-and-forget, non-blocking)
       // This allows the HTTP response to return immediately while analysis happens in background
-      const filePath = path.join(process.cwd(), 'data', 'projects', projectId, 'conversations', convId, 'files', storedFile.name);
+      // Use centralized path config to ensure consistency with tenant-based structure
+      const filePath = path.join(getConversationFilesDir(projectId, convId, tenantId), storedFile.name);
 
       // Don't await - run in background
       (async () => {
@@ -258,7 +270,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
             console.log('[UPLOAD-HANDLER] Background hook generated description for', file.name, ':', hookResult.description.substring(0, 100));
 
             // Update file metadata with description
-            await fileStorage.updateFileMeta(convId, storedFile.name, projectId, { description: hookResult.description });
+            await fileStorage.updateFileMeta(convId, storedFile.name, projectId, tenantId, { description: hookResult.description });
             console.log('[UPLOAD-HANDLER] Background file metadata update completed');
           } else {
             console.log('[UPLOAD-HANDLER] Background hook: No description generated');

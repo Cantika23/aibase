@@ -21,6 +21,7 @@ import * as path from "path";
 import { AuthService } from "../services/auth-service";
 import { ProjectStorage } from "../storage/project-storage";
 import { FileStorage } from "../storage/file-storage";
+import { ExtensionLoader } from "../tools/extensions/extension-loader";
 
 const authService = AuthService.getInstance();
 
@@ -720,17 +721,26 @@ export class WSServer extends WSEventEmitter {
         // Fetch file metadata for attachments
         try {
           const fileStorage = FileStorage.getInstance();
-          const allFiles = await fileStorage.listFiles(connectionInfo.convId, connectionInfo.projectId);
+          // Get tenantId for this project
+          const projectStorage = ProjectStorage.getInstance();
+          const project = projectStorage.getById(connectionInfo.projectId);
+          const tenantId = project?.tenant_id ?? 'default';
+          const allFiles = await fileStorage.listFiles(connectionInfo.convId, connectionInfo.projectId, tenantId);
 
           // Format all files as attachments (fileIds are just for logging/verification)
-          attachments = allFiles.map(file => ({
-            id: `file_${file.uploadedAt}_${Math.random().toString(36).slice(2, 11)}`,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            url: `/api/files/${connectionInfo.projectId}/${connectionInfo.convId}/${file.name}`,
-            uploadedAt: file.uploadedAt,
-          }));
+          attachments = allFiles.map(file => {
+            console.log('[UserMessage] File description for', file.name, ':', file.description ? `present (${file.description.substring(0, 50)}...)` : 'MISSING');
+            return {
+              id: `file_${file.uploadedAt}_${Math.random().toString(36).slice(2, 11)}`,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              url: `/api/files/${connectionInfo.projectId}/${connectionInfo.convId}/${file.name}`,
+              uploadedAt: file.uploadedAt,
+              description: file.description,
+              thumbnailUrl: file.thumbnailUrl,
+            };
+          });
 
           console.log("[UserMessage] Fetched attachment metadata:", attachments.length, "files");
           console.log("[UserMessage] Attachment URLs:", attachments.map((a: any) => a.url));
@@ -1452,6 +1462,17 @@ Always be helpful and conversational.`;
     console.log(
       `Loaded ${tools.length} built-in tools for conversation ${convId} in project ${projectId}`
     );
+
+    // Load extensions (this registers hooks like afterFileUpload)
+    try {
+      const extensionLoader = new ExtensionLoader();
+      // Use USE_DEFAULT_EXTENSIONS env var to load from defaults directory
+      const useDefaults = process.env.USE_DEFAULT_EXTENSIONS === 'true';
+      await extensionLoader.loadExtensions(projectId, useDefaults);
+    } catch (error) {
+      console.error(`[WSServer] Failed to load extensions for project ${projectId}:`, error);
+    }
+
     return tools;
   }
 
