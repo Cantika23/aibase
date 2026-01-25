@@ -281,8 +281,12 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
         console.log('[UPLOAD-HANDLER] Extension hook generated description for', file.name, ':', hookResult.description.substring(0, 100));
 
         // Update file metadata with description
-        await fileStorage.updateFileMeta(convId, storedFile.name, projectId, tenantId, { description: hookResult.description });
-        console.log('[UPLOAD-HANDLER] File metadata updated with description');
+        try {
+          await fileStorage.updateFileMeta(convId, storedFile.name, projectId, tenantId, { description: hookResult.description });
+          console.log('[UPLOAD-HANDLER] File metadata updated with description');
+        } catch (updateError) {
+          console.error('[UPLOAD-HANDLER] Failed to update file metadata:', updateError);
+        }
 
         fileDescription = hookResult.description;
       } else {

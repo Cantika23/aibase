@@ -105,6 +105,8 @@ export class FileStorage {
       ? `---\n${frontmatter}\n---\n${meta.description}\n`
       : `---\n${frontmatter}\n---\n`;
 
+    console.log(`[FileStorage] Saving metadata to ${metaPath}`);
+    console.log(`[FileStorage] Description length: ${meta.description?.length || 0}`);
     await fs.writeFile(metaPath, content, 'utf-8');
   }
 
@@ -154,9 +156,15 @@ export class FileStorage {
       }
 
       // Extract description from body (everything after the second ---)
-      const bodyMatch = content.match(/\n---\n([\s\S]*)$/);
+      // Allow optional whitespace after the closing ---
+      const bodyMatch = content.match(/\n---\s*\n([\s\S]*)$/);
       if (bodyMatch) {
         meta.description = bodyMatch[1].trim();
+        if (meta.description) {
+          console.log(`[FileStorage] Loaded description for ${fileName}: ${meta.description.substring(0, 50)}...`);
+        }
+      } else {
+        console.log(`[FileStorage] No body found in metadata for ${fileName}`);
       }
 
       return meta.scope ? meta : { scope: 'user', ...meta };
