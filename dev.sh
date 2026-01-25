@@ -20,10 +20,10 @@ cleanup() {
 # Trap SIGINT and SIGTERM to run cleanup
 trap cleanup SIGINT SIGTERM
 
-# Start backend
-echo "Starting backend..."
+# Start backend with hot-reload
+echo "Starting backend with hot-reload..."
 cd "$SCRIPT_DIR"
-bun run backend/src/server/index.ts &
+bun --watch run backend/src/server/index.ts &
 BACKEND_PID=$!
 
 # Wait a moment for backend to start
