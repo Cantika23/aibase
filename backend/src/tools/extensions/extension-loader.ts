@@ -159,11 +159,19 @@ export class ExtensionLoader {
         // Create a namespace for the extension using its metadata.id
         // Convert kebab-case ID to camelCase for valid JavaScript identifier
         const namespace = extension.metadata.id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+        const functionNames = Object.keys(exports);
 
-        // Add extension under its namespace (e.g., imageDocument, pdfDocument, etc.)
-        scope[namespace] = exports;
-
-        console.log(`[ExtensionLoader] Loaded extension '${extension.metadata.name}' as ${namespace} with ${Object.keys(exports).length} exports`);
+        // Flatten single-function extensions to top level for easier calling
+        // e.g., postgresql = { postgresql: func } → scope.postgresql = func (not scope.postgresql.postgresql = func)
+        if (functionNames.length === 1) {
+          // Single function - add directly to scope
+          Object.assign(scope, exports);
+          console.log(`[ExtensionLoader] Loaded extension '${extension.metadata.name}' with ${functionNames.length} function (flattened to scope): ${functionNames.join(', ')}`);
+        } else {
+          // Multiple functions - use namespace to avoid conflicts
+          scope[namespace] = exports;
+          console.log(`[ExtensionLoader] Loaded extension '${extension.metadata.name}' as namespace '${namespace}' with ${functionNames.length} functions: ${functionNames.join(', ')}`);
+        }
       } catch (error: any) {
         console.error(`[ExtensionLoader] Failed to load extension '${extension.metadata.name}':`, error);
         // Continue loading other extensions even if one fails
