@@ -2,14 +2,27 @@
 
 ## Overview
 
-Extensions in AIBase are modular, project-scoped plugins that extend the LLM's capabilities. They can provide custom script functions, file processing, and custom UI components.
+Extensions in AIBase are modular, project-scoped plugins that extend the LLM's capabilities. They can provide custom script functions, file processing, and custom UI components loaded from the backend using a plugin architecture.
 
-### How Extensions Work
+### Backend Plugin Architecture (Production)
 
-1. **Loading**: Extensions are loaded when a conversation starts via `ExtensionLoader.loadExtensions()`
-2. **Execution**: Extension functions are available to the LLM as tools in the script execution context
-3. **Context**: Extensions generate AI context documentation via `context()` function or automatic code analysis
-4. **Hooks**: Extensions can register callbacks for events like `afterFileUpload`
+AIBase uses a **full backend plugin system** where all extension UI components are loaded dynamically from the backend:
+
+```
+Frontend (window.libs)          Backend Extension UI
+├── React                      └── show-chart/ui.tsx
+├── ReactDOM                       ├── show-table/ui.tsx
+├── echarts                       └── show-mermaid/ui.tsx
+├── ReactECharts
+└── mermaid
+```
+
+**Key Concepts:**
+
+1. **Backend Bundling**: Extension UI files are bundled with esbuild on-demand
+2. **External Dependencies**: React and visualization libraries are loaded in frontend and exposed via `window.libs`
+3. **Dynamic Loading**: Frontend fetches bundled UI from `/api/extensions/:id/ui`
+4. **Priority System**: Project-specific UI overrides global defaults
 
 ### Development vs Production Mode
 
@@ -63,7 +76,277 @@ return myExtension; // Required return statement
 
 ### ui.tsx (Optional)
 
-React components for custom UI. See "Custom UI Components" section below.
+React components for custom UI. Loaded from backend and uses `window.libs` for dependencies.
+
+## Priority System for Extension UI
+
+Extension UI components are loaded with a priority system:
+
+### 1. Project-Specific Extensions (Highest Priority)
+
+```
+data/{projectId}/extensions/{extensionId}/ui.tsx
+```
+
+Custom UI for a specific project. Overrides global default.
+
+**Example:**
+```typescript
+// data/project-A/extensions/show-chart/ui.tsx
+export default function ShowChartInspector({ data }) {
+  // Custom dark theme for project A
+  return <div className="custom-dark">{/* ... */}</div>;
+}
+```
+
+### 2. Global Default Extensions (Fallback)
+
+```
+backend/src/tools/extensions/defaults/{extensionId}/ui.tsx
+```
+
+Default UI used when no project-specific override exists.
+
+**Example:**
+```typescript
+// backend/src/tools/extensions/defaults/show-chart/ui.tsx
+export default function ShowChartInspector({ data }) {
+  // Standard chart UI
+  return <div className="chart">{/* ... */}</div>;
+}
+```
+
+### Loading Priority
+
+When loading UI for extension `show-chart` in `project-A`:
+
+1. Check: `data/project-A/extensions/show-chart/ui.tsx`
+2. If exists → Use project-specific UI
+3. If not → Use `backend/src/tools/extensions/defaults/show-chart/ui.tsx`
+
+### API Endpoint
+
+```typescript
+// Default UI (global)
+GET /api/extensions/show-chart/ui
+
+// Project-specific UI
+GET /api/extensions/show-chart/ui?projectId=project-A&tenantId=1
+```
+
+## Backend Plugin System
+
+### window.libs Architecture
+
+Frontend pre-loads shared libraries to `window.libs` before loading extension UI:
+
+```typescript
+// frontend/src/main.tsx
+import * as echarts from 'echarts';
+import ReactECharts from 'echarts-for-react';
+import mermaid from 'mermaid';
+
+if (typeof window !== 'undefined') {
+  (window as any).libs = {
+    React,
+    ReactDOM: { createRoot },
+    echarts,
+    ReactECharts,
+    mermaid,
+  };
+}
+```
+
+### Extension UI Using window.libs
+
+Extension UI components access libraries from `window.libs`:
+
+```typescript
+// backend/src/tools/extensions/defaults/show-chart/ui.tsx
+
+// Get ReactECharts from window.libs
+declare const window: {
+  libs: {
+    React: any;
+    ReactDOM: any;
+    ReactECharts: any;
+    echarts: any;
+    mermaid: any;
+  };
+};
+
+const ReactECharts = window.libs.ReactECharts;
+
+export default function ShowChartInspector({ data }) {
+  return (
+    <div>
+      <ReactECharts option={chartOption} />
+    </div>
+  );
+}
+```
+
+### esbuild Configuration
+
+Backend uses esbuild with external dependencies:
+
+```typescript
+// backend/src/server/extension-ui-handler.ts
+const result = await esbuild.build({
+  entryPoints: [uiPath],
+  bundle: true,
+  platform: 'browser',
+  target: 'es2020',
+  format: 'esm',
+  external: [
+    'react',
+    'react-dom',
+    'react/jsx-runtime',
+    'echarts',
+    'echarts-for-react',
+    'mermaid'
+  ],  // Exclude shared deps - loaded from frontend window.libs
+  write: false,
+});
+```
+
+## Custom UI Components
+
+Extensions provide React components for two contexts:
+
+### Component Types
+
+#### 1. Inspector Component (Default Export)
+
+Full-featured UI for the inspection dialog:
+
+```typescript
+// ui.tsx
+export default function MyExtensionInspector({ data, error }: InspectorProps) {
+  if (error) {
+    return (
+      <div className="p-4 text-sm text-red-600 dark:text-red-400">
+        <h4 className="font-semibold mb-2">Error</h4>
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        No data available
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <h4 className="font-semibold">Results</h4>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+    </div>
+  );
+}
+```
+
+#### 2. Message Component (Named Export)
+
+Simplified UI for inline chat messages:
+
+```typescript
+// ui.tsx
+export function MyExtensionMessage({ toolInvocation }: MessageProps) {
+  const { result } = toolInvocation;
+
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      {/* Simplified inline UI */}
+    </div>
+  );
+}
+```
+
+### Naming Convention
+
+Component names follow extension ID naming:
+
+| Extension ID | Inspector (default) | Message (named) |
+|--------------|---------------------|-----------------|
+| `show-chart` | `ShowChartInspector` | `ShowChartMessage` |
+| `image-search` | `ImageSearchInspector` | `ImageSearchMessage` |
+| `my-extension` | `MyExtensionInspector` | `MyExtensionMessage` |
+
+Pattern: `{ExtensionId}` → `{PascalCaseId}Inspector` / `{PascalCaseId}Message`
+
+### TypeScript Interfaces
+
+```typescript
+// Inspector props (default export)
+interface InspectorProps {
+  data?: {
+    [key: string]: any;  // Extension-specific data
+  };
+  error?: string;
+}
+
+// Message props (named export)
+interface MessageProps {
+  toolInvocation: {
+    toolCallId: string;
+    result: {
+      [key: string]: any;
+    };
+  };
+}
+```
+
+## Using Visualization Libraries
+
+### ECharts (show-chart)
+
+```typescript
+declare const window: {
+  libs: {
+    React: any;
+    ReactECharts: any;
+    echarts: any;
+  };
+};
+
+const ReactECharts = window.libs.ReactECharts;
+
+export function ShowChartMessage({ toolInvocation }) {
+  const { series, xAxis } = toolInvocation.result.args;
+
+  const option = {
+    xAxis: { type: 'category', data: xAxis },
+    series: [{ type: 'bar', data: series }]
+  };
+
+  return (
+    <div className="h-[300px]">
+      <ReactECharts option={option} />
+    </div>
+  );
+}
+```
+
+### Mermaid (show-mermaid)
+
+```typescript
+const mermaid = window.libs.mermaid;
+
+export function ShowMermaidMessage({ toolInvocation }) {
+  const { code } = toolInvocation.result.args;
+
+  useEffect(() => {
+    mermaid.initialize({ startOnLoad: false });
+    mermaid.render('mermaid-diagram', code);
+  }, [code]);
+
+  return <div id="mermaid-diagram" />;
+}
+```
 
 ## Metadata Reference
 
@@ -99,19 +382,6 @@ interface ExampleEntry {
 }
 ```
 
-```json
-{
-  "examples": [
-    {
-      "title": "Query a CSV file",
-      "description": "Select rows from a CSV file",
-      "code": "await myExtension.query({ file: 'data.csv' });",
-      "result": "Returns first 10 rows"
-    }
-  ]
-}
-```
-
 #### fileExtraction: `FileExtractionConfig`
 
 Declare support for automatic file processing:
@@ -123,58 +393,13 @@ interface FileExtractionConfig {
 }
 ```
 
-```json
-{
-  "fileExtraction": {
-    "supportedTypes": ["pdf", "docx"],
-    "outputFormat": "markdown"
-  }
-}
-```
+#### messageUI: `MessageUIConfig` (DEPRECATED)
 
-#### messageUI: `MessageUIConfig`
+UI components are now auto-discovered from `ui.tsx` exports. This field is no longer needed.
 
-Custom UI component for rendering in chat messages:
+#### inspectionUI: `InspectionUIConfig` (DEPRECATED)
 
-```typescript
-interface MessageUIConfig {
-  componentName: string;          // React component name (e.g., "MyExtensionMessage")
-  visualizationType: string;      // Type for __visualizations (e.g., "my-extension")
-  uiFile?: string;                // UI filename (default: "ui.tsx")
-}
-```
-
-```json
-{
-  "messageUI": {
-    "componentName": "DuckDBMessage",
-    "visualizationType": "duckdb"
-  }
-}
-```
-
-#### inspectionUI: `InspectionUIConfig`
-
-Custom UI for the inspection dialog:
-
-```typescript
-interface InspectionUIConfig {
-  tabLabel: string;               // Tab label (e.g., "Query Details")
-  componentName: string;          // React component name (e.g., "DuckDBInspector")
-  uiFile?: string;                // UI filename (default: "ui.tsx")
-  showByDefault?: boolean;        // Auto-select this tab
-}
-```
-
-```json
-{
-  "inspectionUI": {
-    "tabLabel": "Query Details",
-    "componentName": "DuckDBInspector",
-    "showByDefault": true
-  }
-}
-```
+UI components are now auto-discovered from `ui.tsx` exports. This field is no longer needed.
 
 ## Core Features
 
@@ -234,7 +459,6 @@ await myExtension.query({
 #### 2. Auto-Generated Context
 
 If no `context()` is exported, AIBase analyzes the code:
-
 - Extracts function signatures
 - Parses parameters and return types
 - Generates basic usage examples
@@ -271,227 +495,63 @@ return myExtension;
 |-----------|-------------------|-------------|
 | `afterFileUpload` | `FileUploadContext` | Called after file upload |
 
-#### FileUploadContext
+## UI Caching and Performance
+
+### Cache Strategy
+
+Extension UI is cached with ETag support:
 
 ```typescript
-interface FileUploadContext {
-  convId: string;       // Conversation ID
-  projectId: string;    // Project ID
-  fileName: string;     // Original filename
-  filePath: string;     // Full file path
-  fileType: string;     // MIME type
-  fileSize: number;     // File size in bytes
-}
+// First request
+GET /api/extensions/show-chart/ui
+→ 200 OK + ETag: "abc123..."
+
+// Subsequent requests
+GET /api/extensions/show-chart/ui
+→ 304 Not Modified (if cached)
+
+// Forced refresh
+GET /api/extensions/show-chart/ui
+→ Returns fresh content if source changed
 ```
 
-Return `{ description: string }` to provide AI context about the file.
+### Cache Invalidation
 
-### File Processing
-
-Extensions can declare support for automatic file extraction via `fileExtraction` metadata. When combined with `afterFileUpload` hooks, files are automatically processed on upload.
-
-Example from `image-document` extension:
-
-```typescript
-// metadata.json
-{
-  "fileExtraction": {
-    "supportedTypes": ["png", "jpg", "jpeg", "gif", "webp"],
-    "outputFormat": "markdown"
-  }
-}
-
-// index.ts
-if (typeof extensionHookRegistry !== 'undefined') {
-  extensionHookRegistry.registerHook(
-    'afterFileUpload',
-    'image-document',
-    async (context) => {
-      if (!isImageFile(context.fileType)) return;
-
-      const description = await analyzeImageFile(context.filePath, context.fileType);
-      return { description };
-    }
-  );
-}
-```
-
-### Custom UI Components
-
-Extensions can provide React components for two contexts:
-
-#### 1. Message UI (Inline Chat)
-
-Renders in chat messages when `__visualization` is returned:
-
-```typescript
-// index.ts
-const myExtension = {
-  showChart: async (options: ChartOptions) => {
-    return {
-      __visualization: {
-        type: "show-chart",  // Must match messageUI.visualizationType
-        toolCallId: `call_${Date.now()}`,
-        args: options
-      }
-    };
-  }
-};
-```
-
-```tsx
-// ui.tsx - Message component (named export)
-export function ShowChartMessage({ toolInvocation }: MessageProps) {
-  const { args } = toolInvocation.result.__visualization;
-  return <div>{/* Render chart */}</div>;
-}
-```
-
-#### 2. Inspection UI (Dialog)
-
-Renders in a tab of the inspection dialog:
-
-```tsx
-// ui.tsx - Inspector component (default export)
-export default function MyInspector({ data, error }: InspectorProps) {
-  if (error) return <ErrorMessage error={error} />;
-  if (!data) return <div>No data</div>;
-
-  return (
-    <div>
-      <h4>Result</h4>
-      <pre>{JSON.stringify(data, null, 2)}</pre>
-    </div>
-  );
-}
-```
-
-#### UI TypeScript Interfaces
-
-```typescript
-// Inspector props (default export)
-interface InspectorProps {
-  data?: {
-    [key: string]: any;  // Extension-specific data
-  };
-  error?: string;
-}
-
-// Message props (named export)
-interface MessageProps {
-  toolInvocation: {
-    toolCallId: string;
-    result: {
-      __visualization?: {
-        type: string;
-        toolCallId: string;
-        args: any;
-      };
-      [key: string]: any;
-    };
-  };
-}
-```
-
-## TypeScript Interfaces
-
-Complete type definitions from `extension-storage.ts`:
-
-```typescript
-export interface ExampleEntry {
-  title: string;
-  description?: string;
-  code: string;
-  result?: string;
-}
-
-export interface FileExtractionConfig {
-  supportedTypes: string[];
-  outputFormat: 'markdown' | 'text';
-}
-
-export interface MessageUIConfig {
-  componentName: string;
-  visualizationType: string;
-  uiFile?: string;
-}
-
-export interface InspectionUIConfig {
-  tabLabel: string;
-  componentName: string;
-  uiFile?: string;
-  showByDefault?: boolean;
-}
-
-export interface ExtensionMetadata {
-  id: string;
-  name: string;
-  description: string;
-  author?: string;
-  version: string;
-  category: string;
-  enabled: boolean;
-  isDefault: boolean;
-  createdAt: number;
-  updatedAt: number;
-
-  // Optional advanced metadata
-  examples?: ExampleEntry[];
-  fileExtraction?: FileExtractionConfig;
-  messageUI?: MessageUIConfig;
-  inspectionUI?: InspectionUIConfig;
-}
-
-export interface Extension {
-  metadata: ExtensionMetadata;
-  code: string;
-}
-
-export interface CreateExtensionData {
-  id: string;
-  name: string;
-  description: string;
-  author?: string;
-  version?: string;
-  category?: string;
-  code: string;
-  enabled?: boolean;
-  isDefault?: boolean;
-  examples?: ExampleEntry[];
-  fileExtraction?: FileExtractionConfig;
-  messageUI?: MessageUIConfig;
-  inspectionUI?: InspectionUIConfig;
-}
-```
+Cache is invalidated when:
+- Source file (`ui.tsx`) is modified (mtime-based)
+- Manually cleared via `clearBackendComponentCache()`
+- Server restart (in-memory cache cleared)
 
 ## Examples
 
 ### Database Tools
 
-- **duckdb**: Query CSV, Excel, Parquet, JSON with SQL (`backend/src/tools/extensions/defaults/duckdb/`)
+- **duckdb**: Query CSV, Excel, Parquet, JSON with SQL
 - **postgresql**: PostgreSQL queries with connection pooling
 - **clickhouse**: ClickHouse analytics database
 - **trino**: Distributed SQL queries
 
+All include inspection UI showing query results, execution time, and database-specific stats.
+
 ### Document Processing
 
-- **pdf-document**: PDF text extraction (`backend/src/tools/extensions/defaults/pdf-document/`)
+- **pdf-document**: PDF text extraction
 - **excel-document**: Excel file processing
 - **word-document**: Word document text extraction
 - **powerpoint-document**: PowerPoint presentation extraction
-- **image-document**: Image analysis with vision models
+- **image-document**: Image analysis with vision models (needs UI)
 
 ### Visualization
 
-- **show-chart**: Interactive charts (bar, line, pie, scatter)
+- **show-chart**: Interactive charts (bar, line, pie, scatter) using ECharts
 - **show-table**: Data table display
 - **show-mermaid**: Mermaid diagram rendering
-- **peek**: Quick data inspection
+- **peek**: Quick data inspection with pagination
 
 ### Web Tools
 
-- **web-search**: Web search functionality
-- **image-search**: Image search capabilities
+- **web-search**: Web search functionality with Brave API
+- **image-search**: Image search with thumbnails
 
 ## Development Workflow
 
@@ -517,20 +577,33 @@ const myExtension = {
 return myExtension;
 ```
 
-4. **Test in development mode**:
+4. **Write ui.tsx** (optional):
+```typescript
+export default function MyExtensionInspector({ data, error }) {
+  // Inspector UI
+}
+
+export function MyExtensionMessage({ toolInvocation }) {
+  // Message UI
+}
+```
+
+5. **Test in development mode**:
 ```bash
 USE_DEFAULT_EXTENSIONS=true bun run backend/src/server/index.ts
 ```
 
-### Testing Extensions
+### Testing Extension UI
 
 1. Start backend with `USE_DEFAULT_EXTENSIONS=true`
 2. Create a new conversation
-3. Call extension function in script:
+3. Call extension function:
 ```typescript
 const result = await myExtension.myFunction({ param: 'value' });
 return result;
 ```
+4. Click on result to open inspection dialog
+5. Verify custom UI renders correctly
 
 ### Deployment
 
@@ -544,21 +617,21 @@ POST /api/projects/{projectId}/extensions/reset
 
 ## API Endpoints
 
-REST API for extension management:
+### Extension Management
 
-### List Extensions
+#### List Extensions
 ```
 GET /api/projects/{projectId}/extensions
 ```
 Returns all extensions for a project.
 
-### Get Extension
+#### Get Extension
 ```
 GET /api/projects/{projectId}/extensions/{extensionId}
 ```
 Returns a specific extension.
 
-### Create Extension
+#### Create Extension
 ```
 POST /api/projects/{projectId}/extensions
 ```
@@ -574,28 +647,69 @@ Body:
 }
 ```
 
-### Update Extension
+#### Update Extension
 ```
 PUT /api/projects/{projectId}/extensions/{extensionId}
 ```
 Body: Same as create (all fields optional).
 
-### Delete Extension
+#### Delete Extension
 ```
 DELETE /api/projects/{projectId}/extensions/{extensionId}
 ```
 
-### Toggle Extension
+#### Toggle Extension
 ```
 POST /api/projects/{projectId}/extensions/{extensionId}/toggle
 ```
 Toggles the `enabled` state.
 
-### Reset to Defaults
+#### Reset to Defaults
 ```
 POST /api/projects/{projectId}/extensions/reset
 ```
 Deletes all project extensions and copies defaults.
+
+### Extension UI
+
+#### Get Extension UI
+```
+GET /api/extensions/{extensionId}/ui
+GET /api/extensions/{extensionId}/ui?projectId={projectId}&tenantId={tenantId}
+```
+Returns bundled React component code.
+
+**Response:**
+- Content-Type: `application/javascript; charset=utf-8`
+- ETag header for caching
+- 304 Not Modified if cached
+
+## Best Practices
+
+### Extension Development
+
+1. **Namespace design**: Use kebab-case IDs (`my-extension`) that become camelCase namespaces (`myExtension`)
+2. **Error handling**: Always throw descriptive `Error` objects
+3. **Type safety**: Define TypeScript interfaces for options/returns
+4. **Context quality**: Provide rich `context()` for better LLM usage
+5. **Hook cleanup**: Hooks automatically cleaned up on extension unload
+
+### UI Development
+
+1. **Use window.libs**: Always access React/ECharts/Mermaid from `window.libs`
+2. **Dual exports**: Provide both Inspector (default) and Message (named) components
+3. **Naming**: Follow `{ExtensionId}Inspector` / `{ExtensionId}Message` pattern
+4. **Error states**: Handle `error` prop gracefully
+5. **Loading states**: Show loading indicators for async operations
+6. **Responsive**: Use Tailwind classes for responsive design
+7. **Dark mode**: Support both light and dark themes
+
+### Performance
+
+1. **Lazy loading**: Message UI should be lightweight
+2. **Caching**: Leverage backend UI caching
+3. **Pre-bundling**: Server pre-bundles UI on startup for faster first load
+4. **External deps**: Never bundle React/viz libs - use window.libs
 
 ## Key Files Referenced
 
@@ -603,15 +717,8 @@ Deletes all project extensions and copies defaults.
 - **`extension-context.ts`**: AI context generation from metadata and code
 - **`extension-hooks.ts`**: Hook system implementation
 - **`extension-storage.ts`**: Storage layer (metadata, code persistence)
+- **`extension-ui-handler.ts`**: UI bundling and serving with esbuild
 - **`defaults/*/`**: Example extension implementations
 - **`../../server/extensions-handler.ts`**: REST API endpoints
-
-## Best Practices
-
-1. **Namespace design**: Use kebab-case IDs (`my-extension`) that become camelCase namespaces (`myExtension`)
-2. **Error handling**: Always throw descriptive `Error` objects
-3. **Type safety**: Define TypeScript interfaces for options/returns
-4. **Context quality**: Provide rich `context()` for better LLM usage
-5. **Hook cleanup**: Hooks automatically cleaned up on extension unload
-6. **UI performance**: Keep message UI components lightweight
-7. **Testing**: Use `USE_DEFAULT_EXTENSIONS=true` for rapid iteration
+- **`frontend/src/main.tsx`**: window.libs initialization
+- **`frontend/src/components/ui/chat/tools/extension-component-registry.tsx`**: Dynamic component loading
