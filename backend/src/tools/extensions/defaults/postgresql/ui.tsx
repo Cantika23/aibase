@@ -12,6 +12,10 @@ interface InspectorProps {
     rowCount?: number;
     columns?: string[];
     sampleData?: any[];
+    // Support wrapped user results (e.g., { tables, count })
+    data?: any[];
+    tables?: any[];
+    count?: number;
   };
   error?: string;
 }
@@ -20,7 +24,9 @@ interface MessageProps {
   toolInvocation: {
     result: {
       data?: any[];
+      tables?: any[];
       rowCount?: number;
+      count?: number;
       executionTime?: number;
       query?: string;
     };
@@ -49,7 +55,21 @@ export default function PostgreSQLInspector({ data, error }: InspectorProps) {
     );
   }
 
-  const { query, executionTime, rowCount, columns, sampleData } = data;
+  const { query, executionTime, rowCount, columns, sampleData, data: resultData, tables, count } = data;
+
+  // Handle both direct extension results and wrapped user results
+  const displayData = sampleData || resultData || tables;
+  const displayCount = rowCount || count;
+  const hasData = displayData && displayData.length > 0;
+  const hasColumns = columns && columns.length > 0;
+
+  // Extract columns from data if not explicitly provided
+  const displayColumns = hasColumns ? columns : (hasData ? Object.keys(displayData[0]) : []);
+
+  // Debug logging
+  console.log('[PostgreSQLInspector] Received data:', data);
+  console.log('[PostgreSQLInspector] Display data:', displayData);
+  console.log('[PostgreSQLInspector] Display count:', displayCount);
 
   return (
     <div className="p-4 space-y-4">
@@ -64,7 +84,7 @@ export default function PostgreSQLInspector({ data, error }: InspectorProps) {
       )}
 
       {/* Execution Statistics */}
-      {(executionTime !== undefined || rowCount !== undefined) && (
+      {(executionTime !== undefined || displayCount !== undefined) && (
         <div className="grid grid-cols-2 gap-4">
           {executionTime !== undefined && (
             <div>
@@ -77,21 +97,21 @@ export default function PostgreSQLInspector({ data, error }: InspectorProps) {
               </p>
             </div>
           )}
-          {rowCount !== undefined && (
+          {displayCount !== undefined && (
             <div>
               <h4 className="font-semibold text-sm mb-1">Rows Returned</h4>
-              <p className="text-sm">{rowCount.toLocaleString()}</p>
+              <p className="text-sm">{displayCount.toLocaleString()}</p>
             </div>
           )}
         </div>
       )}
 
       {/* Columns */}
-      {columns && columns.length > 0 && (
+      {displayColumns && displayColumns.length > 0 && (
         <div>
           <h4 className="font-semibold text-sm mb-2">Columns</h4>
           <div className="flex flex-wrap gap-2">
-            {columns.map((col, idx) => (
+            {displayColumns.map((col, idx) => (
               <span
                 key={idx}
                 className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
@@ -104,14 +124,14 @@ export default function PostgreSQLInspector({ data, error }: InspectorProps) {
       )}
 
       {/* Sample Data */}
-      {sampleData && sampleData.length > 0 && (
+      {hasData && (
         <div>
           <h4 className="font-semibold text-sm mb-2">Sample Data (First 3 rows)</h4>
           <div className="overflow-auto max-h-40 border rounded">
             <table className="w-full text-xs">
               <thead className="bg-muted">
                 <tr>
-                  {Object.keys(sampleData[0]).map((key) => (
+                  {displayColumns.map((key) => (
                     <th key={key} className="px-2 py-1 text-left font-medium">
                       {key}
                     </th>
@@ -119,11 +139,11 @@ export default function PostgreSQLInspector({ data, error }: InspectorProps) {
                 </tr>
               </thead>
               <tbody>
-                {sampleData.map((row, idx) => (
+                {displayData.slice(0, 3).map((row, idx) => (
                   <tr key={idx} className="border-t">
-                    {Object.values(row).map((value, vIdx) => (
-                      <td key={vIdx} className="px-2 py-1">
-                        {String(value ?? 'NULL')}
+                    {displayColumns.map((key) => (
+                      <td key={key} className="px-2 py-1">
+                        {String(row[key] ?? 'NULL')}
                       </td>
                     ))}
                   </tr>
@@ -148,9 +168,13 @@ export default function PostgreSQLInspector({ data, error }: InspectorProps) {
  */
 export function PostgreSQLMessage({ toolInvocation }: MessageProps) {
   const { result } = toolInvocation;
-  const { data, rowCount, executionTime, query } = result;
+  const { data, tables, rowCount, count, executionTime, query } = result;
 
-  if (!data || data.length === 0) {
+  // Handle both direct extension results and wrapped user results
+  const displayData = data || tables;
+  const displayCount = rowCount || count;
+
+  if (!displayData || displayData.length === 0) {
     return (
       <div className="text-sm text-muted-foreground">
         No results returned
@@ -159,7 +183,8 @@ export function PostgreSQLMessage({ toolInvocation }: MessageProps) {
   }
 
   // For inline chat, show simplified table with first 5 rows
-  const previewData = data.slice(0, 5);
+  const previewData = displayData.slice(0, 5);
+  const columns = Object.keys(previewData[0]);
 
   return (
     <div className="space-y-2">
@@ -172,8 +197,8 @@ export function PostgreSQLMessage({ toolInvocation }: MessageProps) {
 
       {/* Stats */}
       <div className="flex gap-4 text-xs text-muted-foreground">
-        {rowCount !== undefined && (
-          <span>{rowCount.toLocaleString()} rows</span>
+        {displayCount !== undefined && (
+          <span>{displayCount.toLocaleString()} rows</span>
         )}
         {executionTime !== undefined && (
           <span>{executionTime}ms</span>
@@ -185,7 +210,7 @@ export function PostgreSQLMessage({ toolInvocation }: MessageProps) {
         <table className="w-full text-xs">
           <thead className="bg-muted">
             <tr>
-              {Object.keys(previewData[0]).map((key) => (
+              {columns.map((key) => (
                 <th key={key} className="px-2 py-1 text-left font-medium">
                   {key}
                 </th>
@@ -195,9 +220,9 @@ export function PostgreSQLMessage({ toolInvocation }: MessageProps) {
           <tbody>
             {previewData.map((row, idx) => (
               <tr key={idx} className="border-t">
-                {Object.values(row).map((value, vIdx) => (
-                  <td key={vIdx} className="px-2 py-1">
-                    {String(value ?? 'NULL')}
+                {columns.map((key) => (
+                  <td key={key} className="px-2 py-1">
+                    {String(row[key] ?? 'NULL')}
                   </td>
                 ))}
               </tr>
@@ -206,9 +231,9 @@ export function PostgreSQLMessage({ toolInvocation }: MessageProps) {
         </table>
       </div>
 
-      {data.length > 5 && (
+      {displayData.length > 5 && (
         <div className="text-xs text-muted-foreground italic">
-          Showing 5 of {data.length.toLocaleString()} rows
+          Showing 5 of {displayData.length.toLocaleString()} rows
         </div>
       )}
     </div>

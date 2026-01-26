@@ -10,8 +10,11 @@ interface InspectorProps {
     query?: string;
     executionTime?: number;
     rowCount?: number;
+    count?: number;
     columns?: string[];
     sampleData?: any[];
+    data?: any[];
+    tables?: any[];
     stats?: {
       rows_read?: number;
       bytes_read?: number;
@@ -25,7 +28,9 @@ interface MessageProps {
   toolInvocation: {
     result: {
       data?: any[];
+      tables?: any[];
       rowCount?: number;
+      count?: number;
       executionTime?: number;
       query?: string;
       stats?: {
@@ -59,7 +64,16 @@ export default function ClickHouseInspector({ data, error }: InspectorProps) {
     );
   }
 
-  const { query, executionTime, rowCount, columns, sampleData, stats } = data;
+  const { query, executionTime, rowCount, count, columns, sampleData, data, tables, stats } = data;
+
+  // Handle both direct extension results and wrapped user results
+  const displayData = sampleData || data || tables;
+  const displayCount = rowCount || count;
+  const hasData = displayData && displayData.length > 0;
+  const hasColumns = columns && columns.length > 0;
+
+  // Extract columns from data if not explicitly provided
+  const displayColumns = hasColumns ? columns : (hasData ? Object.keys(displayData[0]) : []);
 
   return (
     <div className="p-4 space-y-4">
@@ -74,7 +88,7 @@ export default function ClickHouseInspector({ data, error }: InspectorProps) {
       )}
 
       {/* Execution Statistics */}
-      {(executionTime !== undefined || rowCount !== undefined) && (
+      {(executionTime !== undefined || displayCount !== undefined) && (
         <div className="grid grid-cols-2 gap-4">
           {executionTime !== undefined && (
             <div>
@@ -87,10 +101,10 @@ export default function ClickHouseInspector({ data, error }: InspectorProps) {
               </p>
             </div>
           )}
-          {rowCount !== undefined && (
+          {displayCount !== undefined && (
             <div>
               <h4 className="font-semibold text-sm mb-1">Rows Returned</h4>
-              <p className="text-sm">{rowCount.toLocaleString()}</p>
+              <p className="text-sm">{displayCount.toLocaleString()}</p>
             </div>
           )}
         </div>
@@ -124,11 +138,11 @@ export default function ClickHouseInspector({ data, error }: InspectorProps) {
       )}
 
       {/* Columns */}
-      {columns && columns.length > 0 && (
+      {displayColumns && displayColumns.length > 0 && (
         <div>
           <h4 className="font-semibold text-sm mb-2">Columns</h4>
           <div className="flex flex-wrap gap-2">
-            {columns.map((col, idx) => (
+            {displayColumns.map((col, idx) => (
               <span
                 key={idx}
                 className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
@@ -141,14 +155,14 @@ export default function ClickHouseInspector({ data, error }: InspectorProps) {
       )}
 
       {/* Sample Data */}
-      {sampleData && sampleData.length > 0 && (
+      {hasData && (
         <div>
           <h4 className="font-semibold text-sm mb-2">Sample Data (First 3 rows)</h4>
           <div className="overflow-auto max-h-40 border rounded">
             <table className="w-full text-xs">
               <thead className="bg-muted">
                 <tr>
-                  {Object.keys(sampleData[0]).map((key) => (
+                  {displayColumns.map((key) => (
                     <th key={key} className="px-2 py-1 text-left font-medium">
                       {key}
                     </th>
@@ -156,11 +170,11 @@ export default function ClickHouseInspector({ data, error }: InspectorProps) {
                 </tr>
               </thead>
               <tbody>
-                {sampleData.map((row, idx) => (
+                {displayData.slice(0, 3).map((row, idx) => (
                   <tr key={idx} className="border-t">
-                    {Object.values(row).map((value, vIdx) => (
-                      <td key={vIdx} className="px-2 py-1">
-                        {String(value ?? 'NULL')}
+                    {displayColumns.map((key) => (
+                      <td key={key} className="px-2 py-1">
+                        {String(row[key] ?? 'NULL')}
                       </td>
                     ))}
                   </tr>
