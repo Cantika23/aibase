@@ -181,6 +181,12 @@ const postgresqlExtension = {
         // Bun's SQL returns arrays of objects
         const dataArray = Array.isArray(result) ? result : [result];
 
+        // Extract columns from first row if available
+        const columns = dataArray.length > 0 ? Object.keys(dataArray[0]) : [];
+
+        // Sample first 3 rows for UI display
+        const sampleData = dataArray.slice(0, 3);
+
         const extensionResult = {
           data: dataArray,
           rowCount: dataArray.length,
@@ -189,9 +195,14 @@ const postgresqlExtension = {
         };
 
         // Broadcast inspection data if __broadcastInspection is available
+        // Include columns and sampleData for UI display
         if (globalThis.__broadcastInspection) {
           globalThis.__broadcastInspection('postgresql', {
-            ...extensionResult,
+            query: options.query,
+            executionTime,
+            rowCount: dataArray.length,
+            columns,
+            sampleData,
           });
         }
 
@@ -204,9 +215,14 @@ const postgresqlExtension = {
           query: options.query,
         };
 
+        // Broadcast inspection data for raw format (limited info)
         if (globalThis.__broadcastInspection) {
           globalThis.__broadcastInspection('postgresql', {
-            ...extensionResult,
+            query: options.query,
+            executionTime,
+            rowCount: null,  // Unknown for raw format
+            columns: [],
+            sampleData: [],
           });
         }
 
