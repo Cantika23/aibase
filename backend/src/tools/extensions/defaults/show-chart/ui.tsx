@@ -3,7 +3,8 @@
  * Displays interactive charts using ECharts
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
+import ReactECharts from 'echarts-for-react';
 
 interface ChartSeries {
   name: string;
@@ -38,10 +39,123 @@ interface MessageProps {
 }
 
 /**
+ * Get chart theme based on document class
+ */
+function getChartTheme(): 'dark' | undefined {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : undefined;
+}
+
+/**
+ * Build ECharts option from simplified data
+ */
+function buildChartOption(
+  chartType: string,
+  data: { series?: ChartSeries[]; xAxis?: string[]; yAxis?: string },
+  theme: 'dark' | undefined
+) {
+  // If data is already a full ECharts option, use it
+  if (data.series && !Array.isArray(data.series) && data.xAxis) {
+    return {
+      ...data,
+      backgroundColor: 'transparent',
+      textStyle: {
+        fontFamily: 'Inter, sans-serif',
+      },
+    };
+  }
+
+  const baseOption: any = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow',
+      },
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true,
+    },
+    textStyle: {
+      fontFamily: 'Inter, sans-serif',
+    },
+  };
+
+  if (chartType === 'pie') {
+    baseOption.tooltip = {
+      trigger: 'item',
+    };
+    baseOption.series = data.series?.map((s: any) => ({
+      ...s,
+      type: 'pie',
+      radius: ['40%', '70%'],
+      avoidLabelOverlap: false,
+      itemStyle: {
+        borderRadius: 10,
+        borderColor: '#fff',
+        borderWidth: 2,
+      },
+      label: {
+        show: false,
+        position: 'center',
+      },
+      emphasis: {
+        label: {
+          show: true,
+          fontSize: 20,
+          fontWeight: 'bold',
+        },
+      },
+      labelLine: {
+        show: false,
+      },
+    }));
+  } else {
+    // Line, Bar, etc.
+    baseOption.xAxis = {
+      type: 'category',
+      data: data.xAxis,
+      axisLine: {
+        lineStyle: {
+          color: theme === 'dark' ? '#525252' : '#e5e5e5',
+        },
+      },
+      axisLabel: {
+        color: theme === 'dark' ? '#a3a3a3' : '#525252',
+      },
+    };
+    baseOption.yAxis = {
+      type: 'value',
+      splitLine: {
+        lineStyle: {
+          color: theme === 'dark' ? '#262626' : '#f5f5f5',
+        },
+      },
+      axisLabel: {
+        color: theme === 'dark' ? '#a3a3a3' : '#525252',
+      },
+    };
+    baseOption.series = data.series?.map((s: any) => ({
+      ...s,
+      type: chartType,
+      smooth: chartType === 'line',
+    }));
+  }
+
+  return baseOption;
+}
+
+/**
  * Inspection Dialog UI - default export
  * Full-featured UI for the inspection dialog
  */
 export default function ShowChartInspector({ data, error }: InspectorProps) {
+  const theme = getChartTheme();
+
   if (error) {
     return (
       <div className="p-4 text-sm text-red-600 dark:text-red-400">
@@ -69,6 +183,8 @@ export default function ShowChartInspector({ data, error }: InspectorProps) {
     );
   }
 
+  const option = useMemo(() => buildChartOption(chartType || 'bar', { series, xAxis, yAxis }, theme), [chartType, series, xAxis, yAxis, theme]);
+
   return (
     <div className="p-4 space-y-4">
       {/* Title and Description */}
@@ -80,6 +196,16 @@ export default function ShowChartInspector({ data, error }: InspectorProps) {
           )}
         </div>
       )}
+
+      {/* Chart Rendering */}
+      <div className="h-[400px] w-full">
+        <ReactECharts
+          option={option}
+          theme={theme}
+          style={{ height: '100%', width: '100%' }}
+          opts={{ renderer: 'svg' }}
+        />
+      </div>
 
       {/* Chart Info */}
       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -112,26 +238,9 @@ export default function ShowChartInspector({ data, error }: InspectorProps) {
         </div>
       )}
 
-      {/* X-Axis Labels */}
-      {xAxis && xAxis.length > 0 && (
-        <div>
-          <h4 className="font-semibold text-sm mb-2">X-Axis Labels</h4>
-          <div className="flex flex-wrap gap-2">
-            {xAxis.map((label, idx) => (
-              <span
-                key={idx}
-                className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
-              >
-                {label}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Info Badge */}
       <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-xs text-orange-800 dark:text-orange-200">
-        📈 Chart - Interactive visualization (use chat for rendering)
+        📈 Chart - Interactive visualization
       </div>
     </div>
   );
@@ -140,11 +249,9 @@ export default function ShowChartInspector({ data, error }: InspectorProps) {
 /**
  * Message Chat UI - named export
  * Simplified UI for inline rendering in chat messages
- *
- * Note: This is a placeholder that shows chart metadata.
- * The actual chart rendering happens in the frontend visualization component.
  */
 export function ShowChartMessage({ toolInvocation }: MessageProps) {
+  const theme = getChartTheme();
   const { title, description, chartType, xAxis, yAxis, series } = toolInvocation.result.args;
 
   if (!series || series.length === 0) {
@@ -154,6 +261,8 @@ export function ShowChartMessage({ toolInvocation }: MessageProps) {
       </div>
     );
   }
+
+  const option = useMemo(() => buildChartOption(chartType || 'bar', { series, xAxis, yAxis }, theme), [chartType, series, xAxis, yAxis, theme]);
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-sm">
@@ -165,28 +274,14 @@ export function ShowChartMessage({ toolInvocation }: MessageProps) {
         )}
       </div>
 
-      {/* Chart Metadata */}
-      <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-        <div>
-          <span className="font-medium">Type:</span> {chartType}
-        </div>
-        {yAxis && (
-          <div>
-            <span className="font-medium">Y-Axis:</span> {yAxis}
-          </div>
-        )}
-      </div>
-
-      {/* Series Summary */}
-      <div className="text-sm text-muted-foreground">
-        <span className="font-medium">Series:</span>{' '}
-        {series.map(s => s.name).join(', ')}
-        {chartType !== 'pie' && xAxis && ` (${xAxis.length} data points)`}
-      </div>
-
-      {/* Info */}
-      <div className="text-xs text-muted-foreground italic">
-        Chart rendering is handled by the frontend visualization component
+      {/* Chart Rendering */}
+      <div className="h-[300px] w-full">
+        <ReactECharts
+          option={option}
+          theme={theme}
+          style={{ height: '100%', width: '100%' }}
+          opts={{ renderer: 'svg' }}
+        />
       </div>
     </div>
   );

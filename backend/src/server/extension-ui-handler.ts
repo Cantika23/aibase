@@ -11,7 +11,7 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ExtensionUI');
 
-const extensionsDir = path.join(process.cwd(), 'backend/src/tools/extensions/defaults');
+const globalExtensionsDir = path.join(process.cwd(), 'backend/src/tools/extensions/defaults');
 const cacheDir = path.join(process.cwd(), 'data/cache/extension-ui');
 
 // Cache metadata storage
@@ -47,12 +47,43 @@ function generateETag(contentHash: string): string {
 }
 
 /**
- * GET /api/extensions/:id/ui
+ * GET /api/extensions/:id/ui?projectId=xxx&tenantId=xxx
  * Get transpiled & bundled extension UI component
+ *
+ * Priority:
+ * 1. Project-specific: data/{projectId}/extensions/{extensionId}/ui.tsx
+ * 2. Global default: backend/src/tools/extensions/defaults/{extensionId}/ui.tsx
  */
 export async function handleGetExtensionUI(req: Request, extensionId: string): Promise<Response> {
   try {
-    const uiPath = path.join(extensionsDir, extensionId, 'ui.tsx');
+    // Extract projectId and tenantId from query params
+    const url = new URL(req.url);
+    const projectId = url.searchParams.get('projectId');
+    const tenantId = url.searchParams.get('tenantId');
+
+    // Determine UI path with priority system
+    let uiPath: string;
+    let isProjectSpecific = false;
+
+    if (projectId && tenantId) {
+      // Check project-specific extension first
+      const projectExtDir = path.join(process.cwd(), 'data', projectId, 'extensions', extensionId);
+      const projectUIPath = path.join(projectExtDir, 'ui.tsx');
+
+      try {
+        await fs.access(projectUIPath);
+        uiPath = projectUIPath;
+        isProjectSpecific = true;
+        logger.info({ extensionId, projectId, tenantId }, 'Using project-specific extension UI');
+      } catch {
+        // Project-specific UI not found, will use global default
+        uiPath = path.join(globalExtensionsDir, extensionId, 'ui.tsx');
+        logger.info({ extensionId, projectId, tenantId }, 'Project-specific UI not found, using global default');
+      }
+    } else {
+      // No projectId provided, use global default
+      uiPath = path.join(globalExtensionsDir, extensionId, 'ui.tsx');
+    }
 
     // Check if ui.tsx exists
     try {
@@ -68,8 +99,8 @@ export async function handleGetExtensionUI(req: Request, extensionId: string): P
     // Check If-None-Match header for conditional request
     const ifNoneMatch = req.headers.get('If-None-Match');
 
-    // Check cache with metadata
-    const cached = await getFromCacheWithMetadata(extensionId);
+    // Check cache with metadata (pass uiPath for proper cache key)
+    const cached = await getFromCacheWithMetadata(extensionId, uiPath);
     if (cached && cached.metadata) {
       // Return 304 if ETag matches
       if (ifNoneMatch && ifNoneMatch === cached.metadata.etag) {
@@ -112,7 +143,14 @@ export async function handleGetExtensionUI(req: Request, extensionId: string): P
       format: 'esm',
       minify: isProduction(),            // Minify in production
       sourcemap: !isProduction(),        // Source maps in development only
-      external: ['react', 'react-dom'],  // Exclude shared React deps
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'echarts',
+        'echarts-for-react',
+        'mermaid'
+      ],  // Exclude shared deps - loaded from frontend window.libs
       write: false,
       outdir: 'out',
     });
@@ -133,8 +171,8 @@ export async function handleGetExtensionUI(req: Request, extensionId: string): P
     const contentHash = generateContentHash(bundledCode);
     const etag = generateETag(contentHash);
 
-    // Save to cache with metadata
-    await saveToCacheWithMetadata(extensionId, bundledCode, {
+    // Save to cache with metadata (pass uiPath for proper cache key)
+    await saveToCacheWithMetadata(uiPath, bundledCode, {
       etag,
       contentHash,
       bundleSize: bundledCode.length,
@@ -172,9 +210,16 @@ export async function handleGetExtensionUI(req: Request, extensionId: string): P
 /**
  * Check cache with metadata and mtime-based invalidation
  */
-async function getFromCacheWithMetadata(extensionId: string): Promise<{ code: string; metadata: CacheMetadata } | null> {
-  const cachePath = path.join(cacheDir, `${extensionId}.js`);
-  const uiPath = path.join(extensionsDir, extensionId, 'ui.tsx');
+async function getFromCacheWithMetadata(
+  extensionId: string,
+  uiPath: string
+): Promise<{ code: string; metadata: CacheMetadata } | null> {
+  // Generate cache key from uiPath (includes project-specific info)
+  const cacheKey = path.relative(process.cwd(), uiPath)
+    .replace(/[\/\\]/g, '-')
+    .replace(/\.tsx$/, '');
+
+  const cachePath = path.join(cacheDir, `${cacheKey}.js`);
 
   try {
     // Check cache exists
@@ -187,7 +232,7 @@ async function getFromCacheWithMetadata(extensionId: string): Promise<{ code: st
     ]);
 
     // Check in-memory metadata first
-    const memMetadata = metadataCache.get(extensionId);
+    const memMetadata = metadataCache.get(cacheKey);
     if (memMetadata && memMetadata.sourceMtimeMs >= uiStat.mtimeMs) {
       const code = await fs.readFile(cachePath, 'utf-8');
       return { code, metadata: memMetadata };
@@ -197,14 +242,14 @@ async function getFromCacheWithMetadata(extensionId: string): Promise<{ code: st
     if (cacheStat.mtimeMs >= uiStat.mtimeMs) {
       const code = await fs.readFile(cachePath, 'utf-8');
       // Try to load metadata from file
-      const metadata = await loadMetadata(extensionId);
+      const metadata = await loadMetadata(cacheKey);
       if (metadata) {
-        metadataCache.set(extensionId, metadata);
+        metadataCache.set(cacheKey, metadata);
         return { code, metadata };
       }
     }
 
-    logger.info({ extensionId }, 'Cache expired (source modified)');
+    logger.info({ extensionId, cacheKey }, 'Cache expired (source modified)');
     return null;
   } catch (error) {
     // Cache doesn't exist or error reading
@@ -216,22 +261,28 @@ async function getFromCacheWithMetadata(extensionId: string): Promise<{ code: st
  * Save to cache with metadata
  */
 async function saveToCacheWithMetadata(
-  extensionId: string,
+  uiPath: string,
   code: string,
   metadata: CacheMetadata
 ): Promise<void> {
   try {
     await fs.mkdir(cacheDir, { recursive: true });
-    const cachePath = path.join(cacheDir, `${extensionId}.js`);
-    const metadataPath = path.join(cacheDir, `${extensionId}.json`);
+
+    // Generate cache key from uiPath
+    const cacheKey = path.relative(process.cwd(), uiPath)
+      .replace(/[\/\\]/g, '-')
+      .replace(/\.tsx$/, '');
+
+    const cachePath = path.join(cacheDir, `${cacheKey}.js`);
+    const metadataPath = path.join(cacheDir, `${cacheKey}.json`);
 
     await Promise.all([
       fs.writeFile(cachePath, code, 'utf-8'),
       fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8')
     ]);
 
-    metadataCache.set(extensionId, metadata);
-    logger.info({ extensionId, size: code.length, etag: metadata.etag }, 'Cached bundled UI with metadata');
+    metadataCache.set(cacheKey, metadata);
+    logger.info({ cacheKey, size: code.length, etag: metadata.etag }, 'Cached bundled UI with metadata');
   } catch (error) {
     logger.error({ extensionId, error }, 'Failed to cache bundled UI');
     // Non-fatal, continue without caching

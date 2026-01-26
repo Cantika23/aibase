@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { MemoryToolGroup } from "./memory-tool-group";
 import { FileToolGroup } from "./file-tool-group";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import type { ToolInvocation } from "./types";
-import { getExtensionComponent } from "./extension-component-registry";
+import { getExtensionComponent, clearBackendComponentCache } from "./extension-component-registry";
 
 // Helper function to format duration display
 function formatDuration(duration?: number): string | null {

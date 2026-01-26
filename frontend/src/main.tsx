@@ -5,6 +5,23 @@ import { AppRouter } from "./components/app-router";
 import { getBasePath, buildWsUrl } from "./lib/base-path";
 import { getAppName, getFaviconUrl } from "./lib/setup";
 
+// Load visualization libraries for backend extension UI
+import * as echarts from 'echarts';
+import ReactECharts from 'echarts-for-react';
+import mermaid from 'mermaid';
+
+// Expose libraries globally for backend extension UI components
+if (typeof window !== 'undefined') {
+  (window as any).libs = {
+    React,
+    ReactDOM: { createRoot },
+    echarts,
+    ReactECharts,
+    mermaid,
+  };
+  console.log('[main] Visualization libraries loaded to window.libs');
+}
+
 // Set document title from setup config or environment variable
 getAppName().then((appName) => {
   document.title = appName;
