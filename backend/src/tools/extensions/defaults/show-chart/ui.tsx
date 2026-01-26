@@ -1,10 +1,23 @@
 /**
  * Show Chart Extension UI Components
- * Displays interactive charts using ECharts
+ * Displays interactive charts using ECharts (loaded from window.libs)
  */
 
-import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import React from 'react';
+
+// Get ReactECharts from window.libs (loaded by frontend)
+declare const window: {
+  libs: {
+    React: any;
+    ReactDOM: any;
+    ReactECharts: any;
+    echarts: any;
+    mermaid: any;
+  };
+};
+
+const ReactECharts = window.libs.ReactECharts;
+const echarts = window.libs.echarts;
 
 interface ChartSeries {
   name: string;
@@ -55,17 +68,6 @@ function buildChartOption(
   data: { series?: ChartSeries[]; xAxis?: string[]; yAxis?: string },
   theme: 'dark' | undefined
 ) {
-  // If data is already a full ECharts option, use it
-  if (data.series && !Array.isArray(data.series) && data.xAxis) {
-    return {
-      ...data,
-      backgroundColor: 'transparent',
-      textStyle: {
-        fontFamily: 'Inter, sans-serif',
-      },
-    };
-  }
-
   const baseOption: any = {
     backgroundColor: 'transparent',
     tooltip: {
@@ -183,7 +185,7 @@ export default function ShowChartInspector({ data, error }: InspectorProps) {
     );
   }
 
-  const option = useMemo(() => buildChartOption(chartType || 'bar', { series, xAxis, yAxis }, theme), [chartType, series, xAxis, yAxis, theme]);
+  const option = buildChartOption(chartType || 'bar', { series, xAxis, yAxis }, theme);
 
   return (
     <div className="p-4 space-y-4">
@@ -240,7 +242,7 @@ export default function ShowChartInspector({ data, error }: InspectorProps) {
 
       {/* Info Badge */}
       <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-xs text-orange-800 dark:text-orange-200">
-        📈 Chart - Interactive visualization
+        📈 Chart - Interactive visualization from backend plugin
       </div>
     </div>
   );
@@ -262,7 +264,7 @@ export function ShowChartMessage({ toolInvocation }: MessageProps) {
     );
   }
 
-  const option = useMemo(() => buildChartOption(chartType || 'bar', { series, xAxis, yAxis }, theme), [chartType, series, xAxis, yAxis, theme]);
+  const option = buildChartOption(chartType || 'bar', { series, xAxis, yAxis }, theme);
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-sm">

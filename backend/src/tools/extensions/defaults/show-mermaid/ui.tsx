@@ -1,9 +1,20 @@
 /**
  * Show Mermaid Extension UI Components
- * Displays Mermaid diagram code and metadata
+ * Displays Mermaid diagrams (using window.libs.mermaid from frontend)
  */
 
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+
+// Get mermaid from window.libs (loaded by frontend)
+declare const window: {
+  libs: {
+    React: any;
+    ReactDOM: any;
+    mermaid: any;
+  };
+};
+
+const mermaid = window.libs.mermaid;
 
 interface InspectorProps {
   data: {
@@ -24,6 +35,77 @@ interface MessageProps {
       };
     };
   };
+}
+
+/**
+ * Mermaid Diagram Component
+ */
+function MermaidDiagram({ code }: { code: string }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [svgContent, setSvgContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Initialize Mermaid on mount
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+    });
+
+    const renderDiagram = async () => {
+      try {
+        console.log('[MermaidDiagram] Starting render');
+        setIsLoading(true);
+        setError(null);
+
+        // Generate a unique ID for this diagram
+        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Check if the diagram is valid
+        const valid = await mermaid.parse(code);
+        if (!valid) {
+          throw new Error('Invalid Mermaid syntax');
+        }
+
+        // Render the diagram
+        const { svg } = await mermaid.render(id, code);
+        console.log('[MermaidDiagram] SVG generated');
+
+        setSvgContent(svg);
+        setIsLoading(false);
+      } catch (err: any) {
+        console.error('[MermaidDiagram] Rendering error:', err);
+        setError(err.message || 'Failed to render diagram');
+        setIsLoading(false);
+      }
+    };
+
+    renderDiagram();
+  }, [code]);
+
+  return (
+    <div className="min-h-[200px] w-full overflow-auto flex items-center justify-center bg-background rounded-lg border">
+      {isLoading && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+          <span className="text-sm">Rendering diagram...</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex flex-col items-center gap-2 text-destructive">
+          <p className="text-sm font-medium">Failed to render diagram</p>
+          <p className="text-xs text-muted-foreground">{error}</p>
+        </div>
+      )}
+
+      {svgContent && !isLoading && !error && (
+        <div dangerouslySetInnerHTML={{ __html: svgContent }} />
+      )}
+    </div>
+  );
 }
 
 /**
@@ -62,27 +144,8 @@ export default function ShowMermaidInspector({ data, error }: InspectorProps) {
         </div>
       )}
 
-      {/* Diagram Type */}
-      <div className="text-sm">
-        <span className="font-semibold">Type:</span>{' '}
-        <span className="text-muted-foreground">
-          {code.includes('graph TD') || code.includes('graph LR')
-            ? 'Flowchart'
-            : code.includes('sequenceDiagram')
-            ? 'Sequence Diagram'
-            : code.includes('classDiagram')
-            ? 'Class Diagram'
-            : code.includes('stateDiagram')
-            ? 'State Diagram'
-            : code.includes('erDiagram')
-            ? 'Entity Relationship Diagram'
-            : code.includes('gantt')
-            ? 'Gantt Chart'
-            : code.includes('pie')
-            ? 'Pie Chart'
-            : 'Mermaid Diagram'}
-        </span>
-      </div>
+      {/* Diagram Rendering */}
+      <MermaidDiagram code={code} />
 
       {/* Code */}
       <div>
@@ -94,7 +157,7 @@ export default function ShowMermaidInspector({ data, error }: InspectorProps) {
 
       {/* Info Badge */}
       <div className="p-3 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800 rounded text-xs text-indigo-800 dark:text-indigo-200">
-        🎨 Mermaid Diagram - Text-to-diagram rendering (use chat for visualization)
+        🎨 Mermaid Diagram - Text-to-diagram rendering from backend plugin
       </div>
     </div>
   );
@@ -103,9 +166,6 @@ export default function ShowMermaidInspector({ data, error }: InspectorProps) {
 /**
  * Message Chat UI - named export
  * Simplified UI for inline rendering in chat messages
- *
- * Note: This is a placeholder that shows diagram metadata.
- * The actual diagram rendering happens in the frontend visualization component.
  */
 export function ShowMermaidMessage({ toolInvocation }: MessageProps) {
   const { title, description, code } = toolInvocation.result.args;
@@ -128,18 +188,8 @@ export function ShowMermaidMessage({ toolInvocation }: MessageProps) {
         )}
       </div>
 
-      {/* Code Preview */}
-      <div>
-        <p className="text-xs font-medium mb-1 text-muted-foreground">Diagram Code:</p>
-        <pre className="p-3 bg-muted rounded text-xs font-mono overflow-auto max-h-40 whitespace-pre-wrap">
-          {code}
-        </pre>
-      </div>
-
-      {/* Info */}
-      <div className="text-xs text-muted-foreground italic">
-        Diagram rendering is handled by the frontend visualization component
-      </div>
+      {/* Diagram Rendering */}
+      <MermaidDiagram code={code} />
     </div>
   );
 }
