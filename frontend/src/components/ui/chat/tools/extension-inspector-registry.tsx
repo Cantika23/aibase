@@ -16,6 +16,9 @@ export interface InspectorComponentProps {
 // Registry of extension-defined inspector components
 const inspectorComponents: Record<string, ComponentType<InspectorComponentProps>> = {};
 
+// Cache for dynamically loaded inspector components
+const inspectorCache: Record<string, ComponentType<InspectorComponentProps>> = {};
+
 /**
  * Register an extension's inspector component
  * @param extensionId - The extension ID (e.g., 'postgresql', 'duckdb')
@@ -31,10 +34,90 @@ export function registerInspector(
 
 /**
  * Get an inspector component by extension ID
+ * First checks registry, then tries to load from API
  * @param extensionId - The extension ID
  * @returns The component or null if not found
  */
-export function getInspector(
+export async function getInspector(
+  extensionId: string
+): Promise<ComponentType<InspectorComponentProps> | null> {
+  // Check registry first (hardcoded inspectors)
+  if (inspectorComponents[extensionId]) {
+    return inspectorComponents[extensionId];
+  }
+
+  // Check cache
+  if (inspectorCache[extensionId]) {
+    return inspectorCache[extensionId];
+  }
+
+  // Try to load from API
+  try {
+    const component = await loadInspectorFromAPI(extensionId);
+    if (component) {
+      inspectorCache[extensionId] = component;
+      return component;
+    }
+  } catch (error) {
+    console.warn(`[ExtensionInspectorRegistry] Failed to load inspector for ${extensionId}:`, error);
+  }
+
+  return null;
+}
+
+/**
+ * Load inspector component from backend API
+ * @param extensionId - The extension ID
+ * @returns The component or null if not found
+ */
+async function loadInspectorFromAPI(
+  extensionId: string
+): Promise<ComponentType<InspectorComponentProps> | null> {
+  try {
+    console.log(`[ExtensionInspectorRegistry] Loading inspector for ${extensionId} from API`);
+
+    // Fetch bundled UI from backend
+    const response = await fetch(`/api/extensions/${extensionId}/ui`);
+
+    if (!response.ok) {
+      console.warn(`[ExtensionInspectorRegistry] API returned ${response.status} for ${extensionId}`);
+      return null;
+    }
+
+    const bundledCode = await response.text();
+
+    // Create module from code
+    const blob = new Blob([bundledCode], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+
+    // Dynamic import
+    const module = await import(url);
+
+    // Clean up blob URL
+    URL.revokeObjectURL(url);
+
+    // Get default export or named export
+    const component = module.default || module.PostgreSQLInspector || module[Object.keys(module)[0]];
+
+    if (component) {
+      console.log(`[ExtensionInspectorRegistry] Successfully loaded inspector for ${extensionId}`);
+      return component as ComponentType<InspectorComponentProps>;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`[ExtensionInspectorRegistry] Error loading inspector for ${extensionId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Synchronous version of getInspector for backward compatibility
+ * @deprecated Use async version instead
+ * @param extensionId - The extension ID
+ * @returns The component or null if not found
+ */
+export function getInspectorSync(
   extensionId: string
 ): ComponentType<InspectorComponentProps> | null {
   return inspectorComponents[extensionId] || null;
@@ -54,4 +137,14 @@ export function hasInspector(extensionId: string): boolean {
  */
 export function getRegisteredInspectors(): string[] {
   return Object.keys(inspectorComponents);
+}
+
+/**
+ * Clear inspector cache (useful for testing/development)
+ */
+export function clearInspectorCache(): void {
+  Object.keys(inspectorCache).forEach(key => {
+    delete inspectorCache[key];
+  });
+  console.log('[ExtensionInspectorRegistry] Inspector cache cleared');
 }
