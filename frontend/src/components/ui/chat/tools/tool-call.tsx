@@ -16,11 +16,6 @@ function formatDuration(duration?: number): string | null {
   return `${duration}s`;
 }
 
-// Lazy load heavy visualization tools - now using registry
-const ChartTool = lazy(() => import("./chart-tool").then(m => ({ default: m.ChartTool })));
-const TableTool = lazy(() => import("./table-tool").then(m => ({ default: m.TableTool })));
-const MermaidTool = lazy(() => import("./mermaid-tool").then(m => ({ default: m.MermaidTool })));
-
 interface ToolCallProps {
   toolInvocations?: ToolInvocation[];
 }
@@ -143,38 +138,20 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
           console.log('[ToolCall] Script visualizations found:', scriptVisualizations);
         }
 
-        // Handle direct visualization tool calls using registry
+        // Handle visualization tool calls using backend plugin system
         if (isChart || isTable || isMermaid) {
-          const VizComponent = getExtensionComponent(invocation.toolName);
-          if (VizComponent) {
-            return (
-              <Suspense key={index} fallback={<div className="h-[300px] w-full animate-pulse bg-muted rounded-xl" />}>
-                <VizComponent toolInvocation={invocation as any} />
-              </Suspense>
-            );
-          }
-          // Fallback to original components if registry fails
-          if (isChart) {
-            return (
-              <Suspense key={index} fallback={<div className="h-[300px] w-full animate-pulse bg-muted rounded-xl" />}>
-                <ChartTool toolInvocation={invocation as any} />
-              </Suspense>
-            );
-          }
-          if (isTable) {
-            return (
-              <Suspense key={index} fallback={<div className="h-[200px] w-full animate-pulse bg-muted rounded-xl" />}>
-                <TableTool toolInvocation={invocation as any} />
-              </Suspense>
-            );
-          }
-          if (isMermaid) {
-            return (
-              <Suspense key={index} fallback={<div className="h-[300px] w-full animate-pulse bg-muted rounded-xl" />}>
-                <MermaidTool toolInvocation={invocation as any} />
-              </Suspense>
-            );
-          }
+          // Render backend UI component for visualization extensions
+          const VizComponent = lazy(() =>
+            getExtensionComponent(invocation.toolName).then(comp => ({
+              default: comp || (() => <div className="p-4 text-sm text-muted-foreground">UI component not found</div>)
+            }))
+          );
+
+          return (
+            <Suspense key={index} fallback={<div className="h-[300px] w-full animate-pulse bg-muted rounded-xl" />}>
+              <VizComponent toolInvocation={invocation as any} />
+            </Suspense>
+          );
         }
 
         const handleScriptClick = () => {
@@ -400,16 +377,17 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
                     )}
                   </div>
                 </div>
-                {/* Render visualizations from script result */}
+                {/* Render visualizations from script result using backend plugin system */}
                 {scriptVisualizations && scriptVisualizations.length > 0 && (
                   <div className="mt-2 mb-4">
                     {scriptVisualizations.map((viz: any, vizIndex: number) => {
-                      const VizComponent = getExtensionComponent(viz.type);
-
-                      if (!VizComponent) {
-                        console.warn(`[ToolCall] Unknown visualization type: ${viz.type}`);
-                        return null;
-                      }
+                      // Load backend UI component for visualization
+                      const VizComponent = lazy(async () => {
+                        const comp = await getExtensionComponent(viz.type);
+                        return {
+                          default: comp || (() => <div className="p-4 text-sm text-muted-foreground">UI component not found for: {viz.type}</div>)
+                        };
+                      });
 
                       const vizInvocation = {
                         toolName: viz.type,

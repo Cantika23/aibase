@@ -2,9 +2,9 @@
  * Extension Component Registry
  * Dynamic registry for extension-defined UI components
  *
- * Components can come from:
- * 1. Backend API (custom per-project)
- * 2. Frontend built-in (default/fallback)
+ * All components are loaded from backend API:
+ * - Default UI: /api/extensions/:id/ui
+ * - Project-specific UI: /api/extensions/:id/ui?projectId=xxx&tenantId=xxx
  */
 
 import { lazy } from "react";
@@ -20,13 +20,6 @@ const backendComponents: Record<string, ComponentType<VisualizationComponentProp
 
 // Cache for dynamically loaded backend components
 const backendComponentCache: Record<string, ComponentType<VisualizationComponentProps>> = {};
-
-// Built-in frontend components - fallback defaults
-const builtInComponents: Record<string, () => Promise<{ default: ComponentType<any> }>> = {
-  'show-chart': () => import("./chart-tool").then(m => ({ default: m.ChartTool })),
-  'show-table': () => import("./table-tool").then(m => ({ default: m.TableTool })),
-  'show-mermaid': () => import("./mermaid-tool").then(m => ({ default: m.MermaidTool })),
-};
 
 /**
  * Register an extension's component (loaded from backend)
@@ -44,19 +37,30 @@ export function registerExtensionComponent(
 /**
  * Load component from backend API
  * @param extensionId - The extension ID
+ * @param projectId - Optional project ID for project-specific UI
+ * @param tenantId - Optional tenant ID for project-specific UI
  * @returns The component or null if not found
  */
 async function loadComponentFromBackend(
-  extensionId: string
+  extensionId: string,
+  projectId?: string,
+  tenantId?: string
 ): Promise<ComponentType<VisualizationComponentProps> | null> {
   try {
-    console.log(`[ExtensionRegistry] Loading ${extensionId} from backend API`);
+    console.log(`[ExtensionRegistry] Loading ${extensionId} from backend API${projectId ? ` (project: ${projectId})` : ''}`);
+
+    // Build URL with optional query params for project-specific UI
+    const url = new URL(`/api/extensions/${extensionId}/ui`, window.location.origin);
+    if (projectId && tenantId) {
+      url.searchParams.set('projectId', projectId);
+      url.searchParams.set('tenantId', tenantId);
+    }
 
     // Fetch bundled UI from backend
-    const response = await fetch(`/api/extensions/${extensionId}/ui`);
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
-      console.log(`[ExtensionRegistry] Backend UI not available for ${extensionId}, will use frontend fallback`);
+      console.log(`[ExtensionRegistry] Backend UI not available for ${extensionId}`);
       return null;
     }
 
@@ -64,15 +68,15 @@ async function loadComponentFromBackend(
 
     // Create module from code
     const blob = new Blob([bundledCode], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
 
     // Dynamic import
-    const module = await import(url);
+    const module = await import(blobUrl);
 
     // Clean up blob URL
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
 
-    // Get named export (ShowChartMessage, ShowTableMessage, etc.)
+    // Get named export (ShowChartMessage, ShowTableMessage, ShowMermaidMessage, etc.)
     const messageComponentName = extensionId.split('-').map((part, idx) =>
       idx === 0 ? part.charAt(0).toUpperCase() + part.slice(1) :
       part.charAt(0).toUpperCase() + part.slice(1)
@@ -94,15 +98,22 @@ async function loadComponentFromBackend(
 
 /**
  * Get a visualization component by type
+ * Loads from backend API with optional project context
+ *
  * Priority:
- * 1. Backend-loaded component (custom per-project)
- * 2. Frontend built-in component (default fallback)
+ * 1. Backend registry (hardcoded components)
+ * 2. Backend cache (previously loaded)
+ * 3. Backend API (fresh load with project context)
  *
  * @param type - The visualization type
+ * @param projectId - Optional project ID for project-specific UI
+ * @param tenantId - Optional tenant ID for project-specific UI
  * @returns The component or null if not found
  */
 export async function getExtensionComponent(
-  type: string
+  type: string,
+  projectId?: string,
+  tenantId?: string
 ): Promise<ComponentType<VisualizationComponentProps> | null> {
   // Check backend registry first (hardcoded backend components)
   if (backendComponents[type]) {
@@ -110,49 +121,31 @@ export async function getExtensionComponent(
   }
 
   // Check backend cache
-  if (backendComponentCache[type]) {
-    return backendComponentCache[type];
+  const cacheKey = projectId ? `${type}-${projectId}` : type;
+  if (backendComponentCache[cacheKey]) {
+    return backendComponentCache[cacheKey];
   }
 
-  // Try to load from backend API (custom per-project UI)
-  try {
-    const backendComponent = await loadComponentFromBackend(type);
-    if (backendComponent) {
-      backendComponentCache[type] = backendComponent;
-      return backendComponent;
-    }
-  } catch (error) {
-    console.warn(`[ExtensionRegistry] Backend UI load failed for ${type}, falling back to frontend`);
+  // Try to load from backend API (with project context)
+  const backendComponent = await loadComponentFromBackend(type, projectId, tenantId);
+  if (backendComponent) {
+    backendComponentCache[cacheKey] = backendComponent;
+    return backendComponent;
   }
 
-  // Fallback to built-in frontend components
-  if (builtInComponents[type]) {
-    // Create a lazy wrapper for built-in components
-    const LazyComponent = lazy(builtInComponents[type]);
-    return LazyComponent as ComponentType<VisualizationComponentProps>;
-  }
-
+  console.warn(`[ExtensionRegistry] No UI component found for ${type}`);
   return null;
 }
 
 /**
  * Synchronous version for backward compatibility
- * Only returns frontend built-in components
+ * Only returns registry components (no API calls)
  * @deprecated Use async version instead
  */
 export function getExtensionComponentSync(
   type: string
 ): ComponentType<VisualizationComponentProps> | null {
-  if (backendComponents[type]) {
-    return backendComponents[type];
-  }
-
-  if (builtInComponents[type]) {
-    const LazyComponent = lazy(builtInComponents[type]);
-    return LazyComponent as ComponentType<VisualizationComponentProps>;
-  }
-
-  return null;
+  return backendComponents[type] || null;
 }
 
 /**
@@ -163,8 +156,7 @@ export function getExtensionComponentSync(
 export function hasVisualizationType(type: string): boolean {
   return (
     backendComponents[type] !== undefined ||
-    backendComponentCache[type] !== undefined ||
-    builtInComponents[type] !== undefined
+    Object.keys(backendComponentCache).some(key => key.startsWith(type))
   );
 }
 
@@ -174,8 +166,7 @@ export function hasVisualizationType(type: string): boolean {
 export function getRegisteredTypes(): string[] {
   return [
     ...Object.keys(backendComponents),
-    ...Object.keys(backendComponentCache),
-    ...Object.keys(builtInComponents)
+    ...Object.keys(backendComponentCache).map(key => key.split('-')[0])
   ];
 }
 
