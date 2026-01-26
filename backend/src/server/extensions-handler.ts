@@ -400,6 +400,72 @@ export async function handleToggleExtension(
 }
 
 /**
+ * Handle POST /api/projects/:projectId/extensions/:extensionId/reload - Reload extension (clear caches)
+ */
+export async function handleReloadExtension(
+  req: Request,
+  projectId: string,
+  extensionId: string
+): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has access to the project
+    if (auth.user.role !== 'root') {
+      const hasAccess = projectStorage.userHasAccess(projectId, auth.user.id, auth.user.tenant_id);
+      if (!hasAccess) {
+        return Response.json(
+          { success: false, error: "Access denied" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Get project to check tenant_id
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
+    // Check if extension exists
+    const extensions = await extensionStorage.getExtensions(projectId, tenantId);
+    const extension = extensions.find(e => e.metadata.id === extensionId);
+
+    if (!extension) {
+      return Response.json(
+        { success: false, error: "Extension not found" },
+        { status: 404 }
+      );
+    }
+
+    // Clear caches
+    // 1. Delete disk cache files for both project-specific and global default
+    const { extensionUIHandler } = await import('./extension-ui-handler');
+    const cleared = await extensionUIHandler.clearExtensionCache(extensionId, projectId);
+
+    // 2. Clear in-memory metadata cache is handled by the clearExtensionCache function
+
+    return Response.json({
+      success: true,
+      message: `Extension "${extension.metadata.name}" cache cleared. ${cleared} cache file(s) deleted.`,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error reloading extension");
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to reload extension",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * Handle POST /api/projects/:projectId/extensions/reset - Reset to default extensions
  */
 export async function handleResetExtensions(req: Request, projectId: string): Promise<Response> {

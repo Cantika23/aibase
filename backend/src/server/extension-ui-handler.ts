@@ -381,3 +381,62 @@ export async function preBundleExtensionUIs(): Promise<void> {
     // Non-fatal, server can continue
   }
 }
+
+/**
+ * Clear cache for a specific extension
+ * @param extensionId - Extension ID
+ * @param projectId - Optional project ID for project-specific extensions
+ * @returns Number of cache files deleted
+ */
+export async function clearExtensionCache(
+  extensionId: string,
+  projectId?: string
+): Promise<number> {
+  let deletedCount = 0;
+
+  try {
+    // Generate possible cache keys to delete
+    const cacheKeysToDelete: string[] = [];
+
+    // 1. Project-specific cache key: data-{projectId}-extensions-{extensionId}-ui
+    if (projectId) {
+      cacheKeysToDelete.push(`data-${projectId}-extensions-${extensionId}-ui`);
+    }
+
+    // 2. Global default cache key: backend-src-tools-extensions-defaults-{extensionId}-ui
+    cacheKeysToDelete.push(`backend-src-tools-extensions-defaults-${extensionId}-ui`);
+
+    // Delete cache files for each key
+    for (const cacheKey of cacheKeysToDelete) {
+      const cachePath = path.join(cacheDir, `${cacheKey}.js`);
+      const metadataPath = path.join(cacheDir, `${cacheKey}.json`);
+
+      // Delete .js cache file
+      try {
+        await fs.unlink(cachePath);
+        deletedCount++;
+        logger.debug({ cacheKey }, 'Deleted extension UI cache file');
+      } catch {
+        // File doesn't exist, skip
+      }
+
+      // Delete .json metadata file
+      try {
+        await fs.unlink(metadataPath);
+        deletedCount++;
+        logger.debug({ cacheKey }, 'Deleted extension UI metadata file');
+      } catch {
+        // File doesn't exist, skip
+      }
+
+      // Clear in-memory metadata cache
+      metadataCache.delete(cacheKey);
+    }
+
+    logger.info({ extensionId, projectId, deletedCount }, 'Extension cache cleared');
+  } catch (error) {
+    logger.error({ extensionId, projectId, error }, 'Error clearing extension cache');
+  }
+
+  return deletedCount;
+}

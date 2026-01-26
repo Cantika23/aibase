@@ -23,6 +23,7 @@ import {
 import {
   deleteExtension,
   getExtensions,
+  reloadExtension,
   resetExtensionsToDefaults,
   toggleExtension,
   updateExtension,
@@ -37,6 +38,7 @@ import {
   FolderOpen,
   PowerIcon,
   RefreshCw,
+  RotateCw,
   Settings,
   Trash2,
   Wand2
@@ -98,6 +100,9 @@ export function ExtensionsSettings() {
     currentCategory: "",
     newCategory: "",
   });
+
+  // Reloading extensions state
+  const [reloadingExtensions, setReloadingExtensions] = useState<Set<string>>(new Set());
 
   // Load data
   const loadData = useCallback(async () => {
@@ -178,6 +183,28 @@ export function ExtensionsSettings() {
       toast.error(
         error instanceof Error ? error.message : "Failed to toggle extension",
       );
+    }
+  };
+
+  // Handle reload extension
+  const handleReload = async (extensionId: string, extensionName: string) => {
+    if (!currentProject) return;
+
+    setReloadingExtensions(prev => new Set(prev).add(extensionId));
+
+    try {
+      await reloadExtension(currentProject.id, extensionId);
+      const { clearExtensionComponentCache } = await import("@/components/ui/chat/tools/extension-component-registry");
+      clearExtensionComponentCache(extensionId, currentProject.id);
+      toast.success(`Extension "${extensionName}" reloaded successfully`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reload extension");
+    } finally {
+      setReloadingExtensions(prev => {
+        const next = new Set(prev);
+        next.delete(extensionId);
+        return next;
+      });
     }
   };
 
@@ -644,6 +671,17 @@ export function ExtensionsSettings() {
                                       : "text-muted-foreground"
                                   }`}
                                 />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleReload(extension.metadata.id, extension.metadata.name)
+                                }
+                                disabled={reloadingExtensions.has(extension.metadata.id)}
+                                title="Reload extension (clear caches)"
+                              >
+                                <RotateCw className={`w-4 h-4 ${reloadingExtensions.has(extension.metadata.id) ? "animate-spin" : ""}`} />
                               </Button>
                               <Button
                                 variant="ghost"

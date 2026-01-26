@@ -177,3 +177,21 @@ export async function resetExtensionsToDefaults(
   const data = await response.json();
   return data.data.extensions;
 }
+
+/**
+ * Reload extension (clear caches)
+ */
+export async function reloadExtension(
+  projectId: string,
+  extensionId: string
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/projects/${projectId}/extensions/${extensionId}/reload`,
+    { method: "POST", credentials: "include" }
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to reload extension");
+  }
+  return await response.json();
+}

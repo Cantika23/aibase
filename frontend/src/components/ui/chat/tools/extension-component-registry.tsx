@@ -178,3 +178,19 @@ export function clearBackendComponentCache(): void {
   });
   console.log('[ExtensionRegistry] Backend component cache cleared');
 }
+
+/**
+ * Clear cache for a specific extension component
+ * @param extensionId - Extension ID
+ * @param projectId - Optional project ID for project-specific extensions
+ */
+export function clearExtensionComponentCache(
+  extensionId: string,
+  projectId?: string
+): void {
+  const cacheKey = projectId ? `${extensionId}-${projectId}` : extensionId;
+  if (backendComponentCache[cacheKey]) {
+    delete backendComponentCache[cacheKey];
+    console.log(`[ExtensionRegistry] Cleared cache for ${extensionId}${projectId ? ` (project: ${projectId})` : ''}`);
+  }
+}

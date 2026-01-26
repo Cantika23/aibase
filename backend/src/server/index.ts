@@ -68,6 +68,7 @@ import {
   handleUpdateExtension,
   handleDeleteExtension,
   handleToggleExtension,
+  handleReloadExtension,
   handleResetExtensions,
   handleGenerateExtension,
   handlePreviewExtension,
@@ -531,6 +532,13 @@ export class WebSocketServer {
           const projectId = extensionToggleMatch[1];
           const extensionId = extensionToggleMatch[2];
           return handleToggleExtension(req, projectId!, extensionId!);
+        }
+
+        const extensionReloadMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/extensions\/([^\/]+)\/reload$/);
+        if (extensionReloadMatch && req.method === "POST") {
+          const projectId = extensionReloadMatch[1];
+          const extensionId = extensionReloadMatch[2];
+          return handleReloadExtension(req, projectId!, extensionId!);
         }
 
         // Extension UI bundling endpoint
