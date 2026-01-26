@@ -527,6 +527,14 @@ export class WebSocketServer {
           return handleToggleExtension(req, projectId!, extensionId!);
         }
 
+        // Extension UI bundling endpoint
+        const extensionUIMatch = pathname.match(/^\/api\/extensions\/([^\/]+)\/ui$/);
+        if (extensionUIMatch && req.method === "GET") {
+          const extensionId = extensionUIMatch[1];
+          const { handleGetExtensionUI } = await import("./extension-ui-handler");
+          return handleGetExtensionUI(req, extensionId!);
+        }
+
         // Categories API endpoints
         const categoriesMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/categories$/);
         if (categoriesMatch) {
