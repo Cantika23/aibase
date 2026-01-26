@@ -16,7 +16,7 @@ import { Badge } from "./badge";
 import { Button } from "./button";
 import { useUIStore } from "@/stores/ui-store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
-import { getInspector } from "./chat/tools/extension-inspector-registry";
+import { ExtensionInspector } from "./chat/tools/extension-inspector";
 import "./script-details-dialog-tabs.css";
 
 interface ScriptDetailsDialogProps {
@@ -391,17 +391,7 @@ export function ScriptDetailsDialog({
                 {inspectionData && Object.keys(inspectionData).length > 0 && Object.entries(inspectionData).map(([extensionId, data]) => (
                   <TabsContent key={`inspection-${extensionId}`} value={`inspection-${extensionId}`} className="flex-1 min-h-0 mt-2">
                     <div className="h-full overflow-auto">
-                      {(() => {
-                        const InspectorComponent = getInspector(extensionId);
-                        if (InspectorComponent) {
-                          return <InspectorComponent data={data} error={error} />;
-                        }
-                        return (
-                          <div className="p-4 text-sm text-muted-foreground">
-                            No inspector available for extension: <code className="font-mono">{extensionId}</code>
-                          </div>
-                        );
-                      })()}
+                      <ExtensionInspector extensionId={extensionId} data={data} error={error} />
                     </div>
                   </TabsContent>
                 ))}
