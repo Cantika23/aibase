@@ -1,13 +1,14 @@
 import { Ban, Code2, Loader2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import React, { Suspense } from "react";
+import type { ComponentType } from "react";
 
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { MemoryToolGroup } from "./memory-tool-group";
 import { FileToolGroup } from "./file-tool-group";
-import { Suspense, lazy, useEffect, useState } from "react";
 import type { ToolInvocation } from "./types";
-import { getExtensionComponent, clearBackendComponentCache } from "./extension-component-registry";
+import { getExtensionComponent } from "./extension-component-registry";
 
 // Helper function to format duration display
 function formatDuration(duration?: number): string | null {
@@ -140,16 +141,24 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
 
         // Handle visualization tool calls using backend plugin system
         if (isChart || isTable || isMermaid) {
-          // Render backend UI component for visualization extensions
-          const VizComponent = lazy(() =>
-            getExtensionComponent(invocation.toolName).then(comp => ({
-              default: comp || (() => <div className="p-4 text-sm text-muted-foreground">UI component not found</div>)
-            }))
-          );
+          // Create wrapper component that loads backend UI
+          const VizComponentWrapper = () => {
+            const [Comp, setComp] = React.useState<ComponentType<any> | null>(null);
+
+            React.useEffect(() => {
+              getExtensionComponent(invocation.toolName).then(comp => {
+                setComp(() => comp || (() => <div className="p-4 text-sm text-muted-foreground">UI component not found</div>));
+              });
+            }, [invocation.toolName]);
+
+            if (!Comp) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-xl" />;
+
+            return <Comp toolInvocation={invocation as any} />;
+          };
 
           return (
             <Suspense key={index} fallback={<div className="h-[300px] w-full animate-pulse bg-muted rounded-xl" />}>
-              <VizComponent toolInvocation={invocation as any} />
+              <VizComponentWrapper />
             </Suspense>
           );
         }
@@ -381,25 +390,32 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
                 {scriptVisualizations && scriptVisualizations.length > 0 && (
                   <div className="mt-2 mb-4">
                     {scriptVisualizations.map((viz: any, vizIndex: number) => {
-                      // Load backend UI component for visualization
-                      const VizComponent = lazy(async () => {
-                        const comp = await getExtensionComponent(viz.type);
-                        return {
-                          default: comp || (() => <div className="p-4 text-sm text-muted-foreground">UI component not found for: {viz.type}</div>)
-                        };
-                      });
+                      // Create wrapper component for each visualization
+                      const VizComponentWrapper = () => {
+                        const [Comp, setComp] = React.useState<ComponentType<any> | null>(null);
 
-                      const vizInvocation = {
-                        toolName: viz.type,
-                        toolCallId: viz.toolCallId,
-                        args: viz.args,
-                        state: "result" as const,
-                        result: { __visualization: viz }
+                        React.useEffect(() => {
+                          getExtensionComponent(viz.type).then(comp => {
+                            setComp(() => comp || (() => <div className="p-4 text-sm text-muted-foreground">UI component not found for: {viz.type}</div>));
+                          });
+                        }, [viz.type]);
+
+                        if (!Comp) return <div className="h-[200px] w-full animate-pulse bg-muted rounded-xl" />;
+
+                        const vizInvocation = {
+                          toolName: viz.type,
+                          toolCallId: viz.toolCallId,
+                          args: viz.args,
+                          state: "result" as const,
+                          result: { __visualization: viz }
+                        };
+
+                        return <Comp toolInvocation={vizInvocation} />;
                       };
 
                       return (
                         <Suspense key={`${index}-viz-${vizIndex}`} fallback={<div className="h-[200px] w-full animate-pulse bg-muted rounded-xl" />}>
-                          <VizComponent toolInvocation={vizInvocation} />
+                          <VizComponentWrapper />
                         </Suspense>
                       );
                     })}

@@ -9,6 +9,7 @@ import { getAppName, getFaviconUrl } from "./lib/setup";
 import * as echarts from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import mermaid from 'mermaid';
+import React from 'react';
 
 // Expose libraries globally for backend extension UI components
 if (typeof window !== 'undefined') {

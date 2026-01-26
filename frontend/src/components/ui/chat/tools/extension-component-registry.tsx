@@ -7,7 +7,6 @@
  * - Project-specific UI: /api/extensions/:id/ui?projectId=xxx&tenantId=xxx
  */
 
-import { lazy } from "react";
 import type { ComponentType } from "react";
 import type { ToolInvocation } from "./types";
 
