@@ -40,6 +40,10 @@ export async function handleGetExtensions(req: Request, projectId: string): Prom
     // Check if we should use default extensions or project-specific ones
     const useDefaults = process.env.USE_DEFAULT_EXTENSIONS === 'true';
 
+    // Get tenant ID for extension storage
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
     let extensions;
     if (useDefaults) {
       // Development mode: Load from defaults directory
@@ -59,7 +63,7 @@ export async function handleGetExtensions(req: Request, projectId: string): Prom
     } else {
       // Production mode: Load from project extensions folder
       await extensionLoader.initializeProject(projectId);
-      extensions = await extensionStorage.getAll(projectId);
+      extensions = await extensionStorage.getAll(projectId, tenantId);
       logger.info({ useDefaults, count: extensions.length }, "Loaded extensions from project folder");
     }
 
@@ -110,6 +114,10 @@ export async function handleGetExtension(
     // Check if we should use default extensions or project-specific ones
     const useDefaults = process.env.USE_DEFAULT_EXTENSIONS === 'true';
 
+    // Get tenant ID for extension storage
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
     let extension;
     if (useDefaults) {
       // Development mode: Load from defaults directory
@@ -117,7 +125,7 @@ export async function handleGetExtension(
       extension = defaultExtensions.find(ext => ext.metadata.id === extensionId);
     } else {
       // Production mode: Load from project extensions folder
-      extension = await extensionStorage.getById(projectId, extensionId);
+      extension = await extensionStorage.getById(projectId, extensionId, tenantId);
     }
 
     if (!extension) {
@@ -177,7 +185,11 @@ export async function handleCreateExtension(req: Request, projectId: string): Pr
       );
     }
 
-    const extension = await extensionStorage.create(projectId, {
+    // Get tenant ID
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
+    const extension = await extensionStorage.create(projectId, tenantId, {
       id,
       name,
       description,
@@ -236,7 +248,11 @@ export async function handleUpdateExtension(
     const body = await req.json();
     const { name, description, author, version, code, enabled, category } = body;
 
-    const extension = await extensionStorage.update(projectId, extensionId, {
+    // Get tenant ID
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
+    const extension = await extensionStorage.update(projectId, extensionId, tenantId, {
       name,
       description,
       author,
@@ -297,7 +313,11 @@ export async function handleDeleteExtension(
       }
     }
 
-    const deleted = await extensionStorage.delete(projectId, extensionId);
+    // Get tenant ID
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
+    const deleted = await extensionStorage.delete(projectId, extensionId, tenantId);
 
     if (!deleted) {
       return Response.json(
@@ -350,7 +370,11 @@ export async function handleToggleExtension(
       }
     }
 
-    const extension = await extensionStorage.toggle(projectId, extensionId);
+    // Get tenant ID
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
+    const extension = await extensionStorage.toggle(projectId, extensionId, tenantId);
 
     if (!extension) {
       return Response.json(
@@ -399,8 +423,12 @@ export async function handleResetExtensions(req: Request, projectId: string): Pr
       }
     }
 
+    // Get tenant ID
+    const project = projectStorage.getById(projectId);
+    const tenantId = project?.tenant_id ?? auth.user.tenant_id;
+
     await extensionLoader.resetToDefaults(projectId);
-    const extensions = await extensionStorage.getAll(projectId);
+    const extensions = await extensionStorage.getAll(projectId, tenantId);
 
     return Response.json({
       success: true,
