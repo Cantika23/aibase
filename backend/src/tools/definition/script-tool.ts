@@ -258,8 +258,18 @@ Example (multi-line):
     };
 
     try {
-      // Load extensions from defaults directory
+      // Load extensions
       const extensionLoader = new ExtensionLoader();
+
+      // Initialize extensions for project if needed (copies defaults to project folder)
+      // This ensures extensions are available even if user hasn't opened Extensions page yet
+      try {
+        await extensionLoader.initializeProject(this.projectId);
+      } catch (error) {
+        // Log but don't fail script execution if initialization fails
+        console.warn(`[ScriptTool] Extension initialization failed (non-critical):`, error);
+      }
+
       const extensions = await extensionLoader.loadExtensions(this.projectId);
 
       // Create runtime with injected context and extensions
