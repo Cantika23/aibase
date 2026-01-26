@@ -464,21 +464,20 @@ export class ProjectStorage {
       throw new Error('Only the project owner can delete the project');
     }
 
+    // Store tenant_id BEFORE deleting from DB
+    const tenantId = project.tenant_id ?? 'default';
+    const projectDir = getPathProjectDir(id, tenantId);
+
     const stmt = this.db.prepare('DELETE FROM projects WHERE id = ?');
     const result = stmt.run(id);
 
     if (result.changes > 0) {
-      // Delete project directory
-      // First get the project to find its tenant_id
-      const project = this.getById(id);
-      if (project) {
-        const tenantId = project.tenant_id ?? 'default';
-        const projectDir = getPathProjectDir(id, tenantId);
-        try {
-          await fs.rm(projectDir, { recursive: true, force: true });
-        } catch (error) {
-          console.warn(`Failed to delete project directory ${projectDir}:`, error);
-        }
+      // Delete project directory using stored tenantId
+      try {
+        await fs.rm(projectDir, { recursive: true, force: true });
+        console.log(`[ProjectStorage] Deleted project directory: ${projectDir}`);
+      } catch (error) {
+        console.warn(`[ProjectStorage] Failed to delete project directory ${projectDir}:`, error);
       }
     }
 
