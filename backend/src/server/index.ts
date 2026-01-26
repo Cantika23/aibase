@@ -253,6 +253,12 @@ export class WebSocketServer {
     const { ensureDirectories } = await import("../config/paths");
     await ensureDirectories();
 
+    // Pre-bundle extension UIs to warm up cache (async, don't wait)
+    const { preBundleExtensionUIs } = await import("./extension-ui-handler");
+    preBundleExtensionUIs().catch((error) => {
+      console.error('[Server] Extension UI pre-bundling failed:', error);
+    });
+
     // Run migration for embed conversations (async, don't wait)
     migrateEmbedConversations().catch((error) => {
       console.error('[Server] Migration failed:', error);
