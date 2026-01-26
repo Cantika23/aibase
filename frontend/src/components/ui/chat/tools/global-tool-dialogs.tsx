@@ -1,4 +1,3 @@
-import { useShallow } from "zustand/react/shallow";
 import { ScriptDetailsDialog } from "@/components/ui/script-details-dialog";
 import { FileToolDetailsDialog } from "@/components/ui/file-tool-details-dialog";
 import { GenericToolDetailsDialog } from "@/components/ui/generic-tool-details-dialog";
@@ -18,23 +17,12 @@ export function GlobalToolDialogs({
 }: {
   toolInvocations?: ToolInvocation[];
 }) {
-  const {
-    selectedScript,
-    selectedFileTool,
-    selectedGenericTool,
-    setSelectedScript,
-    setSelectedFileTool,
-    setSelectedGenericTool,
-  } = useUIStore(
-    useShallow((state) => ({
-      selectedScript: state.selectedScript,
-      selectedFileTool: state.selectedFileTool,
-      selectedGenericTool: state.selectedGenericTool,
-      setSelectedScript: state.setSelectedScript,
-      setSelectedFileTool: state.setSelectedFileTool,
-      setSelectedGenericTool: state.setSelectedGenericTool,
-    }))
-  );
+  const selectedScript = useUIStore((state) => state.selectedScript);
+  const selectedFileTool = useUIStore((state) => state.selectedFileTool);
+  const selectedGenericTool = useUIStore((state) => state.selectedGenericTool);
+  const setSelectedScript = useUIStore((state) => state.setSelectedScript);
+  const setSelectedFileTool = useUIStore((state) => state.setSelectedFileTool);
+  const setSelectedGenericTool = useUIStore((state) => state.setSelectedGenericTool);
 
   // Collect all progress messages for script tools
   const scriptProgressMap = new Map<string, string[]>();
