@@ -1,6 +1,6 @@
 /**
- * PostgreSQL Extension UI Component
- * Displays query results and details in the inspector
+ * PostgreSQL Extension UI Components
+ * Contains both inspection dialog UI and inline message chat UI
  */
 
 import React from 'react';
@@ -16,6 +16,21 @@ interface InspectorProps {
   error?: string;
 }
 
+interface MessageProps {
+  toolInvocation: {
+    result: {
+      data?: any[];
+      rowCount?: number;
+      executionTime?: number;
+      query?: string;
+    };
+  };
+}
+
+/**
+ * Inspection Dialog UI - default export
+ * Full-featured UI for the inspection dialog
+ */
 export default function PostgreSQLInspector({ data, error }: InspectorProps) {
   if (error) {
     return (
@@ -123,6 +138,79 @@ export default function PostgreSQLInspector({ data, error }: InspectorProps) {
       <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-800 dark:text-blue-200">
         🎉 This UI is loaded from backend extension folder and bundled with esbuild!
       </div>
+    </div>
+  );
+}
+
+/**
+ * Message Chat UI - named export
+ * Simplified UI for inline rendering in chat messages
+ */
+export function PostgreSQLMessage({ toolInvocation }: MessageProps) {
+  const { result } = toolInvocation;
+  const { data, rowCount, executionTime, query } = result;
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground">
+        No results returned
+      </div>
+    );
+  }
+
+  // For inline chat, show simplified table with first 5 rows
+  const previewData = data.slice(0, 5);
+
+  return (
+    <div className="space-y-2">
+      {/* Query snippet */}
+      {query && (
+        <div className="text-xs text-muted-foreground font-mono">
+          {query.length > 100 ? `${query.substring(0, 100)}...` : query}
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="flex gap-4 text-xs text-muted-foreground">
+        {rowCount !== undefined && (
+          <span>{rowCount.toLocaleString()} rows</span>
+        )}
+        {executionTime !== undefined && (
+          <span>{executionTime}ms</span>
+        )}
+      </div>
+
+      {/* Preview Table */}
+      <div className="overflow-x-auto border rounded">
+        <table className="w-full text-xs">
+          <thead className="bg-muted">
+            <tr>
+              {Object.keys(previewData[0]).map((key) => (
+                <th key={key} className="px-2 py-1 text-left font-medium">
+                  {key}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {previewData.map((row, idx) => (
+              <tr key={idx} className="border-t">
+                {Object.values(row).map((value, vIdx) => (
+                  <td key={vIdx} className="px-2 py-1">
+                    {String(value ?? 'NULL')}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {data.length > 5 && (
+        <div className="text-xs text-muted-foreground italic">
+          Showing 5 of {data.length.toLocaleString()} rows
+        </div>
+      )}
     </div>
   );
 }
