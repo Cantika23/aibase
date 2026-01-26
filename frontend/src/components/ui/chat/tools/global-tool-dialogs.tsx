@@ -68,6 +68,7 @@ export function GlobalToolDialogs({
         }
         result={selectedScript?.result}
         error={selectedScript?.error}
+        inspectionData={selectedScript?.inspectionData}
       />
       <FileToolDetailsDialog
         open={!!selectedFileTool}
