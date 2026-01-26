@@ -1,6 +1,8 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { createLogger } from "../utils/logger";
+import { getProjectDir } from "../config/paths";
+import { ProjectStorage } from "../storage/project-storage";
 
 const logger = createLogger("Memory");
 
@@ -12,16 +14,24 @@ export interface MemoryStore {
 
 /**
  * Get the memory directory path for a project
+ * Returns: data/projects/{tenantId}/{projectId}/
  */
-function getMemoryDir(projectId: string): string {
-  return join(process.cwd(), "data", projectId);
+async function getMemoryDir(projectId: string): Promise<string> {
+  // Get tenant_id for the project
+  const projectStorage = ProjectStorage.getInstance();
+  const project = projectStorage.getById(projectId);
+  const tenantId = project?.tenant_id ?? 'default';
+
+  return getProjectDir(projectId, tenantId);
 }
 
 /**
  * Get the memory file path for a project
+ * Returns: data/projects/{tenantId}/{projectId}/memory.json
  */
-function getMemoryFilePath(projectId: string): string {
-  return join(getMemoryDir(projectId), "memory.json");
+async function getMemoryFilePath(projectId: string): Promise<string> {
+  const memoryDir = await getMemoryDir(projectId);
+  return join(memoryDir, "memory.json");
 }
 
 /**
@@ -29,7 +39,7 @@ function getMemoryFilePath(projectId: string): string {
  */
 async function loadMemory(projectId: string): Promise<MemoryStore> {
   try {
-    const memoryPath = getMemoryFilePath(projectId);
+    const memoryPath = await getMemoryFilePath(projectId);
     const content = await readFile(memoryPath, "utf-8");
     return JSON.parse(content);
   } catch (error) {
@@ -42,8 +52,8 @@ async function loadMemory(projectId: string): Promise<MemoryStore> {
  * Save memory to file
  */
 async function saveMemory(projectId: string, memory: MemoryStore): Promise<void> {
-  const memoryDir = getMemoryDir(projectId);
-  const memoryPath = getMemoryFilePath(projectId);
+  const memoryDir = await getMemoryDir(projectId);
+  const memoryPath = await getMemoryFilePath(projectId);
 
   // Ensure directory exists
   await mkdir(memoryDir, { recursive: true });

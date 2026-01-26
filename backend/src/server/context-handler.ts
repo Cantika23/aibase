@@ -1,6 +1,8 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { join, dirname } from "path";
 import { createLogger } from "../utils/logger";
+import { getProjectDir } from "../config/paths";
+import { ProjectStorage } from "../storage/project-storage";
 
 const logger = createLogger("Context");
 
@@ -65,16 +67,24 @@ async function expandTemplate(template: string): Promise<string> {
 
 /**
  * Get the context template directory path for a project
+ * Returns: data/projects/{tenantId}/{projectId}/
  */
-function getContextDir(projectId: string): string {
-  return join(process.cwd(), "data", projectId);
+async function getContextDir(projectId: string): Promise<string> {
+  // Get tenant_id for the project
+  const projectStorage = ProjectStorage.getInstance();
+  const project = projectStorage.getById(projectId);
+  const tenantId = project?.tenant_id ?? 'default';
+
+  return getProjectDir(projectId, tenantId);
 }
 
 /**
  * Get the context template file path for a project
+ * Returns: data/projects/{tenantId}/{projectId}/context.md
  */
-function getContextFilePath(projectId: string): string {
-  return join(getContextDir(projectId), "context.md");
+async function getContextFilePath(projectId: string): Promise<string> {
+  const contextDir = await getContextDir(projectId);
+  return join(contextDir, "context.md");
 }
 
 /**
@@ -91,7 +101,7 @@ const DEFAULT_TEMPLATE = `# AI Assistant Context
  */
 async function loadContext(projectId: string): Promise<string> {
   try {
-    const contextPath = getContextFilePath(projectId);
+    const contextPath = await getContextFilePath(projectId);
     const content = await readFile(contextPath, "utf-8");
     return content;
   } catch (error) {
@@ -104,8 +114,8 @@ async function loadContext(projectId: string): Promise<string> {
  * Save context template to file
  */
 async function saveContext(projectId: string, content: string): Promise<void> {
-  const contextDir = getContextDir(projectId);
-  const contextPath = getContextFilePath(projectId);
+  const contextDir = await getContextDir(projectId);
+  const contextPath = await getContextFilePath(projectId);
 
   // Ensure directory exists
   await mkdir(contextDir, { recursive: true });
@@ -134,12 +144,13 @@ export async function handleGetContext(req: Request): Promise<Response> {
     }
 
     const content = await loadContext(projectId);
+    const contextPath = await getContextFilePath(projectId);
 
     return Response.json({
       success: true,
       data: {
         content,
-        path: getContextFilePath(projectId),
+        path: contextPath,
         projectId,
       },
     });
@@ -209,11 +220,12 @@ export async function handleUpdateContext(req: Request): Promise<Response> {
 
     // Save the new content
     await saveContext(projectId, content);
+    const contextPath = await getContextFilePath(projectId);
 
     return Response.json({
       success: true,
       message: "Context template updated successfully",
-      path: getContextFilePath(projectId),
+      path: contextPath,
       projectId,
     });
   } catch (error) {
