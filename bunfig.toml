@@ -1,0 +1,6 @@
+[watch]
+# Ignore patterns for watch mode - exclude extension UI files that are bundled separately
+ignore = [
+  "backend/src/tools/extensions/defaults/*/ui.tsx",
+  "data/*/extensions/*/ui.tsx"
+]
