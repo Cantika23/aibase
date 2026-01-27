@@ -147,6 +147,10 @@ async function loadComponentFromBackend(
       console.error(`[ExtensionRegistry] Error loading module with Function:`, error);
       return null;
     }
+  } catch (error) {
+    console.warn(`[ExtensionRegistry] Failed to load backend UI for ${extensionId}:`, error);
+    return null;
+  }
 }
 
 /**
