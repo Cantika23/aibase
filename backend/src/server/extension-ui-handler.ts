@@ -143,14 +143,8 @@ export async function handleGetExtensionUI(req: Request, extensionId: string): P
       format: 'esm',
       minify: isProduction(),            // Minify in production
       sourcemap: !isProduction(),        // Source maps in development only
-      external: [
-        'react',
-        'react-dom',
-        'react/jsx-runtime',
-        'echarts',
-        'echarts-for-react',
-        'mermaid'
-      ],  // Exclude shared deps - loaded from frontend window.libs
+      // NOTE: Don't externalize anything - bundle everything together
+      // This avoids bare specifier errors when loading with new Function()
       write: false,
       outdir: 'out',
     });
@@ -355,14 +349,8 @@ export async function preBundleExtensionUIs(): Promise<void> {
           format: 'esm',
           minify: isProduction(),      // Minify in production
           sourcemap: !isProduction(),  // Source maps in development only
-          external: [
-            'react',
-            'react-dom',
-            'react/jsx-runtime',
-            'echarts',
-            'echarts-for-react',
-            'mermaid'
-          ],  // Exclude shared deps - loaded from frontend window.libs
+          // NOTE: Don't externalize anything - bundle everything together
+          // This avoids bare specifier errors when loading with new Function()
           write: false,
           outdir: 'out',
         });

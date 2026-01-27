@@ -78,37 +78,11 @@ async function loadComponentFromBackend(
 
     const bundledCode = await response.text();
 
-    // Transform ESM module to work with new Function
-    // 1. Remove all import statements
-    // 2. Replace export with assignments to a module object
-    const transformedCode = bundledCode
-      // Remove all import statements
-      .replace(/import\s*{[^}]*}\s*from\s*["'][^"']+["'];?\s*/g, '')
-      .replace(/import\s*\*\s+as\s+\w+\s*from\s*["'][^"']+["'];?\s*/g, '')
-      .replace(/import\s+\w+\s*,\s*{[^}]*}\s*from\s*["'][^"']+["'];?\s*/g, '')
-      // Replace export default
-      .replace(/export\s+default\s+/g, 'module.exports.default = ')
-      // Replace named exports: export function X -> module.exports.X = function
-      .replace(/export\s+(async\s+)?function\s+(\w+)/g, 'module.exports.$2 = $1function $2')
-      // Replace export const X = ... -> const X = ...; module.exports.X = X;
-      .replace(/export\s+const\s+(\w+)\s*=/g, (_match, name) => {
-        return `const ${name} =`;
-      })
-      // Handle export { X, Y }
-      .replace(/export\s*{([^}]+)}/g, (_match, exports) => {
-        // Convert export { X, Y } to module.exports.X = X; module.exports.Y = Y;
-        return exports.split(',').map((e: string) => {
-          const [name, as] = e.trim().split(/\s+as\s+/);
-          const exportName = as || name;
-          return `if (typeof ${name} !== 'undefined') module.exports.${exportName} = ${name};`;
-        }).join(' ');
-      });
-
     // Use new Function to create a module with injected dependencies
     // This is safe because the code comes from our own backend
+    // All dependencies are now bundled by esbuild (no external imports)
     try {
       const moduleFactory = new Function(
-        'React', 'ReactDOM', 'echarts', 'ReactECharts', 'mermaid',
         `
         "use strict";
         // Module exports object
@@ -124,8 +98,8 @@ async function loadComponentFromBackend(
           mermaid: mermaid
         };
 
-        // Execute the transformed code
-        ${transformedCode}
+        // Execute the bundled code
+        ${bundledCode}
 
         // Return the module exports
         return module.exports;
