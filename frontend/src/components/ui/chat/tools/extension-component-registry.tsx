@@ -65,40 +65,88 @@ async function loadComponentFromBackend(
 
     const bundledCode = await response.text();
 
-    // Create module from code
-    const blob = new Blob([bundledCode], { type: 'application/javascript' });
-    const blobUrl = URL.createObjectURL(blob);
+    // Transform ESM module to work with new Function
+    // 1. Remove all import statements
+    // 2. Replace export with assignments to a module object
+    const transformedCode = bundledCode
+      // Remove all import statements
+      .replace(/import\s*{[^}]*}\s*from\s*["'][^"']+["'];?\s*/g, '')
+      .replace(/import\s*\*\s+as\s+\w+\s*from\s*["'][^"']+["'];?\s*/g, '')
+      .replace(/import\s+\w+\s*,\s*{[^}]*}\s*from\s*["'][^"']+["'];?\s*/g, '')
+      // Replace export default
+      .replace(/export\s+default\s+/g, 'module.exports.default = ')
+      // Replace named exports: export function X -> module.exports.X = function
+      .replace(/export\s+(async\s+)?function\s+(\w+)/g, 'module.exports.$2 = $1function $2')
+      // Replace export const X = ... -> const X = ...; module.exports.X = X;
+      .replace(/export\s+const\s+(\w+)\s*=/g, (match, name) => {
+        return `const ${name} =`;
+      })
+      // Handle export { X, Y }
+      .replace(/export\s*{([^}]+)}/g, (match, exports) => {
+        // Convert export { X, Y } to module.exports.X = X; module.exports.Y = Y;
+        return exports.split(',').map((e: string) => {
+          const [name, as] = e.trim().split(/\s+as\s+/);
+          const exportName = as || name;
+          return `if (typeof ${name} !== 'undefined') module.exports.${exportName} = ${name};`;
+        }).join(' ');
+      });
 
-    // Dynamic import
-    const module = await import(blobUrl);
+    // Use new Function to create a module with injected dependencies
+    // This is safe because the code comes from our own backend
+    try {
+      const moduleFactory = new Function(
+        'React', 'ReactDOM', 'echarts', 'ReactECharts', 'mermaid',
+        `
+        "use strict";
+        // Module exports object
+        const module = { exports: {} };
 
-    // Clean up blob URL after a short delay to ensure module is loaded
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+        // Inject dependencies into window.libs for the code
+        window = window || {};
+        window.libs = {
+          React: React,
+          ReactDOM: ReactDOM,
+          ReactECharts: ReactECharts,
+          echarts: echarts,
+          mermaid: mermaid
+        };
 
-    // Get named export (ShowChartMessage, ShowTableMessage, ShowMermaidMessage, etc.)
-    const messageComponentName = extensionId.split('-').map((part, idx) =>
-      idx === 0 ? part.charAt(0).toUpperCase() + part.slice(1) :
-      part.charAt(0).toUpperCase() + part.slice(1)
-    ).join('') + 'Message';
+        // Execute the transformed code
+        ${transformedCode}
 
-    console.log(`[ExtensionRegistry] Looking for component: ${messageComponentName}`);
-    console.log(`[ExtensionRegistry] Module exports:`, Object.keys(module));
-    console.log(`[ExtensionRegistry] Has named export?`, !!module[messageComponentName]);
-    console.log(`[ExtensionRegistry] Has default export?`, !!module.default);
+        // Return the module exports
+        return module.exports;
+        `
+      );
 
-    const component = module[messageComponentName] || module.default || Object.values(module)[0];
+      // Execute with window.libs as arguments
+      const moduleExports = moduleFactory(
+        window.libs.React,
+        window.libs.ReactDOM,
+        window.libs.echarts,
+        window.libs.ReactECharts,
+        window.libs.mermaid
+      );
 
-    if (component) {
-      console.log(`[ExtensionRegistry] Successfully loaded backend UI for ${extensionId}`);
-      return component as ComponentType<VisualizationComponentProps>;
+      // Get the named export we need (e.g., ShowChartMessage)
+      const messageComponentName = extensionId.split('-').map((part, idx) =>
+        idx === 0 ? part.charAt(0).toUpperCase() + part.slice(1) :
+        part.charAt(0).toUpperCase() + part.slice(1)
+      ).join('') + 'Message';
+
+      const component = moduleExports[messageComponentName] || moduleExports.default;
+
+      if (component) {
+        console.log(`[ExtensionRegistry] Successfully loaded backend UI for ${extensionId}:`, messageComponentName);
+        return component as ComponentType<VisualizationComponentProps>;
+      }
+
+      console.warn(`[ExtensionRegistry] No component found in module for ${extensionId}. Looked for:`, messageComponentName, 'Available:', Object.keys(moduleExports));
+      return null;
+    } catch (error) {
+      console.error(`[ExtensionRegistry] Error loading module with Function:`, error);
+      return null;
     }
-
-    console.warn(`[ExtensionRegistry] No component found in module for ${extensionId}`);
-    return null;
-  } catch (error) {
-    console.warn(`[ExtensionRegistry] Failed to load backend UI for ${extensionId}:`, error);
-    return null;
-  }
 }
 
 /**
