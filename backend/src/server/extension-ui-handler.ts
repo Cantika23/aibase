@@ -53,8 +53,30 @@ function generateETag(contentHash: string): string {
 function transformBundledCode(code: string): string {
   let transformed = code;
 
-  // Replace bare module imports with window.libs references
-  // This handles: import ... from 'react' and import ... from 'react-dom'
+  // Step 1: Handle CommonJS require() calls (for format: 'cjs')
+  // The minified output has patterns like: var L=require("react"),e=require("react/jsx-runtime")
+  // We need to handle all require patterns in one pass
+
+  // First, replace react requires with window.libs
+  transformed = transformed.replace(
+    /(\w+)=(?:require\(['"]react['"]\)|window\.libs\.React)/g,
+    'const $1=window.libs.React'
+  );
+
+  // Then remove react/jsx-runtime requires
+  transformed = transformed.replace(
+    /\w+=(?:require\(['"]react\/jsx[^'"]*['"]\)|window\.libs\.jsxRuntime)/g,
+    ''
+  );
+
+  // Clean up: replace double commas, trailing commas, and fix var/const issues
+  transformed = transformed.replace(/,const/g, ';\nconst');
+  transformed = transformed.replace(/,\n/g, ';\n');
+  transformed = transformed.replace(/var const/g, 'const');
+  transformed = transformed.replace(/;const const/g, ';\nconst');
+  transformed = transformed.replace(/const (\w+)=window\.libs\.React;const/g, 'const $1=window.libs.React;\nconst');
+
+  // Also handle ESM import statements (for format: 'esm' fallback or direct imports)
   const importReplacements: [RegExp, string][] = [
     // Simple React import: import React from 'react'
     [/import\s+React\s+from\s+['"]react['"];?\s*\n?/g, 'const React = window.libs.React;\n'],
