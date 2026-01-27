@@ -239,11 +239,15 @@ export class ExtensionLoader {
       const jsCode = transpiler.transformSync(extension.code);
 
       // Wrap code to capture exports and provide globals
-      // Extensions should export default an object with their functions
+      // Extensions can use: return exports; or module.exports = exports; or export default exports
+      // We wrap the code in a function body to capture the return value
       const wrappedCode = `
         globalThis.extensionHookRegistry = arguments[0];
-        ${jsCode}
-        return (typeof module !== 'undefined' && module.exports) || {};
+        const module = { exports: {} };
+        const getExtensionExports = () => {
+          ${jsCode}
+        };
+        return module.exports || getExtensionExports() || {};
       `;
 
       // Execute in isolated context with hook registry
