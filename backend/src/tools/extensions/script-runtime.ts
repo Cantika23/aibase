@@ -196,6 +196,9 @@ export class ScriptRuntime {
     (globalThis as any).projectId = this.context.projectId;
     (globalThis as any).tenantId = tenantId;
 
+    // Inject __registerVisualization into globalThis for extensions to access
+    (globalThis as any).__registerVisualization = this.createVisualizationCollector();
+
     const scope: Record<string, any> = {
       // Context variables
       convId: this.context.convId,

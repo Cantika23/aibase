@@ -16,10 +16,22 @@ interface ChartSeries {
 
 interface ShowChartOptions {
   title: string;
-  chartType: 'bar' | 'line' | 'pie' | 'scatter';
+  chartType?: 'bar' | 'line' | 'pie' | 'scatter';
   xAxis?: string[];
   yAxis?: string;
-  series: ChartSeries[];
+  series?: ChartSeries[];
+}
+
+// Alternative Chart.js-style format
+interface ChartJsOptions {
+  title: string;
+  type?: 'bar' | 'line' | 'pie' | 'scatter';
+  labels?: string[];
+  datasets?: Array<{
+    label: string;
+    data: number[] | number;
+    backgroundColor?: string | string[];
+  }>;
 }
 
 interface ChartVisualizationResult {
@@ -27,6 +39,38 @@ interface ChartVisualizationResult {
     type: string;
     toolCallId: string;
     args: ShowChartOptions;
+  };
+}
+
+/**
+ * Convert Chart.js format to internal format
+ */
+function convertChartJsFormat(options: any): ShowChartOptions {
+  const { title, type, chartType, labels, datasets, series, xAxis, yAxis } = options;
+
+  // Check if this is Chart.js format (has datasets)
+  if (datasets && Array.isArray(datasets) && datasets.length > 0) {
+    const chartSeries: ChartSeries[] = datasets.map((ds: any) => ({
+      name: ds.label,
+      data: ds.data
+    }));
+
+    return {
+      title: title || 'Chart',
+      chartType: (type || chartType) || 'bar',
+      xAxis: labels,
+      yAxis: datasets[0]?.label || yAxis || 'Value',
+      series: chartSeries
+    };
+  }
+
+  // Already in internal format
+  return {
+    title: title || 'Chart',
+    chartType: (type || chartType) || 'bar',
+    xAxis: labels || xAxis,
+    yAxis: yAxis,
+    series: series || []
   };
 }
 
@@ -133,11 +177,14 @@ const showChartExtension = {
    *   }
    * });
    */
-  showChart: async (args: ShowChartOptions): Promise<ChartVisualizationResult> => {
+  showChart: async (args: ShowChartOptions | ChartJsOptions): Promise<ChartVisualizationResult> => {
+    // Convert Chart.js format to internal format if needed
+    const normalizedArgs = convertChartJsFormat(args);
+
     // Register visualization with the script runtime
     // This ensures charts are included in __visualizations array
     if (globalThis.__registerVisualization) {
-      return globalThis.__registerVisualization("show-chart", args);
+      return globalThis.__registerVisualization("show-chart", normalizedArgs);
     }
 
     // Fallback for direct usage (not recommended)
@@ -146,7 +193,7 @@ const showChartExtension = {
       __visualization: {
         type: "show-chart",
         toolCallId,
-        args
+        args: normalizedArgs
       }
     };
   },
