@@ -167,6 +167,8 @@ export class ExtensionLoader {
           // Single function - add directly to scope
           Object.assign(scope, exports);
           console.log(`[ExtensionLoader] Loaded extension '${extension.metadata.name}' with ${functionNames.length} function (flattened to scope): ${functionNames.join(', ')}`);
+          console.log(`[ExtensionLoader] Scope keys:`, Object.keys(scope));
+          console.log(`[ExtensionLoader] Export type for '${functionNames[0]}':`, typeof exports[functionNames[0]]);
         } else {
           // Multiple functions - use namespace to avoid conflicts
           scope[namespace] = exports;
@@ -238,6 +240,9 @@ export class ExtensionLoader {
 
       const jsCode = transpiler.transformSync(extension.code);
 
+      console.log(`[ExtensionLoader] Evaluating '${extension.metadata.name}':`);
+      console.log(`[ExtensionLoader] Transpiled code (first 500 chars):`, jsCode.substring(0, 500));
+
       // Wrap code to capture exports and provide globals
       // Extensions can use: return exports; or module.exports = exports; or export default exports
       // We wrap the code in a function body to capture the return value
@@ -247,13 +252,23 @@ export class ExtensionLoader {
         const getExtensionExports = () => {
           ${jsCode}
         };
-        return module.exports || getExtensionExports() || {};
+        const extensionResult = getExtensionExports();
+        // Check if module.exports was actually populated (has keys)
+        const moduleExportsKeys = Object.keys(module.exports);
+        if (moduleExportsKeys.length > 0) {
+          return module.exports;
+        }
+        return extensionResult || {};
       `;
 
       // Execute in isolated context with hook registry
       const AsyncFunction = (async function () {}).constructor as any;
       const fn = new AsyncFunction(wrappedCode);
       const result = await fn(extensionHookRegistry);
+
+      console.log(`[ExtensionLoader] Result from extension '${extension.metadata.name}':`, JSON.stringify(result, null, 2));
+      console.log(`[ExtensionLoader] Result keys:`, Object.keys(result));
+      console.log(`[ExtensionLoader] Result.showTable type:`, typeof result.showTable);
 
       // Handle different export patterns
       if (result.default) {
