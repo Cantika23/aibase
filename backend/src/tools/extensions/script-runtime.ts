@@ -67,6 +67,15 @@ return { created: texts.length };
 
 **Available:** fetch, progress(msg), memory.read(category, key), file(...), todo(...), memory(...), peek(outputId, offset, limit), peekInfo(outputId), webSearch(...), imageSearch(...), showChart(...), showTable(...), showMermaid(...), convertDocument(...), imageDocument(...), convId, projectId, CURRENT_UID (user ID from authentication, empty string "" if not authenticated), console (goes to server logs, not visible to AI - use progress() or return values for AI-visible output)
 
+**IMPORTANT:** Project extension functions are also available! See the "## 🧩 Project Extensions" section below for extension functions like:
+- extensionCreator.createOrUpdate() - Create extensions
+- postgresql() - Query PostgreSQL databases
+- duckdb() - Query CSV/Excel/Parquet/JSON files
+- webSearch() - Search the web
+- And more project-specific extensions
+
+These extension functions can be called directly in your code just like the built-in functions above.
+
 **BACKEND DEPENDENCIES:** If the active extension has declared backend dependencies in metadata.json, they are available via the \`deps\` object:
 - \`deps.packageName\` - For packages without hyphens (e.g., deps.lodash)
 - \`deps['package-name']\` - For packages with hyphens (e.g., deps['csv-parse'])
