@@ -8,20 +8,6 @@ declare const globalThis: {
   __registerVisualization?: (type: string, args: any) => any;
 };
 
-// Debug log function - uses require() internally to avoid top-level imports
-function debugLog(message: string, data?: any) {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const debugLogPath = path.join(process.cwd(), 'data', 'logs', 'showchart-debug.log');
-    const timestamp = new Date().toISOString();
-    const logMessage = data ? `[${timestamp}] ${message} ${JSON.stringify(data, null, 2)}\n` : `[${timestamp}] ${message}\n`;
-    fs.appendFileSync(debugLogPath, logMessage);
-  } catch (err) {
-    // Ignore logging errors
-  }
-}
-
 // Type definitions
 interface ChartSeries {
   name: string;
@@ -105,13 +91,30 @@ const context = () =>
   'await showChart({' +
   '  title: "Monthly Sales",' +
   '  chartType: "bar",              // "bar", "line", "pie", "scatter"' +
-  '  xAxis: ["Jan", "Feb", "Mar"],    // X-axis labels' +
-  '  yAxis: "Sales",                 // Y-axis label' +
-  '  series: [{                      // Data series' +
-  '    name: "Revenue",' +
-  '    data: [150, 230, 224]' +
+  '  xAxis: ["Jan", "Feb", "Mar"],    // X-axis labels (optional for pie)' +
+  '  yAxis: "Sales",                 // Y-axis label (optional for pie)' +
+  '  series: [{' +
+  '    name: "Revenue",' +           // Series name (REQUIRED)' +
+  '    data: [150, 230, 224]' +      // Series data (REQUIRED) - array of numbers' +
   '  }]' +
   '});' +
+  '`' + '`' + '`' +
+  '' +
+  '**CRITICAL: Each series MUST have both `name` AND `data` fields:**' +
+  '' +
+  '✅ CORRECT:' +
+  '`' + '`' + '`' + 'typescript' +
+  'series: [{' +
+  '  name: "Sales",' +
+  '  data: [100, 200, 300]' +       // ← data MUST be included!' +
+  '}]' +
+  '`' + '`' + '`' +
+  '' +
+  '❌ WRONG (will show "No chart data available"):' +
+  '`' + '`' + '`' + 'typescript' +
+  'series: [{' +
+  '  name: "Sales"' +                // ← Missing data field!' +
+  '}]' +
   '`' + '`' + '`' +
   '' +
   '**Parameters:**' +
@@ -119,7 +122,7 @@ const context = () =>
   '- \\`chartType\\` (required): Chart type - "bar", "line", "pie", or "scatter"' +
   '- \\`xAxis\\` (optional): X-axis labels (array of strings)' +
   '- \\`yAxis\\` (optional): Y-axis label' +
-  '- \\`series\\` (required): Array of data series with \\`name\\` and \\`data\\`' +
+  '- \\`series\\` (required): Array of data series. Each series MUST have \\`name\\` (string) AND \\`data\\` (array of numbers or single number for pie)' +
   '' +
   '**Examples:**' +
   '' +
@@ -137,16 +140,19 @@ const context = () =>
   '});' +
   '`' + '`' + '`' +
   '' +
-  '2. **Line chart:**' +
+  '2. **Line chart with multiple series:**' +
   '`' + '`' + '`' + 'typescript' +
   'await showChart({' +
-  '  title: "Stock Price Trend",' +
+  '  title: "Sales vs Profit",' +
   '  chartType: "line",' +
-  '  xAxis: ["Mon", "Tue", "Wed", "Thu", "Fri"],' +
-  '  yAxis: "Price ($)",' +
+  '  xAxis: ["Jan", "Feb", "Mar", "Apr"],' +
+  '  yAxis: "Amount ($)",' +
   '  series: [{' +
-  '    name: "AAPL",' +
-  '    data: [175.5, 178.2, 176.8, 180.1, 182.3]' +
+  '    name: "Sales",' +
+  '    data: [5000, 7000, 6000, 8000]' +
+  '  }, {' +
+  '    name: "Profit",' +
+  '    data: [1000, 2000, 1500, 2500]' +
   '  }]' +
   '});' +
   '`' + '`' + '`' +
@@ -172,7 +178,8 @@ const context = () =>
   '**Important Notes:**' +
   '- Charts render interactively in the chat interface' +
   '- Use after querying data with duckdb, postgresql, etc.' +
-  '- Return the result directly to display the chart';
+  '- Return the result directly to display the chart' +
+  '- Each series item MUST include both `name` AND `data` fields';
 
 /**
  * Show chart extension
@@ -192,19 +199,8 @@ const showChartExtension = {
    * });
    */
   showChart: async (args: ShowChartOptions | ChartJsOptions): Promise<ChartVisualizationResult> => {
-    // Debug logging to file
-    debugLog('=== showChart called ===');
-    debugLog('Received args:', args);
-    debugLog('args.series:', args?.series);
-    debugLog('args.datasets:', args?.datasets);
-    debugLog('args keys:', Object.keys(args || {}));
-
     // Convert Chart.js format to internal format if needed
     const normalizedArgs = convertChartJsFormat(args);
-
-    debugLog('normalizedArgs:', normalizedArgs);
-    debugLog('normalizedArgs.series:', normalizedArgs?.series);
-    debugLog('=========================');
 
     // Register visualization with the script runtime
     // This ensures charts are included in __visualizations array

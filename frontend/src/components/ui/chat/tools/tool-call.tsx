@@ -397,24 +397,14 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
                 {/* Render visualizations from script result using backend plugin system */}
                 {scriptVisualizations && scriptVisualizations.length > 0 && (
                   <div className="mt-2 mb-4">
-                    {console.log('[ToolCall] Rendering visualizations, count:', scriptVisualizations.length)}
                     {scriptVisualizations.map((viz: any, vizIndex: number) => {
-                      // Debug: log each visualization before rendering
-                      console.log(`[ToolCall] Processing viz ${vizIndex}:`, viz);
-                      console.log(`[ToolCall] viz.type:`, viz.type, `viz.args:`, viz.args);
-                      console.log(`[ToolCall] viz.args.series:`, viz.args?.series);
-                      console.log(`[ToolCall] viz.args.datasets:`, viz.args?.datasets);
                       // Create wrapper component for each visualization
                       const VizComponentWrapper = () => {
-                        console.log(`[VizComponentWrapper] RENDER called - viz.type: ${viz.type}, vizIndex: ${vizIndex}`);
-
                         const [Comp, setComp] = React.useState<ComponentType<any> | null>(null);
                         const [error, setError] = React.useState<string | null>(null);
 
                         React.useEffect(() => {
-                          console.log(`[VizComponentWrapper] Loading component for viz.type: ${viz.type}, vizIndex: ${vizIndex}`);
                           getExtensionComponent(viz.type).then(comp => {
-                            console.log(`[VizComponentWrapper] Got component for ${viz.type}:`, comp ? 'YES' : 'NO');
                             if (comp) {
                               setComp(() => comp);
                             } else {
