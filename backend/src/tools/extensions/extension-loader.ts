@@ -19,7 +19,6 @@ export class ExtensionLoader {
   private categoryStorage: CategoryStorage;
   private projectStorage: ProjectStorage;
   private defaultsPath: string;
-  private workerCache: Map<string, Worker> = new Map();
 
   constructor() {
     this.extensionStorage = new ExtensionStorage();
@@ -314,15 +313,16 @@ export class ExtensionLoader {
   }
 
   /**
-   * Evaluate an extension's TypeScript code using worker thread isolation
+   * Evaluate an extension's TypeScript code directly in the main thread
+   *
+   * Note: We don't use worker threads because postMessage cannot clone functions.
+   * Extensions export functions that need to be callable from the main thread.
    */
   private async evaluateExtension(extension: Extension): Promise<Record<string, any>> {
-    const workerPath = path.join(__dirname, 'extension-worker.ts');
-
     try {
-      console.log(`[ExtensionLoader] Evaluating '${extension.metadata.name}' in worker thread`);
+      console.log(`[ExtensionLoader] Evaluating '${extension.metadata.name}' in main thread`);
 
-      // Transpile TypeScript to JavaScript before sending to worker
+      // Transpile TypeScript to JavaScript
       const jsCode = await this.transpileExtension(extension.code, extension.metadata.id);
 
       // Load backend dependencies if declared
@@ -332,75 +332,77 @@ export class ExtensionLoader {
         console.log(`[ExtensionLoader] Loading ${Object.keys(backendDeps).length} backend dependencies for '${extension.metadata.name}'`);
       }
 
-      // Create or reuse worker
-      const workerKey = extension.metadata.id;
-      let worker = this.workerCache.get(workerKey);
-
-      if (!worker) {
-        worker = new Worker(workerPath, {
-          env: {
-            EXTENSION_ID: extension.metadata.id,
-          },
-        });
-        this.workerCache.set(workerKey, worker);
-        console.log(`[ExtensionLoader] Created new worker for '${extension.metadata.name}'`);
+      // Load dependencies
+      const loadedDeps: Record<string, any> = {};
+      for (const [name, version] of Object.entries(backendDeps)) {
+        try {
+          loadedDeps[name] = await import(name);
+        } catch (error) {
+          console.error(`[ExtensionLoader] Failed to load dependency ${name}:`, error);
+          throw new Error(`Failed to load dependency ${name}: ${error}`);
+        }
       }
 
-      // Send evaluation request to worker (with transpiled JavaScript)
-      const messageId = `eval_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Create dependency object string
+      const depsObjectString = Object.keys(loadedDeps).length > 0
+        ? `const deps = ${JSON.stringify(Object.keys(loadedDeps).reduce((acc, key) => {
+            const safeKey = key.includes('-') ? `"${key}"` : key;
+            acc[safeKey] = `__deps[${JSON.stringify(key)}]`;
+            return acc;
+          }, {} as Record<string, string>))};`
+        : 'const deps = {};';
 
-      const result = await new Promise<any>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          console.error(`[ExtensionLoader] TIMEOUT waiting for worker response for '${extension.metadata.name}'`);
-          reject(new Error('Worker evaluation timeout'));
-        }, 35000); // 35 second total timeout
+      // Wrap code to capture exports
+      const wrappedCode = `
+        "use strict";
+        const module = { exports: {} };
 
-        worker.onmessage = (e: MessageEvent) => {
-          console.log(`[ExtensionLoader] Worker message received:`, e.data.id, 'expected:', messageId);
-          if (e.data.id === messageId) {
-            clearTimeout(timeout);
-            if (e.data.type === 'error') {
-              console.error(`[ExtensionLoader] Worker returned error:`, e.data.error);
-              reject(new Error(e.data.error));
-            } else {
-              console.log(`[ExtensionLoader] Worker returned result:`, JSON.stringify(e.data.result));
-              resolve(e.data.result);
-            }
-          }
-        };
+        // Inject dependencies
+        const __deps = arguments[1] || {};
+        ${depsObjectString}
 
-        worker.onerror = (error) => {
-          console.error(`[ExtensionLoader] Worker onerror triggered:`, error);
-          clearTimeout(timeout);
-          reject(new Error(`Worker error: ${error}`));
-        };
+        // Extension hook registry placeholder
+        globalThis.extensionHookRegistry = arguments[0];
 
-        const message = {
-          id: messageId,
-          type: 'evaluate',
-          extensionId: extension.metadata.id,
-          code: jsCode,  // Send transpiled JavaScript instead of TypeScript
-          dependencies: backendDeps,
-          metadata: extension.metadata,
-        };
+        // Execute extension code (already transpiled to JavaScript)
+        let extensionResult;
+        let errorMsg;
+        try {
+          const getExtensionExports = () => {
+            ${jsCode}
+          };
 
-        console.log(`[ExtensionLoader] Posting message to worker, id:`, messageId);
-        console.log(`[ExtensionLoader] jsCode length being sent:`, jsCode.length);
-        console.log(`[ExtensionLoader] jsCode first 100 chars:`, jsCode.substring(0, 100));
-        worker.postMessage(message);
-      });
+          extensionResult = getExtensionExports();
+        } catch (e) {
+          errorMsg = e instanceof Error ? e.message : String(e);
+          throw e;
+        }
 
-      console.log(`[ExtensionLoader] Result from extension '${extension.metadata.name}':`, JSON.stringify(result, null, 2));
-      console.log(`[ExtensionLoader] Result keys:`, Object.keys(result));
+        // Check for module.exports pattern
+        const moduleExportsKeys = Object.keys(module.exports);
+        if (moduleExportsKeys.length > 0) {
+          return module.exports;
+        }
 
-      // Add debug log if debug mode is enabled
-      if (extension.metadata.debug) {
-        const tenantId = this.getTenantId(extension.metadata.id); // Wait, need projectId
-        // We don't have projectId here, so we'll handle this differently
-        // For now, skip since we don't have context
-      }
+        return extensionResult || {};
+      `;
 
-      return result;
+      // Execute in controlled environment
+      const AsyncFunction = (async function () {}).constructor as any;
+      const fn = new AsyncFunction(wrappedCode);
+
+      // Mock hook registry
+      const hookRegistry = {
+        registerHook: () => {},
+        unregisterHook: () => {},
+      };
+
+      // Evaluate the extension
+      const result = await fn(hookRegistry, loadedDeps);
+
+      console.log(`[ExtensionLoader] Result from extension '${extension.metadata.name}':`, Object.keys(result || {}));
+
+      return result || {};
     } catch (error: any) {
       console.error(`[ExtensionLoader] Failed to evaluate extension '${extension.metadata.name}':`, error);
       throw new Error(`Extension evaluation failed: ${error.message}`);
@@ -488,28 +490,5 @@ export class ExtensionLoader {
     }
 
     return status;
-  }
-
-  /**
-   * Terminate worker for an extension
-   */
-  terminateWorker(extensionId: string): void {
-    const worker = this.workerCache.get(extensionId);
-    if (worker) {
-      worker.terminate();
-      this.workerCache.delete(extensionId);
-      console.log(`[ExtensionLoader] Terminated worker for extension '${extensionId}'`);
-    }
-  }
-
-  /**
-   * Terminate all workers
-   */
-  terminateAllWorkers(): void {
-    for (const [extensionId, worker] of this.workerCache.entries()) {
-      worker.terminate();
-      console.log(`[ExtensionLoader] Terminated worker for extension '${extensionId}'`);
-    }
-    this.workerCache.clear();
   }
 }
