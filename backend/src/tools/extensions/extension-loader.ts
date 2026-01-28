@@ -290,9 +290,15 @@ export class ExtensionLoader {
     try {
       const result = await esbuild.transform(code, {
         loader: 'ts',
-        target: 'es2020',
+        target: 'esnext',
         format: 'cjs',
         minify: false,
+        supported: {
+          // Allow top-level await
+          'top-level-await': true,
+          // Allow dynamic import
+          'dynamic-import': true,
+        },
       });
 
       console.log(`[ExtensionLoader] AFTER transpile '${extensionId}', original: ${code.length}, transpiled: ${result.code.length}`);
@@ -307,8 +313,8 @@ export class ExtensionLoader {
     } catch (error) {
       console.error(`[ExtensionLoader] Transpilation FAILED for '${extensionId}':`, error);
       console.error(`[ExtensionLoader] Error details:`, error);
-      // Return original code if transpilation fails (shouldn't happen with valid TS)
-      return code;
+      // Throw error instead of returning original code - we can't evaluate raw TypeScript
+      throw new Error(`Failed to transpile extension '${extensionId}': ${error}`);
     }
   }
 
