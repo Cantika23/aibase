@@ -88,6 +88,13 @@ export class CategoryStorage {
             createdAt: Date.now(),
             updatedAt: Date.now(),
           },
+          {
+            id: 'developer-tools',
+            name: 'Developer Tools',
+            description: 'Tools for development and extension management',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
         ];
 
         await fs.writeFile(
