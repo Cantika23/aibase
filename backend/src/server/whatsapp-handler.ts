@@ -307,31 +307,49 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
         }
       } else {
         // If we don't know our phone number but there are mentions, 
-        // we conservatively ignore it to prevent spamming groups,
-        // unless we want to assume we ARE mentioned if mentions exist?
-        // Safer to ignore if we can't verify identity.
+        // we conservatively ignore it to prevent spamming groups.
         console.log("[WhatsApp] Ignoring group message (unknown bot identity)");
         return Response.json({ success: true, ignored: true });
       }
 
       console.log("[WhatsApp] Processing group message (bot mentioned)", { myPhone, mentions });
+    } else {
+      // Logic for Private Chat (DM)
+      console.log("[WhatsApp] Processing PRIVATE message (DM)", { 
+        from: messageData.from, 
+        pushName: messageData.pushName 
+      });
     }
 
-    // Extract WhatsApp phone number as UID
-    // For self-chat (LID case), we need to extract from rawChat/rawSender instead of 'from'
-    let whatsappNumber = messageData.from;
+    // Extract WhatsApp phone number for reply target
+    // For DM: rawChat contains the phone number JID (e.g. "6281803417004@s.whatsapp.net")
+    // For Group: rawSender contains the sender JID, but we still reply to rawChat (group)
+    // The 'from' field may contain LID which is NOT suitable for replies
+    let whatsappNumber: string;
 
-    // If it's a LID (Linked ID) or doesn't look like a phone number, try to extract from rawChat/rawSender
-    if (messageData.isLID || !whatsappNumber.match(/^\d+$/)) {
-      // Try rawChat first (format: "6282350634214@s.whatsapp.net")
-      if (messageData.rawChat) {
-        whatsappNumber = messageData.rawChat.split('@')[0];
-      }
-      // Fallback to rawSender (format: "6282350634214@s.whatsapp.net")
-      else if (messageData.rawSender) {
-        whatsappNumber = messageData.rawSender.split('@')[0];
-      }
+    // PRIORITY 1: For DM, use rawChat (the chat JID is the phone number)
+    if (!messageData.isGroup && messageData.rawChat && messageData.rawChat.includes('@s.whatsapp.net')) {
+      whatsappNumber = messageData.rawChat.split('@')[0];
+      console.log("[WhatsApp] Using rawChat for DM reply target:", whatsappNumber);
     }
+    // PRIORITY 2: For Group, use rawSender (who sent the message)
+    else if (messageData.isGroup && messageData.rawSender && messageData.rawSender.includes('@s.whatsapp.net')) {
+      whatsappNumber = messageData.rawSender.split('@')[0];
+      console.log("[WhatsApp] Using rawSender for Group reply target:", whatsappNumber);
+    }
+    // PRIORITY 3: Try rawSenderAlt if available
+    else if (messageData.rawSenderAlt && messageData.rawSenderAlt.includes('@s.whatsapp.net')) {
+      whatsappNumber = messageData.rawSenderAlt.split('@')[0];
+      console.log("[WhatsApp] Using rawSenderAlt for reply target:", whatsappNumber);
+    }
+    // FALLBACK: Use 'from' field (may be LID, may fail)
+    else {
+      whatsappNumber = messageData.from;
+      console.warn("[WhatsApp] WARNING: Using 'from' field as fallback. This may be an LID and reply may fail:", whatsappNumber);
+    }
+
+    // Ensure format is clean (digits only)
+    whatsappNumber = whatsappNumber.replace(/[^0-9]/g, '');
 
     const uid = `whatsapp_user_${whatsappNumber}`;
 
@@ -547,12 +565,36 @@ async function processWhatsAppMessageWithAI(
     let fullResponse = "";
 
     // Add user message to conversation and stream response
-    for await (const chunk of conversation.sendMessage(messageText)) {
-      fullResponse += chunk;
-      console.log("[WhatsApp] AI chunk received, length:", chunk.length);
-    }
+    console.log("[WhatsApp] Stream started. Waiting for first chunk...");
+    let chunkCount = 0;
+    
+    // Create a timeout promise
+    let isComplete = false;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        if (!isComplete && chunkCount === 0) reject(new Error("AI Response Timeout (No chunks received in 30s)"));
+      }, 30000);
+    });
 
-    console.log("[WhatsApp] AI response complete, full response length:", fullResponse.length);
+    const streamPromise = (async () => {
+      try {
+        for await (const chunk of conversation.sendMessage(messageText)) {
+          chunkCount++;
+          if (chunkCount === 1) console.log("[WhatsApp] First chunk received!");
+          fullResponse += chunk;
+          // Log progress every 50 chunks to avoid spam
+          if (chunkCount % 50 === 0) console.log(`[WhatsApp] Received ${chunkCount} chunks...`);
+        }
+      } catch (err) {
+        throw err;
+      }
+    })();
+
+    // Race between stream and timeout
+    await Promise.race([streamPromise, timeoutPromise]);
+    isComplete = true;
+
+    console.log("[WhatsApp] AI response complete, total chunks:", chunkCount, "length:", fullResponse.length);
 
     // Save conversation history
     const history = (conversation as any)._history || [];
@@ -561,6 +603,13 @@ async function processWhatsAppMessageWithAI(
     // Send response back to WhatsApp
     if (fullResponse.trim()) {
       const cleanedResponse = cleanWhatsAppResponse(fullResponse);
+      
+      if (!cleanedResponse.trim()) {
+        console.warn("[WhatsApp] WARNING: Response is empty after cleaning. The AI likely executed a tool but didn't generate a text reply.");
+        console.warn("[WhatsApp] Full raw response was:", fullResponse);
+        return;
+      }
+
       console.log("[WhatsApp] Sending response back to WhatsApp:", cleanedResponse.substring(0, 100) + "...");
       await sendWhatsAppMessage(projectId, whatsappNumber, {
         text: cleanedResponse,
@@ -606,7 +655,14 @@ async function sendWhatsAppMessage(
 
     console.log("[WhatsApp] Message sent successfully to", phone);
   } catch (error) {
-    console.error("[WhatsApp] Error sending message:", error);
+    console.error("[WhatsApp] Error sending message to URL:", `${WHATSAPP_API_URL}/clients/${projectId}/send-message`);
+    console.error("[WhatsApp] Error details:", error);
+    
+    const errorStr = String(error);
+    if (errorStr.includes("fetch failed") || errorStr.includes("ECONNREFUSED")) {
+      console.error("\x1b[31m[WhatsApp] CRITICAL: Could not connect to WhatsApp Service!\x1b[0m");
+      console.error("\x1b[33m[WhatsApp] Please ensure the WhatsApp automation service is running on port 7031.\x1b[0m");
+    }
     throw error;
   }
 }

@@ -2318,12 +2318,17 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 		"fromMe":    msg.Info.IsFromMe,
 	}
 
-	// Include additional sender info for LID resolution on the receiving end
+	// ALWAYS include raw JID info for reliable reply targeting
+	// The backend can use rawChat (for DM) or rawSender (for Groups) to determine reply destination
+	messageData["rawChat"] = msg.Info.Chat.String()
+	messageData["rawSender"] = msg.Info.Sender.String()
+	if msg.Info.SenderAlt.User != "" {
+		messageData["rawSenderAlt"] = msg.Info.SenderAlt.String()
+	}
+
+	// Flag unresolved LID for additional handling
 	if isUnresolvedLID {
 		messageData["isLID"] = true
-		messageData["rawChat"] = msg.Info.Chat.String()
-		messageData["rawSender"] = msg.Info.Sender.String()
-		messageData["rawSenderAlt"] = msg.Info.SenderAlt.String()
 		fmt.Printf("[Webhook Warning] ⚠️ Unresolved LID detected: %s - SenderAlt was: %s\n", fromUser, msg.Info.SenderAlt.String())
 	}
 
