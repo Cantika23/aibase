@@ -11,7 +11,9 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ExtensionUI');
 
-const globalExtensionsDir = path.join(process.cwd(), 'backend/src/tools/extensions/defaults');
+// Use __dirname to resolve path relative to this file (server/)
+// This file is in backend/src/server/, so we need to go up and then to extensions/defaults
+const globalExtensionsDir = path.join(__dirname, '../tools/extensions/defaults');
 const cacheDir = path.join(process.cwd(), 'data/cache/extension-ui');
 
 // Cache metadata storage

@@ -75,7 +75,7 @@ async function loadDependencies(dependencies: Record<string, string>): Promise<R
 }
 
 /**
- * Evaluate extension code in isolation
+ * Evaluate extension code in isolation (code is already transpiled to JavaScript)
  */
 function evaluateExtension(code: string, dependencies: Record<string, any>, metadata: { id?: string }): any {
   // Create dependency object string
@@ -99,19 +99,35 @@ function evaluateExtension(code: string, dependencies: Record<string, any>, meta
     // Extension hook registry placeholder
     globalThis.extensionHookRegistry = arguments[0];
 
-    // Execute extension code
-    const getExtensionExports = () => {
-      ${code}
-    };
+    // Execute extension code (already transpiled to JavaScript)
+    let extensionResult;
+    let errorMsg;
+    try {
+      const getExtensionExports = () => {
+        ${code}
+      };
 
-    const extensionResult = getExtensionExports();
+      extensionResult = getExtensionExports();
+    } catch (e) {
+      errorMsg = e instanceof Error ? e.message : String(e);
+    }
+
+    // Send debug info via console
+    if (errorMsg) {
+      console.log('[ExtensionWorker] ERROR:', errorMsg);
+    }
+    console.log('[ExtensionWorker] extensionResult:', JSON.stringify(extensionResult));
+    console.log('[ExtensionWorker] extensionResult keys:', Object.keys(extensionResult || {}));
 
     // Check for module.exports pattern
     const moduleExportsKeys = Object.keys(module.exports);
+    console.log('[ExtensionWorker] module.exports keys:', moduleExportsKeys);
     if (moduleExportsKeys.length > 0) {
+      console.log('[ExtensionWorker] Returning module.exports');
       return module.exports;
     }
 
+    console.log('[ExtensionWorker] Returning extensionResult');
     return extensionResult || {};
   `;
 
@@ -147,6 +163,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         throw new Error('No code provided for evaluation');
       }
 
+      console.log('[ExtensionWorker] Starting evaluation for:', metadata?.id);
+
       // Load dependencies if provided
       const loadedDeps = dependencies && Object.keys(dependencies).length > 0
         ? await loadDependencies(dependencies)
@@ -158,10 +176,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         id: metadataId,
         ...(metadata || {})
       };
+
+      console.log('[ExtensionWorker] Calling evaluateExtension, code length:', code.length);
       const result = await withTimeout(
         () => evaluateExtension(code, loadedDeps, enhancedMetadata),
         30000 // 30 second timeout
       );
+
+      console.log('[ExtensionWorker] Evaluation result:', JSON.stringify(result));
+      console.log('[ExtensionWorker] Evaluation result keys:', Object.keys(result || {}));
 
       response.result = result;
 
@@ -170,20 +193,23 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
 
   } catch (error) {
+    console.log('[ExtensionWorker] ERROR:', error instanceof Error ? error.message : String(error));
+    console.log('[ExtensionWorker] ERROR stack:', error instanceof Error ? error.stack : 'N/A');
     response.type = 'error';
     response.error = error instanceof Error ? error.message : String(error);
   }
 
+  console.log('[ExtensionWorker] Posting response:', response.type);
   self.postMessage(response);
 };
 
 /**
  * Execute function with timeout
  */
-async function withTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T> {
+async function withTimeout<T>(fn: () => T | Promise<T>, timeoutMs: number): Promise<T> {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error(`Execution timeout after ${timeoutMs}ms`)), timeoutMs);
   });
 
-  return Promise.race([fn(), timeoutPromise]);
+  return Promise.race([Promise.resolve(fn()), timeoutPromise]);
 }

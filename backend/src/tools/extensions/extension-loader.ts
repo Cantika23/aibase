@@ -5,6 +5,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import * as esbuild from 'esbuild';
 import { ExtensionStorage, type Extension, type ExtensionMetadata } from '../../storage/extension-storage';
 import { ProjectStorage } from '../../storage/project-storage';
 import { CategoryStorage } from '../../storage/category-storage';
@@ -281,6 +282,38 @@ export class ExtensionLoader {
   }
 
   /**
+   * Transpile TypeScript to JavaScript using esbuild
+   */
+  private async transpileExtension(code: string, extensionId: string): Promise<string> {
+    console.log(`[ExtensionLoader] BEFORE transpile '${extensionId}', length: ${code.length}`);
+    console.log(`[ExtensionLoader] First 100 chars:`, code.substring(0, 100));
+
+    try {
+      const result = await esbuild.transform(code, {
+        loader: 'ts',
+        target: 'es2020',
+        format: 'cjs',
+        minify: false,
+      });
+
+      console.log(`[ExtensionLoader] AFTER transpile '${extensionId}', original: ${code.length}, transpiled: ${result.code.length}`);
+      console.log(`[ExtensionLoader] Transpiled first 100 chars:`, result.code.substring(0, 100));
+
+      // Check if transpilation actually changed anything
+      if (result.code === code) {
+        console.error(`[ExtensionLoader] WARNING: Transpiled code is IDENTICAL to original! esbuild didn't transpile.`);
+      }
+
+      return result.code;
+    } catch (error) {
+      console.error(`[ExtensionLoader] Transpilation FAILED for '${extensionId}':`, error);
+      console.error(`[ExtensionLoader] Error details:`, error);
+      // Return original code if transpilation fails (shouldn't happen with valid TS)
+      return code;
+    }
+  }
+
+  /**
    * Evaluate an extension's TypeScript code using worker thread isolation
    */
   private async evaluateExtension(extension: Extension): Promise<Record<string, any>> {
@@ -288,6 +321,9 @@ export class ExtensionLoader {
 
     try {
       console.log(`[ExtensionLoader] Evaluating '${extension.metadata.name}' in worker thread`);
+
+      // Transpile TypeScript to JavaScript before sending to worker
+      const jsCode = await this.transpileExtension(extension.code, extension.metadata.id);
 
       // Load backend dependencies if declared
       const backendDeps = extension.metadata.dependencies?.backend || {};
@@ -310,26 +346,31 @@ export class ExtensionLoader {
         console.log(`[ExtensionLoader] Created new worker for '${extension.metadata.name}'`);
       }
 
-      // Send evaluation request to worker
+      // Send evaluation request to worker (with transpiled JavaScript)
       const messageId = `eval_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       const result = await new Promise<any>((resolve, reject) => {
         const timeout = setTimeout(() => {
+          console.error(`[ExtensionLoader] TIMEOUT waiting for worker response for '${extension.metadata.name}'`);
           reject(new Error('Worker evaluation timeout'));
         }, 35000); // 35 second total timeout
 
         worker.onmessage = (e: MessageEvent) => {
+          console.log(`[ExtensionLoader] Worker message received:`, e.data.id, 'expected:', messageId);
           if (e.data.id === messageId) {
             clearTimeout(timeout);
             if (e.data.type === 'error') {
+              console.error(`[ExtensionLoader] Worker returned error:`, e.data.error);
               reject(new Error(e.data.error));
             } else {
+              console.log(`[ExtensionLoader] Worker returned result:`, JSON.stringify(e.data.result));
               resolve(e.data.result);
             }
           }
         };
 
         worker.onerror = (error) => {
+          console.error(`[ExtensionLoader] Worker onerror triggered:`, error);
           clearTimeout(timeout);
           reject(new Error(`Worker error: ${error}`));
         };
@@ -338,11 +379,14 @@ export class ExtensionLoader {
           id: messageId,
           type: 'evaluate',
           extensionId: extension.metadata.id,
-          code: extension.code,
+          code: jsCode,  // Send transpiled JavaScript instead of TypeScript
           dependencies: backendDeps,
           metadata: extension.metadata,
         };
 
+        console.log(`[ExtensionLoader] Posting message to worker, id:`, messageId);
+        console.log(`[ExtensionLoader] jsCode length being sent:`, jsCode.length);
+        console.log(`[ExtensionLoader] jsCode first 100 chars:`, jsCode.substring(0, 100));
         worker.postMessage(message);
       });
 
