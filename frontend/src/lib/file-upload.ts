@@ -3,7 +3,6 @@
  * Uses standard multipart/form-data for efficient file uploads
  */
 
-import { ConvIdManager } from "./conv-id";
 import { buildApiUrl } from "@/lib/base-path";
 
 const UPLOAD_ENDPOINT = `${buildApiUrl("")}/api/upload`;
@@ -34,7 +33,7 @@ export interface UploadOptions {
  */
 export async function uploadFiles(
   files: File[],
-  options: UploadOptions & { convId?: string }
+  options: UploadOptions
 ): Promise<UploadedFile[]> {
   const projectId = options.projectId;
   const formData = new FormData();
@@ -47,12 +46,6 @@ export async function uploadFiles(
   // Build URL query params manually
   const params = new URLSearchParams();
   params.append("projectId", projectId);
-
-  // Only add convId if provided (for chat uploads)
-  // File manager uploads don't include convId
-  if (options.convId) {
-    params.append("convId", options.convId);
-  }
 
   const url = `${UPLOAD_ENDPOINT}?${params.toString()}`;
 
@@ -93,7 +86,7 @@ export async function uploadFiles(
  */
 export function uploadFilesWithProgress(
   files: File[],
-  options: UploadOptions & { convId?: string }
+  options: UploadOptions
 ): Promise<UploadedFile[]> {
   return new Promise((resolve, reject) => {
     const projectId = options.projectId;
@@ -106,12 +99,6 @@ export function uploadFilesWithProgress(
     // Build URL query params manually
     const params = new URLSearchParams();
     params.append("projectId", projectId);
-
-    // Only add convId if provided (for chat uploads)
-    // File manager uploads don't include convId
-    if (options.convId) {
-      params.append("convId", options.convId);
-    }
 
     const url = `${UPLOAD_ENDPOINT}?${params.toString()}`;
     const xhr = new XMLHttpRequest();
@@ -169,6 +156,6 @@ export function uploadFilesWithProgress(
 /**
  * Get file URL for display/download
  */
-export function getFileUrl(convId: string, fileName: string, projectId: string): string {
-  return `${buildApiUrl("")}/api/files/${projectId}/${convId}/${fileName}`;
+export function getFileUrl(fileName: string, projectId: string): string {
+  return `${buildApiUrl("")}/api/files/${projectId}/${fileName}`;
 }

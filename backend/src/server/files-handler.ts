@@ -20,11 +20,10 @@ export interface FileWithConversation {
   size: number;
   type: string;
   uploadedAt: number;
-  convId: string;
-  conversationTitle?: string;
   url: string;
   thumbnailUrl?: string;
   scope: FileScope;
+  description?: string;
 }
 
 /**
@@ -55,60 +54,29 @@ export async function handleGetProjectFiles(req: Request): Promise<Response> {
     }
     const tenantId = project.tenant_id ?? 'default';
 
-    // Get all conversation directories for the project (from the files folder)
-    const { getProjectDir } = await import('../config/paths');
-    const projectDir = getProjectDir(projectId, tenantId);
-    const filesBaseDir = path.join(projectDir, "files");
+    // List files directly from project files directory (flat structure)
+    const files = await fileStorage.listFiles('', projectId, tenantId);
 
-    // Check if files directory exists
-    try {
-      await fs.access(filesBaseDir);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        return Response.json({
-          success: true,
-          data: { files: [] },
-        });
-      }
-      throw error;
-    }
+    logger.info({ projectId, fileCount: files.length, files: files.map(f => f.name) }, 'Files found in project');
 
-    // Read all conversation directories in the files folder
-    const entries = await fs.readdir(filesBaseDir, { withFileTypes: true });
-    const convDirs = entries.filter(entry => entry.isDirectory());
-
-    logger.info({ projectId, convDirCount: convDirs.length, convDirs: convDirs.map(d => d.name) }, 'Found conversation directories in files folder');
-
-    // Get files for each conversation directory
-    const filesPromises = convDirs.map(async (convDir) => {
-      const convId = convDir.name;
-      const files = await fileStorage.listFiles(convId, projectId, tenantId);
-
-      logger.info({ convId, fileCount: files.length, files: files.map(f => f.name) }, 'Files in conversation');
-
-      return files.map(file => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        uploadedAt: file.uploadedAt,
-        convId: convId,
-        url: `/api/files/${projectId}/${convId}/${file.name}`,
-        thumbnailUrl: file.thumbnailUrl,
-        scope: file.scope,
-      }));
-    });
-
-    const filesArrays = await Promise.all(filesPromises);
-    const allFiles = filesArrays.flat();
-
-    logger.info({ projectId, totalFiles: allFiles.length }, 'Total files found');
+    // Map files to response format with new URL structure
+    const filesWithUrls = files.map(file => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      uploadedAt: file.uploadedAt,
+      url: `/api/files/${projectId}/${file.name}`,
+      thumbnailUrl: file.thumbnailUrl,
+      scope: file.scope,
+      description: file.description,
+    }));
 
     // Sort by upload date (most recent first)
-    allFiles.sort((a, b) => b.uploadedAt - a.uploadedAt);
+    filesWithUrls.sort((a, b) => b.uploadedAt - a.uploadedAt);
 
     return Response.json({
       success: true,
-      data: { files: allFiles },
+      data: { files: filesWithUrls },
     });
   } catch (error) {
     logger.error({ error }, "Error getting project files");
@@ -184,12 +152,11 @@ export async function handleGetConversationFiles(
 }
 
 /**
- * Handle PATCH /api/files/:projectId/:convId/:fileName/rename - Rename a file
+ * Handle PATCH /api/files/:projectId/:fileName/rename - Rename a file
  */
 export async function handleRenameFile(
   req: Request,
   projectId: string,
-  convId: string,
   fileName: string
 ): Promise<Response> {
   try {
@@ -216,7 +183,7 @@ export async function handleRenameFile(
     }
     const tenantId = project.tenant_id ?? 'default';
 
-    await fileStorage.renameFile(convId, fileName, newName as string, projectId, tenantId);
+    await fileStorage.renameFile('', fileName, newName as string, projectId, tenantId);
 
     return Response.json({
       success: true,
@@ -295,12 +262,11 @@ export async function handleMoveFile(req: Request): Promise<Response> {
 }
 
 /**
- * Handle DELETE /api/files/:projectId/:convId/:fileName - Delete a specific file
+ * Handle DELETE /api/files/:projectId/:fileName - Delete a specific file
  */
 export async function handleDeleteFile(
   req: Request,
   projectId: string,
-  convId: string,
   fileName: string
 ): Promise<Response> {
   try {
@@ -314,7 +280,7 @@ export async function handleDeleteFile(
     }
     const tenantId = project.tenant_id ?? 'default';
 
-    await fileStorage.deleteFile(convId, fileName, projectId, tenantId);
+    await fileStorage.deleteFile('', fileName, projectId, tenantId);
 
     return Response.json({
       success: true,

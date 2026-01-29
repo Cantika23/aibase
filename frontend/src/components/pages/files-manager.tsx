@@ -159,9 +159,7 @@ export function FilesManagerPage() {
           file.name &&
           typeof file.name === "string" &&
           file.size &&
-          typeof file.size === "number" &&
-          file.convId &&
-          typeof file.convId === "string"
+          typeof file.size === "number"
         );
       });
 
@@ -185,7 +183,7 @@ export function FilesManagerPage() {
     if (!deletingFile || !projectId) return;
 
     try {
-      await deleteFile(projectId, deletingFile.convId, deletingFile.name);
+      await deleteFile(projectId, deletingFile.name);
       toast.success("File deleted successfully");
       loadFiles(projectId);
     } catch (error) {
@@ -207,7 +205,6 @@ export function FilesManagerPage() {
     try {
       await renameFile(
         projectId,
-        renamingFile.convId,
         renamingFile.name,
         newFileName.trim(),
       );
@@ -239,7 +236,7 @@ export function FilesManagerPage() {
       setSelectedFiles(new Set());
     } else {
       const allKeys = new Set(
-        filteredFiles.map((f) => `${f.convId}-${f.name}`),
+        filteredFiles.map((f) => `${f.name}`),
       );
       setSelectedFiles(allKeys);
     }
@@ -251,9 +248,9 @@ export function FilesManagerPage() {
     try {
       await Promise.all(
         Array.from(selectedFiles).map(async (fileKey) => {
-          const file = files.find((f) => `${f.convId}-${f.name}` === fileKey);
+          const file = files.find((f) => f.name === fileKey);
           if (file) {
-            return deleteFile(projectId, file.convId, file.name);
+            return deleteFile(projectId, file.name);
           }
         }),
       );
@@ -272,7 +269,7 @@ export function FilesManagerPage() {
 
   const handleFileClick = (file: FileInfo) => {
     const index = filteredFiles.findIndex(
-      (f) => f.convId === file.convId && f.name === file.name,
+      (f) => f.name === file.name && f.name === file.name,
     );
     if (index !== -1) {
       setPreviewIndex(index);
@@ -282,12 +279,11 @@ export function FilesManagerPage() {
 
   const handleGoToConversation = (file: FileInfo) => {
     if (!projectId) return;
-    setConvId(file.convId);
+    
     clearMessages();
     navigate(`/projects/${projectId}/chat`);
   };
 
-  const getConversationTitle = (convId: string): string => {
     const conversation = conversations.find((c) => c.convId === convId);
     return conversation?.title || "Unknown Conversation";
   };
@@ -459,7 +455,6 @@ export function FilesManagerPage() {
     const matchesSearch =
       searchQuery === "" ||
       file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      getConversationTitle(file.convId)
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
 
@@ -633,7 +628,7 @@ export function FilesManagerPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredFiles.map((file) => {
-                          const fileKey = `${file.convId}-${file.name}`;
+                          const fileKey = `${file.name}`;
                           return (
                             <TableRow
                               key={fileKey}
@@ -664,7 +659,6 @@ export function FilesManagerPage() {
                               <TableCell>{formatFileSize(file.size)}</TableCell>
                               <TableCell>
                                 <span className="text-sm text-muted-foreground">
-                                  {getConversationTitle(file.convId)}
                                 </span>
                               </TableCell>
                               <TableCell>
@@ -763,7 +757,7 @@ export function FilesManagerPage() {
                 filteredFiles.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
                     {filteredFiles.map((file) => {
-                      const fileKey = `${file.convId}-${file.name}`;
+                      const fileKey = `${file.name}`;
                       return (
                         <div
                           key={fileKey}
@@ -1013,7 +1007,6 @@ export function FilesManagerPage() {
           initialIndex={previewIndex}
           open={previewOpen}
           onOpenChange={setPreviewOpen}
-          getConversationTitle={getConversationTitle}
         />
 
         {/* Drag and Drop Overlay */}

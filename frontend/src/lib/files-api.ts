@@ -13,10 +13,10 @@ export interface FileInfo {
   size: number;
   type: string;
   uploadedAt: number;
-  convId: string;
-  conversationTitle?: string;
   url: string;
   thumbnailUrl?: string;
+  scope?: string;
+  description?: string;
 }
 
 /**
@@ -64,12 +64,11 @@ export async function fetchConversationFiles(
  */
 export async function renameFile(
   projectId: string,
-  convId: string,
   fileName: string,
   newName: string
 ): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/api/files/${projectId}/${convId}/${fileName}/rename`,
+    `${API_BASE_URL}/api/files/${projectId}/${fileName}/rename`,
     {
       method: "PATCH",
       headers: {
@@ -118,11 +117,10 @@ export async function moveFile(
  */
 export async function deleteFile(
   projectId: string,
-  convId: string,
   fileName: string
 ): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/api/files/${projectId}/${convId}/${fileName}`,
+    `${API_BASE_URL}/api/files/${projectId}/${fileName}`,
     {
       method: "DELETE",
     }
