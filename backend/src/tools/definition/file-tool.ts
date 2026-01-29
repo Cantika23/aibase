@@ -2,7 +2,7 @@ import { Tool } from "../../llm/conversation";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { extractTextFromFile, isDocxFile, isPdfFile, isExcelFile, isPowerPointFile } from "../../utils/document-extractor";
-import { getProjectFilesDir, getProjectLevelFilesDir } from "../../config/paths";
+import { getProjectFilesDir } from "../../config/paths";
 import { ProjectStorage } from "../../storage/project-storage";
 
 type FileScope = 'user' | 'public';
@@ -16,13 +16,9 @@ interface FileMeta {
  * Context for the File tool
  */
 export const context = async () => {
-  return `## FILE TOOL - Manage files in conversation
+  return `## FILE TOOL - Manage files in project
 
-Files are stored in two locations:
-1. **Conversation-level**: data/projects/{proj-id}/files/{conv-id}/ - for files uploaded within a conversation
-2. **Project-level**: data/projects/{proj-id}/files/project-files-{proj-id}/ - for files uploaded via file manager
-
-**Search and recent actions automatically search both locations.** When you provide a simple filename (without path), the system will find it regardless of which storage location it's in.
+All files are stored in a flat structure at: data/projects/{proj-id}/files/
 
 **IMPORTANT:** The file tool returns JSON strings. Always parse with \`JSON.parse()\` in scripts!
 - ✓ CORRECT: \`const result = JSON.parse(await file({ action: 'read', path: 'x.txt' }));\`
@@ -47,7 +43,6 @@ Files are stored in two locations:
 // ===== FAST DISCOVERY ACTIONS (Use these first!) =====
 
 // Search files by pattern (supports wildcards: *, ?)
-// Searches BOTH conversation and project-level storage
 // Example: find all PDFs
 const pdfs = JSON.parse(await file({ action: 'search', pattern: '*.pdf' }));
 console.log(pdfs.files); // Array of matching files
@@ -59,7 +54,6 @@ const reports = JSON.parse(await file({ action: 'search', pattern: 'report*' }))
 const dataFiles = JSON.parse(await file({ action: 'search', pattern: '*data*' }));
 
 // Get recently modified files (default: last 24 hours, max 20 files)
-// Searches BOTH conversation and project-level storage
 const recent = JSON.parse(await file({ action: 'recent' }));
 
 // Get files from last 7 days
@@ -69,7 +63,6 @@ const lastWeek = JSON.parse(await file({ action: 'recent', timeRange: '7d', limi
 const lastHour = JSON.parse(await file({ action: 'recent', timeRange: '1h' }));
 
 // Check if a specific file exists (faster than reading)
-// Searches BOTH conversation and project-level storage
 const exists = JSON.parse(await file({ action: 'exists', path: 'document.pdf' }));
 if (exists.exists) {
   console.log('File found:', exists.sizeHuman);
@@ -77,7 +70,7 @@ if (exists.exists) {
 
 // ===== COMPREHENSIVE ACTIONS =====
 
-// List all files in current conversation
+// List all files in project
 // Returns: { baseDirectory, totalFiles, scope, files: [...] }
 const result = await file({ action: 'list' });
 const files = JSON.parse(result).files; // Extract the files array
@@ -105,7 +98,6 @@ await file({ action: 'write', path: 'output.txt', content: 'Hello World' });
 // ===== FILE READING =====
 
 // Read file content (returns up to ~8000 characters, roughly 2000 tokens)
-// Automatically searches BOTH storage locations when using simple filename
 // For .docx files, text is automatically extracted
 await file({ action: 'read', path: 'data.json' });
 await file({ action: 'read', path: 'document.docx' });
@@ -219,26 +211,11 @@ export class FileTool extends Tool {
   }
 
   /**
-   * Get the conversation files directory
-   * Returns: data/projects/{tenantId}/{projectId}/files/{convId}/
+   * Get the project files directory (flat structure)
+   * Returns: data/projects/{tenantId}/{projectId}/files/
    */
-  private getConvFilesDir(): string {
-    return getProjectFilesDir(this.projectId, this.convId, this.tenantId);
-  }
-
-  /**
-   * Get the project-level files directory (for file manager uploads)
-   * Returns: data/projects/{tenantId}/{projectId}/files/project-files-{projectId}/
-   */
-  private getProjectLevelFilesDir(): string {
-    return getProjectLevelFilesDir(this.projectId, this.tenantId);
-  }
-
-  /**
-   * Get all files directories to search (conversation + project-level)
-   */
-  private getAllFilesDirs(): string[] {
-    return [this.getConvFilesDir(), this.getProjectLevelFilesDir()];
+  private getProjectFilesDir(): string {
+    return getProjectFilesDir(this.projectId, this.tenantId);
   }
 
   /**
@@ -321,72 +298,24 @@ ${frontmatter}
 
   /**
    * Resolve and validate a path within the base directory
-   * Supports:
-   * 1. Full path relative to project: files/{conv-id}/{filename}
-   * 2. Simple filename (searches in both conversation and project-level storage)
+   * All files are stored in the flat project files directory
    */
   private async resolvePath(userPath: string): Promise<string> {
     const baseDir = this.getBaseDir();
-    await fs.mkdir(baseDir, { recursive: true });
+    const filesDir = this.getProjectFilesDir();
+    await fs.mkdir(filesDir, { recursive: true });
 
-    // 1. Try resolving strictly relative to Project Root (e.g. "files/other_conv_id/data.csv")
+    // If simple filename (no path separators), resolve to files directory
+    if (!userPath.includes(path.sep) && !userPath.includes('/')) {
+      return path.join(filesDir, userPath);
+    }
+
+    // If path includes "files/", treat as project-relative path
     let resolvedPath = path.resolve(baseDir, userPath);
-    let relativePath = path.relative(baseDir, resolvedPath);
-    let pathParts = relativePath.split(path.sep);
 
-    // Check if it looks like a valid project-relative path: files/{conv-id}/...
-    const isValidProjectRelative =
-      resolvedPath.startsWith(baseDir) &&
-      pathParts.length >= 2 &&
-      pathParts[0] === "files";
-
-    if (isValidProjectRelative) {
-      // Verify the file exists
-      try {
-        await fs.access(resolvedPath);
-        return resolvedPath;
-      } catch {
-        // Path looks valid but file doesn't exist, continue to try other locations
-      }
-    }
-
-    // 2. If simple filename (no path separators), search in both storage locations
-    if (!pathParts.includes("files") && !userPath.includes(path.sep)) {
-      // Try conversation directory first
-      const convFilePath = path.join(this.getConvFilesDir(), userPath);
-      try {
-        await fs.access(convFilePath);
-        return convFilePath;
-      } catch {
-        // Not in conversation dir, try project-level directory
-      }
-
-      // Try project-level directory
-      const projectFilePath = path.join(this.getProjectLevelFilesDir(), userPath);
-      try {
-        await fs.access(projectFilePath);
-        return projectFilePath;
-      } catch {
-        // Not found in project-level either
-      }
-    }
-
-    // 3. If not found yet, try resolving relative to current conversation (legacy behavior)
-    const currentConvFilesDir = path.join(baseDir, "files", this.convId);
-    resolvedPath = path.resolve(currentConvFilesDir, userPath);
-
-    // Re-validate against baseDir to ensure no directory traversal out of project
-    if (!resolvedPath.startsWith(baseDir)) {
+    // Ensure path is within project files directory
+    if (!resolvedPath.startsWith(filesDir) && !resolvedPath.startsWith(baseDir)) {
       throw new Error("Access denied: Path is outside allowed directory");
-    }
-
-    // Final Validation: Must be within SOME conversation's "files" directory
-    // Pattern: files/{any-conv-id}/{filename}
-    relativePath = path.relative(baseDir, resolvedPath);
-    pathParts = relativePath.split(path.sep);
-
-    if (pathParts.length < 2 || pathParts[0] !== "files") {
-      throw new Error(`Access denied: Path must be within files/{conv-id}/ subdirectories. Got: ${relativePath}`);
     }
 
     return resolvedPath;
@@ -636,7 +565,7 @@ ${frontmatter}
     const allMatchedFiles: any[] = [];
 
     // Search in both conversation and project-level directories
-    for (const filesDir of this.getAllFilesDirs()) {
+    for (const filesDir of [this.getProjectFilesDir()]) {
       try {
         await fs.access(filesDir);
         const allFiles = await this.listFilesRecursive(filesDir, baseDir, scope);
@@ -703,7 +632,7 @@ ${frontmatter}
     const allRecentFiles: any[] = [];
 
     // Search in both conversation and project-level directories
-    for (const filesDir of this.getAllFilesDirs()) {
+    for (const filesDir of [this.getProjectFilesDir()]) {
       try {
         await fs.access(filesDir);
         const allFiles = await this.listFilesRecursive(filesDir, baseDir, scope);

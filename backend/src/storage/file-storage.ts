@@ -1,6 +1,6 @@
 /**
  * File storage service for handling uploaded files
- * Stores files in data/projects/[proj-id]/files/[conv-id]/
+ * Stores files in data/projects/[proj-id]/files/ (flat structure, no conversation subdirectories)
  */
 
 import * as fs from 'fs/promises';
@@ -57,26 +57,26 @@ export class FileStorage {
   }
 
   /**
-   * Get the directory path for a conversation's files
+   * Get the directory path for project files
    */
-  private getConvDir(convId: string, projectId: string, tenantId: number | string): string {
-    return getProjectFilesDir(projectId, convId, tenantId);
+  private getProjectDir(projectId: string, tenantId: number | string): string {
+    return getProjectFilesDir(projectId, tenantId);
   }
 
   /**
-   * Ensure conversation directory exists
+   * Ensure project files directory exists
    */
-  private async ensureConvDir(convId: string, projectId: string, tenantId: number | string): Promise<void> {
-    const convDir = this.getConvDir(convId, projectId, tenantId);
-    await fs.mkdir(convDir, { recursive: true });
+  private async ensureProjectDir(projectId: string, tenantId: number | string): Promise<void> {
+    const projectDir = this.getProjectDir(projectId, tenantId);
+    await fs.mkdir(projectDir, { recursive: true });
   }
 
   /**
    * Get metadata file path for a file
    */
-  private getMetaFilePath(convId: string, fileName: string, projectId: string, tenantId: number | string): string {
-    const convDir = this.getConvDir(convId, projectId, tenantId);
-    return path.join(convDir, `.${fileName}.meta.md`);
+  private getMetaFilePath(fileName: string, projectId: string, tenantId: number | string): string {
+    const projectDir = this.getProjectDir(projectId, tenantId);
+    return path.join(projectDir, `.${fileName}.meta.md`);
   }
 
   /**
@@ -89,7 +89,7 @@ export class FileStorage {
     tenantId: number | string,
     meta: { scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string }
   ): Promise<void> {
-    const metaPath = this.getMetaFilePath(convId, fileName, projectId, tenantId);
+    const metaPath = this.getMetaFilePath(fileName, projectId, tenantId);
 
     // Build frontmatter (metadata only, description goes in body)
     const frontmatter = Object.entries(meta)
@@ -119,7 +119,7 @@ export class FileStorage {
     projectId: string,
     tenantId: number | string
   ): Promise<{ scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string }> {
-    const metaPath = this.getMetaFilePath(convId, fileName, projectId, tenantId);
+    const metaPath = this.getMetaFilePath(fileName, projectId, tenantId);
 
     try {
       const content = await fs.readFile(metaPath, 'utf-8');
@@ -196,12 +196,12 @@ export class FileStorage {
     thumbnailUrl?: string,
     description?: string
   ): Promise<StoredFile> {
-    await this.ensureConvDir(convId, projectId, tenantId);
+    await this.ensureProjectDir(projectId, tenantId);
 
     // Sanitize filename to prevent directory traversal
     const sanitizedFileName = path.basename(fileName);
 
-    const filePath = path.join(this.getConvDir(convId, projectId, tenantId), sanitizedFileName);
+    const filePath = path.join(this.getProjectDir(projectId, tenantId), sanitizedFileName);
 
     // Check if file already exists to prevent overwrites
     try {
@@ -248,7 +248,7 @@ export class FileStorage {
    * List all files for a conversation, optionally filtered by scope
    */
   async listFiles(convId: string, projectId: string, tenantId: number | string, scope?: FileScope): Promise<StoredFile[]> {
-    const convDir = this.getConvDir(convId, projectId, tenantId);
+    const convDir = this.getProjectDir(projectId, tenantId);
 
     try {
       const entries = await fs.readdir(convDir, { withFileTypes: true });
@@ -302,7 +302,7 @@ export class FileStorage {
     // Sanitize filename and decode URL-encoded characters (e.g., %20 -> space)
     const sanitizedFileName = path.basename(fileName);
     const decodedFileName = decodeURIComponent(sanitizedFileName);
-    const filePath = path.join(this.getConvDir(convId, projectId, tenantId), decodedFileName);
+    const filePath = path.join(this.getProjectDir(projectId, tenantId), decodedFileName);
 
     return await fs.readFile(filePath);
   }
@@ -314,7 +314,7 @@ export class FileStorage {
     // Sanitize filename and decode URL-encoded characters (e.g., %20 -> space)
     const sanitizedFileName = path.basename(fileName);
     const decodedFileName = decodeURIComponent(sanitizedFileName);
-    const filePath = path.join(this.getConvDir(convId, projectId, tenantId), decodedFileName);
+    const filePath = path.join(this.getProjectDir(projectId, tenantId), decodedFileName);
 
     await fs.unlink(filePath);
 
@@ -338,8 +338,8 @@ export class FileStorage {
     const decodedOldName = decodeURIComponent(sanitizedOldName);
     const sanitizedNewName = path.basename(newName);
 
-    const oldPath = path.join(this.getConvDir(convId, projectId, tenantId), decodedOldName);
-    const newPath = path.join(this.getConvDir(convId, projectId, tenantId), sanitizedNewName);
+    const oldPath = path.join(this.getProjectDir(projectId, tenantId), decodedOldName);
+    const newPath = path.join(this.getProjectDir(projectId, tenantId), sanitizedNewName);
 
     // Check if source file exists
     try {
@@ -363,7 +363,7 @@ export class FileStorage {
 
     // Also rename metadata file if it exists
     const oldMetaPath = this.getMetaFilePath(convId, decodedOldName, projectId, tenantId);
-    const newMetaPath = this.getMetaFilePath(convId, sanitizedNewName, projectId, tenantId);
+    const newMetaPath = this.getMetaFilePath(sanitizedNewName, projectId, tenantId);
 
     try {
       await fs.rename(oldMetaPath, newMetaPath);
@@ -415,8 +415,8 @@ export class FileStorage {
     await fs.rename(fromPath, toPath);
 
     // Also move metadata file if it exists
-    const oldMetaPath = this.getMetaFilePath(fromConvId, decodedName, projectId, tenantId);
-    const newMetaPath = this.getMetaFilePath(toConvId, decodedName, projectId, tenantId);
+    const oldMetaPath = this.getMetaFilePath(decodedName, projectId, tenantId);
+    const newMetaPath = this.getMetaFilePath(decodedName, projectId, tenantId);
 
     try {
       await fs.rename(oldMetaPath, newMetaPath);
@@ -432,7 +432,7 @@ export class FileStorage {
    * Delete all files for a conversation
    */
   async deleteAllFiles(convId: string, projectId: string, tenantId: number | string): Promise<void> {
-    const convDir = this.getConvDir(convId, projectId, tenantId);
+    const convDir = this.getProjectDir(projectId, tenantId);
 
     try {
       await fs.rm(convDir, { recursive: true, force: true });

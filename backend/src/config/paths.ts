@@ -111,17 +111,10 @@ export function getConversationChatsDir(projectId: string, convId: string, tenan
 }
 
 /**
- * Get project files directory (files are now stored at project level, organized by conversation)
+ * Get project files directory (flat structure, no conversation subdirectories)
  */
-export function getProjectFilesDir(projectId: string, convId: string, tenantId: number | string): string {
-  return join(getProjectDir(projectId, tenantId), "files", convId);
-}
-
-/**
- * Get project-level files directory (for files uploaded via file manager without conversation context)
- */
-export function getProjectLevelFilesDir(projectId: string, tenantId: number | string): string {
-  return join(getProjectDir(projectId, tenantId), "files", `project-files-${projectId}`);
+export function getProjectFilesDir(projectId: string, tenantId: number | string): string {
+  return join(getProjectDir(projectId, tenantId), "files");
 }
 
 /**

@@ -3,7 +3,16 @@
  * Query CSV, Excel, Parquet, and JSON files using SQL
  */
 
-import { getDuckDBPath } from "../../../../binaries/duckdb";
+// Dynamically import getDuckDBPath to avoid esbuild transpilation issues
+let getDuckDBPathFn: (() => Promise<string>) | null = null;
+async function getDuckDBPath(): Promise<string> {
+  if (!getDuckDBPathFn) {
+    // Use absolute path from backend directory to avoid relative path resolution issues
+    const module = await import(`${process.cwd()}/backend/src/binaries/duckdb.ts`);
+    getDuckDBPathFn = module.getDuckDBPath;
+  }
+  return getDuckDBPathFn();
+}
 
 // Type definitions
 interface DuckDBOptions {

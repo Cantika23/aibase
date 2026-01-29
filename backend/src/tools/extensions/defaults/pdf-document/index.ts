@@ -116,10 +116,10 @@ const extract = async (options: ExtractPDFOptions): Promise<ExtractPDFResult> =>
   // If fileId is provided, resolve to actual file path
   if (options.fileId) {
     // Access conversation files from storage
-    const convId = globalThis.convId || '';
+    
     const projectId = globalThis.projectId || '';
     const tenantId = globalThis.tenantId || 'default';
-    const convFilesDir = getProjectFilesDir(projectId, convId, tenantId);
+    const convFilesDir = getProjectFilesDir(projectId, tenantId);
     filePath = path.join(convFilesDir, options.fileId);
 
     // Try to find file by ID if not directly accessible
@@ -175,10 +175,10 @@ const read = async (options: ReadPDFOptions): Promise<ReadPDFResult> => {
 
       // If fileId is provided, resolve to actual file path
       if (options.fileId) {
-        const convId = globalThis.convId || '';
+        
         const projectId = globalThis.projectId || '';
         const tenantId = globalThis.tenantId || 'default';
-        const convFilesDir = getProjectFilesDir(projectId, convId, tenantId);
+        const convFilesDir = getProjectFilesDir(projectId, tenantId);
         filePath = path.join(convFilesDir, options.fileId);
 
         try {

@@ -34,9 +34,8 @@ export interface UploadOptions {
  */
 export async function uploadFiles(
   files: File[],
-  options: UploadOptions
+  options: UploadOptions & { convId?: string }
 ): Promise<UploadedFile[]> {
-  const convId = ConvIdManager.getConvId();
   const projectId = options.projectId;
   const formData = new FormData();
 
@@ -45,8 +44,17 @@ export async function uploadFiles(
     formData.append("files", file);
   }
 
-  // Build URL with convId and projectId
-  const url = `${UPLOAD_ENDPOINT}?convId=${encodeURIComponent(convId)}&projectId=${encodeURIComponent(projectId)}`;
+  // Build URL query params manually
+  const params = new URLSearchParams();
+  params.append("projectId", projectId);
+
+  // Only add convId if provided (for chat uploads)
+  // File manager uploads don't include convId
+  if (options.convId) {
+    params.append("convId", options.convId);
+  }
+
+  const url = `${UPLOAD_ENDPOINT}?${params.toString()}`;
 
   try {
     // Use fetch with AbortSignal for cancellation support
@@ -85,10 +93,9 @@ export async function uploadFiles(
  */
 export function uploadFilesWithProgress(
   files: File[],
-  options: UploadOptions
+  options: UploadOptions & { convId?: string }
 ): Promise<UploadedFile[]> {
   return new Promise((resolve, reject) => {
-    const convId = ConvIdManager.getConvId();
     const projectId = options.projectId;
     const formData = new FormData();
 
@@ -96,7 +103,17 @@ export function uploadFilesWithProgress(
       formData.append("files", file);
     }
 
-    const url = `${UPLOAD_ENDPOINT}?convId=${encodeURIComponent(convId)}&projectId=${encodeURIComponent(projectId)}`;
+    // Build URL query params manually
+    const params = new URLSearchParams();
+    params.append("projectId", projectId);
+
+    // Only add convId if provided (for chat uploads)
+    // File manager uploads don't include convId
+    if (options.convId) {
+      params.append("convId", options.convId);
+    }
+
+    const url = `${UPLOAD_ENDPOINT}?${params.toString()}`;
     const xhr = new XMLHttpRequest();
 
     // Track upload progress

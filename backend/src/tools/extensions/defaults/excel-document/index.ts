@@ -16,18 +16,11 @@ async function isExcelFile(fileName: string): boolean {
 }
 
 let configPathsModule: any = null;
-async function getProjectFilesDir(projectId: string, convId: string, tenantId: string | number): string {
+async function getProjectFilesDir(projectId: string, tenantId: string | number): string {
   if (!configPathsModule) {
     configPathsModule = await import(`${process.cwd()}/backend/src/config/paths.ts`);
   }
-  return configPathsModule.getProjectFilesDir(projectId, convId, tenantId);
-}
-
-async function getProjectLevelFilesDir(projectId: string, tenantId: string | number): string {
-  if (!configPathsModule) {
-    configPathsModule = await import(`${process.cwd()}/backend/src/config/paths.ts`);
-  }
-  return configPathsModule.getProjectLevelFilesDir(projectId, tenantId);
+  return configPathsModule.getProjectFilesDir(projectId, tenantId);
 }
 
 let getDuckDBPathFn: (() => Promise<string>) | null = null;
@@ -448,62 +441,32 @@ const extract = async (options: ExtractExcelOptions): Promise<ExtractExcelResult
 
   // If fileId is provided, resolve to actual file path
   if (options.fileId) {
-    const convId = globalThis.convId || '';
     const projectId = globalThis.projectId || '';
     const tenantId = globalThis.tenantId || 'default';
 
-    // Try conversation directory first
-    const convFilesDir = await getProjectFilesDir(projectId, convId, tenantId);
-    filePath = path.join(convFilesDir, options.fileId);
+    // Get project files directory (flat structure)
+    const projectFilesDir = await getProjectFilesDir(projectId, tenantId);
+    filePath = path.join(projectFilesDir, options.fileId);
 
     let fileFound = false;
     try {
       await fs.access(filePath);
       fileFound = true;
     } catch {
-      // Not in conversation dir, try project-level directory
+      // File not found, try prefix matching
     }
 
-    // If not found, try project-level directory
+    // If not found, try prefix matching
     if (!fileFound) {
-      const projectFilesDir = await getProjectLevelFilesDir(projectId, tenantId);
-      filePath = path.join(projectFilesDir, options.fileId);
-
       try {
-        await fs.access(filePath);
-        fileFound = true;
-      } catch {
-        // Not in project-level dir either, try prefix matching
-      }
-    }
-
-    // If still not found, try prefix matching in both directories
-    if (!fileFound) {
-      // Try conversation directory with prefix match
-      try {
-        const entries = await fs.readdir(convFilesDir, { withFileTypes: true });
+        const entries = await fs.readdir(projectFilesDir, { withFileTypes: true });
         const fileEntry = entries.find(e => e.name.startsWith(options.fileId!));
         if (fileEntry) {
-          filePath = path.join(convFilesDir, fileEntry.name);
+          filePath = path.join(projectFilesDir, fileEntry.name);
           fileFound = true;
         }
       } catch {
         // Directory doesn't exist
-      }
-
-      // Try project-level directory with prefix match
-      if (!fileFound) {
-        const projectFilesDir = await getProjectLevelFilesDir(projectId, tenantId);
-        try {
-          const entries = await fs.readdir(projectFilesDir, { withFileTypes: true });
-          const fileEntry = entries.find(e => e.name.startsWith(options.fileId!));
-          if (fileEntry) {
-            filePath = path.join(projectFilesDir, fileEntry.name);
-            fileFound = true;
-          }
-        } catch {
-          // Directory doesn't exist
-        }
       }
     }
 

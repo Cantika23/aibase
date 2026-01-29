@@ -417,15 +417,11 @@ export class ExtensionLoader {
       const AsyncFunction = (async function () {}).constructor as any;
       const fn = new AsyncFunction(wrappedCode);
 
-      // Mock hook registry
-      const hookRegistry = {
-        registerHook: () => {},
-        unregisterHook: () => {},
-      };
+      // Import the real extensionHookRegistry singleton
+      const { extensionHookRegistry } = await import('../extensions/extension-hooks');
 
-      // Evaluate the extension (pass require as third argument)
-      // In Bun, require is available globally
-      const result = await fn(hookRegistry, loadedDeps, require);
+      // Evaluate the extension (pass the real hook registry)
+      const result = await fn(extensionHookRegistry, loadedDeps, require);
 
       return result || {};
     } catch (error: any) {

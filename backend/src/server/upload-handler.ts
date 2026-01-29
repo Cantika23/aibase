@@ -16,25 +16,19 @@ import { getProjectFilesDir } from '../config/paths';
 
 const logger = createLogger('Upload');
 
-// Track which projects have had extensions loaded (to avoid re-loading)
-const loadedProjects = new Set<string>();
-
 /**
  * Ensure extensions are loaded for a project (for hooks to be registered)
+ *
+ * Note: We create a new ExtensionLoader instance each time to ensure hooks
+ * are properly registered for the current request context.
  */
 async function ensureExtensionsLoaded(projectId: string): Promise<void> {
-  if (loadedProjects.has(projectId)) {
-    return; // Already loaded
-  }
-
   try {
     const extensionLoader = new ExtensionLoader();
 
     // Load extensions (this registers hooks)
     await extensionLoader.loadExtensions(projectId);
 
-    // Mark as loaded
-    loadedProjects.add(projectId);
     logger.info({ projectId }, 'Extensions loaded for hook registration');
   } catch (error) {
     logger.warn({ projectId, error }, 'Failed to load extensions, hooks may not be available');
@@ -95,7 +89,6 @@ function isImageFile(fileName: string, mimeType: string): boolean {
 async function generateThumbnail(
   imageBuffer: Buffer,
   fileName: string,
-  convId: string,
   projectId: string
 ): Promise<string | null> {
   try {
@@ -124,7 +117,7 @@ async function generateThumbnail(
     const tenantId = project.tenant_id ?? 'default';
 
     // Use centralized path config to ensure consistency
-    const thumbnailPath = path.join(getProjectFilesDir(projectId, convId, tenantId), thumbnailFileName);
+    const thumbnailPath = path.join(getProjectFilesDir(projectId, tenantId), thumbnailFileName);
 
     // Resize and save thumbnail
     await image
@@ -152,15 +145,8 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
   try {
     // Get conversation ID and project ID from query params
     const url = new URL(req.url);
-    const convId = url.searchParams.get('convId');
+    let convId = url.searchParams.get('convId');
     const projectId = url.searchParams.get('projectId');
-
-    if (!convId) {
-      return Response.json(
-        { success: false, error: 'Missing convId parameter' },
-        { status: 400 }
-      );
-    }
 
     if (!projectId) {
       return Response.json(
@@ -233,7 +219,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       const isImage = isImageFile(file.name, file.type);
       if (isImage) {
         broadcastStatus(wsServer, convId, 'processing', `Generating thumbnail for ${file.name}...`);
-        thumbnailUrl = await generateThumbnail(buffer, file.name, convId, projectId) || undefined;
+        thumbnailUrl = await generateThumbnail(buffer, file.name, projectId) || undefined;
       }
 
       // Save file with scope and thumbnail URL
@@ -253,7 +239,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
       // Use centralized path config to ensure consistency with tenant-based structure
-      const filePath = path.join(getProjectFilesDir(projectId, convId, tenantId), storedFile.name);
+      const filePath = path.join(getProjectFilesDir(projectId, tenantId), storedFile.name);
 
       // Wait for extension hooks to complete (blocking)
       // This ensures the description is available when the AI responds
@@ -282,7 +268,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
 
         // Update file metadata with description
         try {
-          await fileStorage.updateFileMeta(convId, storedFile.name, projectId, tenantId, { description: hookResult.description });
+          await fileStorage.updateFileMeta(, storedFile.name, projectId, tenantId, { description: hookResult.description });
           console.log('[UPLOAD-HANDLER] File metadata updated with description');
         } catch (updateError) {
           console.error('[UPLOAD-HANDLER] Failed to update file metadata:', updateError);
@@ -301,7 +287,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
         name: storedFile.name,
         size: storedFile.size,
         type: storedFile.type,
-        url: `/api/files/${projectId}/${convId}/${storedFile.name}`,
+        url: `/api/files/${projectId}/${storedFile.name}`,
         thumbnailUrl: storedFile.thumbnailUrl,
         uploadedAt: storedFile.uploadedAt,
         scope: storedFile.scope,
@@ -333,16 +319,15 @@ export async function handleFileDownload(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/');
 
-    // Expected: /api/files/{projectId}/{convId}/{fileName}
-    if (pathParts.length < 6) {
+    // Expected: /api/files/{projectId}/{fileName}
+    if (pathParts.length < 5) {
       return new Response('Invalid file path', { status: 400 });
     }
 
     const projectId = pathParts[3];
-    const convId = pathParts[4];
-    const fileName = pathParts[5];
+    const fileName = pathParts[4];
 
-    if (!projectId || !convId || !fileName) {
+    if (!projectId || !fileName) {
       return new Response('Invalid file path', { status: 400 });
     }
 
@@ -355,7 +340,7 @@ export async function handleFileDownload(req: Request): Promise<Response> {
 
     const fileStorage = FileStorage.getInstance();
     const tenantId = project.tenant_id ?? 'default';
-    const fileBuffer = await fileStorage.getFile(convId, fileName, projectId, tenantId);
+    const fileBuffer = await fileStorage.getFile('', fileName, projectId, tenantId);
 
     // Try to determine content type from extension
     const ext = fileName.split('.').pop()?.toLowerCase();

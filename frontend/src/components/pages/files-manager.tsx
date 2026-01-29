@@ -135,8 +135,6 @@ export function FilesManagerPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
-  const [showConversationDialog, setShowConversationDialog] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -299,68 +297,52 @@ export function FilesManagerPage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      setPendingFiles(Array.from(files));
-      setShowConversationDialog(true);
+    if (files && files.length > 0 && projectId) {
+      const filesArray = Array.from(files);
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      try {
+        // Upload directly to project storage (no convId = project-level files)
+        await uploadFilesWithProgress(filesArray, {
+          projectId,
+          // No convId - uploads to project storage
+          onProgress: (progress: UploadProgress) => {
+            setUploadProgress(progress.percentage);
+          },
+        });
+
+        toast.success("Files uploaded successfully to project storage");
+
+        // Refresh files list with cache-busting
+        const freshFiles = await fetchProjectFiles(projectId, true);
+        const validFiles = freshFiles.filter((file) => {
+          return (
+            file &&
+            typeof file === "object" &&
+            file.name &&
+            typeof file.name === "string" &&
+            file.size &&
+            typeof file.size === "number" &&
+            file.convId &&
+            typeof file.convId === "string"
+          );
+        });
+        setFiles(validFiles);
+      } catch (error) {
+        console.error("Error uploading files:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to upload files"
+        );
+      } finally {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }
     }
     // Reset input value to allow selecting the same files again
     e.target.value = "";
-  };
-
-  const handleUploadToConversation = async (convId: string) => {
-    if (!projectId || !pendingFiles) {
-      toast.error("Project ID is required");
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress(0);
-    setShowConversationDialog(false);
-
-    // Temporarily set the conversation ID for upload
-    ConvIdManager.setConvId(convId);
-
-    try {
-      // Upload files with progress tracking
-      await uploadFilesWithProgress(pendingFiles, {
-        projectId,
-        onProgress: (progress: UploadProgress) => {
-          setUploadProgress(progress.percentage);
-        },
-      });
-
-      toast.success("Files uploaded successfully");
-
-      // Refresh conversations to get updated data
-      await loadConversations(projectId);
-
-      // Refresh files list with cache-busting
-      const freshFiles = await fetchProjectFiles(projectId, true);
-      const validFiles = freshFiles.filter((file) => {
-        return (
-          file &&
-          typeof file === "object" &&
-          file.name &&
-          typeof file.name === "string" &&
-          file.size &&
-          typeof file.size === "number" &&
-          file.convId &&
-          typeof file.convId === "string"
-        );
-      });
-      setFiles(validFiles);
-    } catch (error) {
-      console.error("Error uploading files:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload files"
-      );
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-      setPendingFiles(null);
-    }
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -373,14 +355,51 @@ export function FilesManagerPage() {
     setIsDragging(false);
   };
 
-  const onDrop = (e: React.DragEvent) => {
+  const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      setPendingFiles(files);
-      setShowConversationDialog(true);
+    if (files.length > 0 && projectId) {
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      try {
+        // Upload directly to project storage (no convId = project-level files)
+        await uploadFilesWithProgress(files, {
+          projectId,
+          // No convId - uploads to project storage
+          onProgress: (progress: UploadProgress) => {
+            setUploadProgress(progress.percentage);
+          },
+        });
+
+        toast.success("Files uploaded successfully to project storage");
+
+        // Refresh files list with cache-busting
+        const freshFiles = await fetchProjectFiles(projectId, true);
+        const validFiles = freshFiles.filter((file) => {
+          return (
+            file &&
+            typeof file === "object" &&
+            file.name &&
+            typeof file.name === "string" &&
+            file.size &&
+            typeof file.size === "number" &&
+            file.convId &&
+            typeof file.convId === "string"
+          );
+        });
+        setFiles(validFiles);
+      } catch (error) {
+        console.error("Error uploading files:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to upload files"
+        );
+      } finally {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }
     }
   };
 
@@ -1013,66 +1032,6 @@ export function FilesManagerPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Conversation Selection Dialog */}
-        <Dialog
-          open={showConversationDialog}
-          onOpenChange={(open) => {
-            if (!open) {
-              setShowConversationDialog(false);
-              setPendingFiles(null);
-            }
-          }}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Select Conversation</DialogTitle>
-              <DialogDescription>
-                Choose a conversation to upload {pendingFiles?.length || 0} file{pendingFiles && pendingFiles.length > 1 ? "s" : ""} to, or create a new one.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 max-h-[300px] overflow-y-auto">
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    const newConvId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                    handleUploadToConversation(newConvId);
-                  }}
-                >
-                  <Folder className="h-4 w-4 mr-2" />
-                  Create new conversation
-                </Button>
-                <div className="text-xs text-muted-foreground px-2 pt-2">
-                  Or select existing conversation:
-                </div>
-                {conversations.map((conv) => (
-                  <Button
-                    key={conv.convId}
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => handleUploadToConversation(conv.convId)}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    <span className="truncate">{conv.title}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowConversationDialog(false);
-                  setPendingFiles(null);
-                }}
-              >
-                Cancel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </FilesErrorBoundary>
   );
