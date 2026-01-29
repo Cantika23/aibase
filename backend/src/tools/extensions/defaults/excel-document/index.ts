@@ -368,6 +368,13 @@ const context = () => {
 
 Extract and query Excel spreadsheets using DuckDB. Auto-extracts structure for Excel files on upload.
 
+**⚠️ IMPORTANT API CHANGE:**
+All functions are now accessed via the \`excelDocument\` namespace:
+- ✅ CORRECT: \`await excelDocument.query({ query: '...' })\`
+- ✅ CORRECT: \`await excelDocument.summarize({ fileId: '...' })\`
+- ❌ WRONG: \`await duckdb({ ... })\` (no longer available)
+- ❌ WRONG: \`await read({ ... })\` (no longer available)
+
 **Available Functions:**
 
 #### query(options)
