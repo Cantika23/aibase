@@ -97,6 +97,47 @@ Each extension MUST have:
      - progress(message) (for status updates)
      - memory.read(category, key) (for stored credentials)
 
+8. **File Processing Extensions (example: PDF, Excel, Image, etc.)**:
+   - If the extension processes files (e.g., PDF, Excel, Image), it MUST register an \`afterFileUpload\` hook
+   - The hook should return both \`description\` AND \`title\`:
+     - \`description\`: Detailed analysis of the file content
+     - \`title\`: A concise 3-8 word title generated using AI (OpenAI)
+   - Title generation MUST have an 8-second timeout to avoid hanging uploads
+   - Use the TITLE_GENERATION_MODEL env var if set, otherwise fall back to OPENAI_MODEL
+   - Example hook registration for file processors:
+     \`\`\`typescript
+     if (hookRegistry) {
+       hookRegistry.registerHook('afterFileUpload', 'extension-id', async (context) => {
+         // Process file and extract content
+         const content = await extractContent(context.filePath);
+
+         // Generate title with timeout
+         let title: string | undefined;
+         try {
+           const openai = new OpenAI({ baseURL: process.env.OPENAI_BASE_URL, apiKey: process.env.OPENAI_API_KEY });
+           const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000);
+           const response = await Promise.race([
+             openai.chat.completions.create({
+               model: process.env.TITLE_GENERATION_MODEL || process.env.OPENAI_MODEL,
+               messages: [
+                 { role: 'system', content: 'Generate a concise 3-8 word title. Return only the title, no quotes.' },
+                 { role: 'user', content: \`File: \${context.fileName}\\nContent preview: \${content.substring(0, 200)}\` }
+               ],
+               temperature: 0.5,
+               max_tokens: 25
+             }),
+             timeoutPromise
+           ]);
+           title = response.choices[0]?.message?.content?.trim()?.replace(/^["']|["']$/g, '');
+         } catch (e) {
+           // Continue without title on timeout/error
+         }
+
+         return { description: content, title };
+       });
+     }
+     \`\`\`
+
 ## Response Format
 
 Return ONLY valid JSON in this exact format (no markdown, no explanation):

@@ -18,6 +18,7 @@ export interface StoredFile {
   scope: FileScope;
   thumbnailUrl?: string;
   description?: string;
+  title?: string;
 }
 
 export class FileStorage {
@@ -87,7 +88,7 @@ export class FileStorage {
     fileName: string,
     projectId: string,
     tenantId: number | string,
-    meta: { scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string }
+    meta: { scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string; title?: string }
   ): Promise<void> {
     const metaPath = this.getMetaFilePath(fileName, projectId, tenantId);
 
@@ -118,7 +119,7 @@ export class FileStorage {
     fileName: string,
     projectId: string,
     tenantId: number | string
-  ): Promise<{ scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string }> {
+  ): Promise<{ scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string; title?: string }> {
     const metaPath = this.getMetaFilePath(fileName, projectId, tenantId);
 
     try {
@@ -460,7 +461,7 @@ export class FileStorage {
     fileName: string,
     projectId: string,
     tenantId: number | string,
-    updates: { description?: string }
+    updates: { description?: string; title?: string }
   ): Promise<void> {
     // Load existing metadata
     const existingMeta = await this.loadFileMeta(convId, fileName, projectId, tenantId);

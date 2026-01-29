@@ -44,6 +44,7 @@ export interface UploadedFileInfo {
   uploadedAt: number;
   scope: FileScope;
   description?: string;
+  title?: string;
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -262,18 +263,28 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       console.log('[UPLOAD-HANDLER] Extension hook execution result:', { fileName: file.name, hookResult });
 
       let fileDescription: string | undefined;
+      let fileTitle: string | undefined;
+
       if (hookResult?.description && typeof hookResult.description === 'string') {
         console.log('[UPLOAD-HANDLER] Extension hook generated description for', file.name, ':', hookResult.description.substring(0, 100));
+        fileDescription = hookResult.description;
 
-        // Update file metadata with description
+        // Use title from extension hook if provided
+        if (hookResult.title && typeof hookResult.title === 'string') {
+          fileTitle = hookResult.title;
+          console.log('[UPLOAD-HANDLER] Extension hook generated title:', fileTitle);
+        }
+
+        // Update file metadata with description and title (if provided by extension)
         try {
-          await fileStorage.updateFileMeta('', storedFile.name, projectId, tenantId, { description: hookResult.description });
-          console.log('[UPLOAD-HANDLER] File metadata updated with description');
+          await fileStorage.updateFileMeta('', storedFile.name, projectId, tenantId, {
+            description: hookResult.description,
+            title: fileTitle
+          });
+          console.log('[UPLOAD-HANDLER] File metadata updated with description and title:', fileTitle);
         } catch (updateError) {
           console.error('[UPLOAD-HANDLER] Failed to update file metadata:', updateError);
         }
-
-        fileDescription = hookResult.description;
       } else {
         console.log('[UPLOAD-HANDLER] Extension hook: No description generated');
       }
@@ -291,6 +302,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
         uploadedAt: storedFile.uploadedAt,
         scope: storedFile.scope,
         description: fileDescription,  // Include description in response
+        title: fileTitle,  // Include title in response
       });
 
       logger.info({ path: storedFile.path, scope }, 'File saved');

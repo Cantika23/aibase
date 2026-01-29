@@ -630,9 +630,16 @@ export function FilesManagerPage() {
                                   onClick={() => handleFileClick(file)}
                                 >
                                   {getFileIconComponent(file.name)}
-                                  <span className="font-medium">
-                                    {file.name}
-                                  </span>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {file.title || file.name}
+                                    </span>
+                                    {file.title && file.title !== file.name && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {file.name}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell>{formatFileSize(file.size)}</TableCell>
@@ -778,8 +785,13 @@ export function FilesManagerPage() {
                             {/* File Info */}
                             <div className="text-center w-full">
                               <p className="font-medium truncate w-full text-sm">
-                                {file.name}
+                                {file.title || file.name}
                               </p>
+                              {file.title && file.title !== file.name && (
+                                <p className="text-xs text-muted-foreground truncate w-full">
+                                  {file.name}
+                                </p>
+                              )}
                               <p className="text-xs text-muted-foreground mt-1">
                                 {formatFileSize(file.size)}
                               </p>

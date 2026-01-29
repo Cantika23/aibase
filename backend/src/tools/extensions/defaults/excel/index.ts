@@ -6,6 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import OpenAI from 'openai';
 
 // Dynamically import all dependencies to avoid esbuild transpilation issues
 let documentExtractorModule: any = null;
@@ -777,7 +778,50 @@ if (hookRegistry) {
         const description = generateDescription(structure, previewText, _context.fileName);
         console.log('[ExcelDocument] Generated structured description for:', _context.fileName, 'length:', description.length);
 
-        return { description };
+        // Generate title using AI (with timeout)
+        let title: string | undefined;
+        try {
+          const openai = new OpenAI({
+            baseURL: process.env.OPENAI_BASE_URL,
+            apiKey: process.env.OPENAI_API_KEY,
+          });
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Title generation timeout')), 8000);
+          });
+
+          const titleModel = process.env.TITLE_GENERATION_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
+          const response = await Promise.race([
+            openai.chat.completions.create({
+              model: titleModel,
+              messages: [
+                {
+                  role: "system",
+                  content: "Generate a concise 3-8 word title for an Excel spreadsheet based on its content. Return only the title, no quotes.",
+                },
+                {
+                  role: "user",
+                  content: `File: ${_context.fileName}\n\nSheets: ${structure.sheets.map(s => `${s.name} (${s.rowCount} rows)`).join(', ')}\n\nPreview:\n${previewText}`,
+                },
+              ],
+              temperature: 0.5,
+              max_tokens: 25,
+            }),
+            timeoutPromise,
+          ]);
+
+          title = response.choices[0]?.message?.content?.trim();
+          if (title && title.length > 0 && title.length < 100) {
+            // Remove any surrounding quotes
+            title = title.replace(/^["']|["']$/g, '');
+            console.log('[ExcelDocument] Generated title:', title);
+          }
+        } catch (titleError) {
+          console.warn('[ExcelDocument] Failed to generate title:', titleError);
+          // Continue without title
+        }
+
+        return { description, title };
       } catch (error) {
         console.error('[ExcelDocument] Hook failed:', error);
         console.error('[ExcelDocument] Error stack:', error instanceof Error ? error.stack : String(error));

@@ -24,6 +24,7 @@ export interface FileWithConversation {
   thumbnailUrl?: string;
   scope: FileScope;
   description?: string;
+  title?: string;
 }
 
 /**
@@ -69,6 +70,7 @@ export async function handleGetProjectFiles(req: Request): Promise<Response> {
       thumbnailUrl: file.thumbnailUrl,
       scope: file.scope,
       description: file.description,
+      title: file.title,
     }));
 
     // Sort by upload date (most recent first)
@@ -133,6 +135,8 @@ export async function handleGetConversationFiles(
       url: `/api/files/${projectId}/${convId}/${file.name}`,
       thumbnailUrl: file.thumbnailUrl,
       scope: file.scope,
+      description: file.description,
+      title: file.title,
     }));
 
     return Response.json({

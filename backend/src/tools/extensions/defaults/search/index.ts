@@ -89,137 +89,120 @@ interface ImageSearchResult {
 /**
  * Context documentation for the search extension
  */
-function context() {
-  return `
-### Search Extension
-
-Search the web and find images using Brave Search API.
-
-**Available Functions:**
-
-#### web(options)
-Search the web for information.
-
-```typescript
-await search.web({
-  search_query: "latest AI developments 2024",
-  count: 10,                   // Optional: number of results (default: 10)
-  country: "US",               // Optional: country code
-  search_lang: "en",           // Optional: language code
-  safesearch: "moderate",      // Optional: "off", "moderate", "strict"
-  freshness: "py",             // Optional: time filter - "pd", "pw", "pm", "py", "pn"
-  text_decorrelation: true      // Optional: deduplicate results
-});
-```
-
-**Parameters:**
-- `search_query` (required): Search query string
-- `count` (optional): Number of results to return (default: 10)
-- `country` (optional): Country code (e.g., "US", "UK", "ID")
-- `search_lang` (optional): Language code (e.g., "en", "id", "es")
-- `safesearch` (optional): Safe search level - "off", "moderate", "strict"
-- `freshness` (optional): Time filter
-  - `pd`: past day
-  - `pw`: past week
-  - `pm`: past month
-  - `py`: past year
-  - `pn`: no limit
-- `text_decorrelation` (optional): Remove similar results (default: false)
-
-**Returns:**
-```typescript
-{
-  results: Array<{
-    title: string,
-    url: string,
-    description: string,
-    published?: string
-  }>,
-  total: number
-}
-```
-
-#### image(options)
-Search for images.
-
-```typescript
-await search.image({
-  search_query: "cute cats",
-  count: 10,                    // Optional: number of results (default: 20)
-  country: "US",                // Optional: country code
-  safesearch: "moderate",        // Optional: "off", "moderate", "strict"
-  spellcheck: true               // Optional: enable spell checking
-});
-```
-
-**Parameters:**
-- `search_query` (required): Search query string
-- `count` (optional): Number of results to return (default: 20)
-- `country` (optional): Country code (e.g., "US", "UK", "ID")
-- `safesearch` (optional): Safe search level - "off", "moderate", "strict"
-- `spellcheck` (optional): Enable spell checking (default: false)
-
-**Returns:**
-```typescript
-{
-  results: Array<{
-    title: string,
-    url: string,
-    thumbnail: string,
-    source: string,
-    width?: number,
-    height?: number
-  }>,
-  total: number
-}
-```
-
-**Examples:**
-
-1. **Basic web search:**
-```typescript
-const results = await search.web({
-  search_query: "TypeScript vs JavaScript 2024",
-  count: 5
-});
-return { count: results.total, results: results.results };
-```
-
-2. **Recent news with freshness filter:**
-```typescript
-const news = await search.web({
-  search_query: "AI news",
-  count: 10,
-  freshness: "pw"  // Past week
-});
-return news.results;
-```
-
-3. **Basic image search:**
-```typescript
-const images = await search.image({
-  search_query: "sunset over mountains",
-  count: 5
-});
-return { count: images.total, images: images.results };
-```
-
-4. **Safe image search:**
-```typescript
-const images = await search.image({
-  search_query: "nature photography",
-  count: 10,
-  safesearch: "strict"
-});
-return images.results;
-```
-
-**Important Notes:**
-- Requires BRAVE_API_KEY environment variable
-- Get API key from https://brave.com/search/api/
-- Provides access to current web information
-- Use freshness parameter to get recent results
-`;
+const context = () =>
+  '' +
+  '### Search Extension\n\n' +
+  'Search the web and find images using Brave Search API.\n\n' +
+  '**Available Functions:**\n\n' +
+  '#### web(options)\n' +
+  'Search the web for information.\n\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  'await search.web({\n' +
+  '  search_query: "latest AI developments 2024",\n' +
+  '  count: 10,                   // Optional: number of results (default: 10)\n' +
+  '  country: "US",               // Optional: country code\n' +
+  '  search_lang: "en",           // Optional: language code\n' +
+  '  safesearch: "moderate",      // Optional: "off", "moderate", "strict"\n' +
+  '  freshness: "py",             // Optional: time filter - "pd", "pw", "pm", "py", "pn"\n' +
+  '  text_decorrelation: true      // Optional: deduplicate results\n' +
+  '});\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '**Parameters:**\n' +
+  '- `search_query` (required): Search query string\n' +
+  '- `count` (optional): Number of results to return (default: 10)\n' +
+  '- `country` (optional): Country code (e.g., "US", "UK", "ID")\n' +
+  '- `search_lang` (optional): Language code (e.g., "en", "id", "es")\n' +
+  '- `safesearch` (optional): Safe search level - "off", "moderate", "strict"\n' +
+  '- `freshness` (optional): Time filter\n' +
+  '  - `pd`: past day\n' +
+  '  - `pw`: past week\n' +
+  '  - `pm`: past month\n' +
+  '  - `py`: past year\n' +
+  '  - `pn`: no limit\n' +
+  '- `text_decorrelation` (optional): Remove similar results (default: false)\n\n' +
+  '**Returns:**\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  '{\n' +
+  '  results: Array<{\n' +
+  '    title: string,\n' +
+  '    url: string,\n' +
+  '    description: string,\n' +
+  '    published?: string\n' +
+  '  }>,\n' +
+  '  total: number\n' +
+  '}\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '#### image(options)\n' +
+  'Search for images.\n\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  'await search.image({\n' +
+  '  search_query: "cute cats",\n' +
+  '  count: 10,                    // Optional: number of results (default: 20)\n' +
+  '  country: "US",                // Optional: country code\n' +
+  '  safesearch: "moderate",        // Optional: "off", "moderate", "strict"\n' +
+  '  spellcheck: true               // Optional: enable spell checking\n' +
+  '});\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '**Parameters:**\n' +
+  '- `search_query` (required): Search query string\n' +
+  '- `count` (optional): Number of results to return (default: 20)\n' +
+  '- `country` (optional): Country code (e.g., "US", "UK", "ID")\n' +
+  '- `safesearch` (optional): Safe search level - "off", "moderate", "strict"\n' +
+  '- `spellcheck` (optional): Enable spell checking (default: false)\n\n' +
+  '**Returns:**\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  '{\n' +
+  '  results: Array<{\n' +
+  '    title: string,\n' +
+  '    url: string,\n' +
+  '    thumbnail: string,\n' +
+  '    source: string,\n' +
+  '    width?: number,\n' +
+  '    height?: number\n' +
+  '  }>,\n' +
+  '  total: number\n' +
+  '}\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '**Examples:**\n\n' +
+  '1. **Basic web search:**\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  'const results = await search.web({\n' +
+  '  search_query: "TypeScript vs JavaScript 2024",\n' +
+  '  count: 5\n' +
+  '});\n' +
+  'return { count: results.total, results: results.results };\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '2. **Recent news with freshness filter:**\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  'const news = await search.web({\n' +
+  '  search_query: "AI news",\n' +
+  '  count: 10,\n' +
+  '  freshness: "pw"  // Past week\n' +
+  '});\n' +
+  'return news.results;\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '3. **Basic image search:**\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  'const images = await search.image({\n' +
+  '  search_query: "sunset over mountains",\n' +
+  '  count: 5\n' +
+  '});\n' +
+  'return { count: images.total, images: images.results };\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '4. **Safe image search:**\n' +
+  '`' + '`' + '`' + 'typescript\n' +
+  'const images = await search.image({\n' +
+  '  search_query: "nature photography",\n' +
+  '  count: 10,\n' +
+  '  safesearch: "strict"\n' +
+  '});\n' +
+  'return images.results;\n' +
+  '`' + '`' + '`' + '\n\n' +
+  '**Important Notes:**\n' +
+  '- Requires BRAVE_API_KEY environment variable\n' +
+  '- Get API key from https://brave.com/search/api/\n' +
+  '- Provides access to current web information\n' +
+  '- Use freshness parameter to get recent results';
 
 /**
  * Get API key from environment
@@ -237,8 +220,7 @@ function getBraveApiKey(): string {
 /**
  * Search extension - combines web and image search
  */
-// @ts-expect-error - Extension loader wraps this code in an async function
-return {
+const searchExtension = {
   /**
    * Search the web for information
    *
@@ -397,3 +379,7 @@ return {
     }
   },
 };
+
+// Return the extension object (extension loader wraps this in an async function)
+// @ts-expect-error - Extension loader wraps this code in an async function
+return searchExtension;

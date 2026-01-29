@@ -17,6 +17,7 @@ export interface FileInfo {
   thumbnailUrl?: string;
   scope?: string;
   description?: string;
+  title?: string;
 }
 
 /**

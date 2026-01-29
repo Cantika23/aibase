@@ -756,6 +756,7 @@ export class WSServer extends WSEventEmitter {
               uploadedAt: file.uploadedAt,
               description: file.description,
               thumbnailUrl: file.thumbnailUrl,
+              title: file.title,
             };
           });
 

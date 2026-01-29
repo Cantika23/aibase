@@ -30,6 +30,7 @@ interface FileInfo {
   modified?: string;
   scope?: 'user' | 'public';
   description?: string;
+  title?: string;
 }
 
 /**
@@ -275,8 +276,9 @@ async function loadProjectLevelFiles(
       const fullPath = path.join(filesDir, entry.name);
       const stats = await fs.stat(fullPath);
 
-      // Load metadata to get scope
+      // Load metadata to get scope and title
       let scope: 'user' | 'public' = 'user';
+      let title: string | undefined;
       const metaPath = path.join(filesDir, `.${entry.name}.meta.md`);
       try {
         const metaContent = await fs.readFile(metaPath, 'utf-8');
@@ -285,6 +287,12 @@ async function loadProjectLevelFiles(
           const scopeMatch = frontmatterMatch[1].match(/scope:\s*["']?(user|public)["']?/);
           if (scopeMatch) {
             scope = scopeMatch[1] as 'user' | 'public';
+          }
+
+          // Extract title from frontmatter
+          const titleMatch = frontmatterMatch[1].match(/title:\s*["']?([^"'\n]+)["']?/);
+          if (titleMatch && titleMatch[1]) {
+            title = titleMatch[1].trim();
           }
         }
       } catch {
@@ -299,6 +307,7 @@ async function loadProjectLevelFiles(
         sizeHuman: formatBytes(stats.size),
         modified: stats.mtime.toISOString(),
         scope,
+        title,  // Include title in file info
       });
     }
 
@@ -397,9 +406,10 @@ async function loadFiles(
       const fullPath = path.join(filesDir, entry.name);
       const stats = await fs.stat(fullPath);
 
-      // Load metadata to get scope and description
+      // Load metadata to get scope, description, and title
       let scope: 'user' | 'public' = 'user';
       let description: string | undefined;
+      let title: string | undefined;
       const metaPath = path.join(filesDir, `.${entry.name}.meta.md`);
       try {
         const metaContent = await fs.readFile(metaPath, 'utf-8');
@@ -410,6 +420,12 @@ async function loadFiles(
           const scopeMatch = frontmatterMatch[1].match(/scope:\s*["']?(user|public)["']?/);
           if (scopeMatch) {
             scope = scopeMatch[1] as 'user' | 'public';
+          }
+
+          // Extract title from frontmatter
+          const titleMatch = frontmatterMatch[1].match(/title:\s*["']?([^"'\n]+)["']?/);
+          if (titleMatch && titleMatch[1]) {
+            title = titleMatch[1].trim();
           }
         }
 
@@ -431,6 +447,7 @@ async function loadFiles(
         modified: stats.mtime.toISOString(),
         scope,
         description,  // Include description in file info
+        title,  // Include title in file info
       });
     }
 
@@ -473,21 +490,27 @@ function formatFilesForContext(files: FileInfo[]): string {
   const publicFiles = files.filter(f => f.scope === 'public');
   const userFiles = files.filter(f => f.scope === 'user');
 
+  // Helper to format file display name (with title if available)
+  const formatFileDisplayName = (file: FileInfo): string => {
+    if (file.title) {
+      return `${file.title} (${file.name})`;
+    }
+    return file.name;
+  };
+
   if (publicFiles.length > 0) {
     context += `\n\n[Public] - Visible to all users in this conversation:`;
     for (const file of publicFiles) {
-      context += `\n  • ${file.name} (${file.sizeHuman}, type: .${file.type})`;
-      // NOTE: File descriptions temporarily disabled due to API compatibility issues
-      // The AI can still analyze files using the imageDocument tool when needed
+      const displayName = formatFileDisplayName(file);
+      context += `\n  • ${displayName} (${file.sizeHuman}, type: .${file.type})`;
     }
   }
 
   if (userFiles.length > 0) {
     context += `\n\n[User] - Only visible to you:`;
     for (const file of userFiles) {
-      context += `\n  • ${file.name} (${file.sizeHuman}, type: .${file.type})`;
-      // NOTE: File descriptions temporarily disabled due to API compatibility issues
-      // The AI can still analyze files using the imageDocument tool when needed
+      const displayName = formatFileDisplayName(file);
+      context += `\n  • ${displayName} (${file.sizeHuman}, type: .${file.type})`;
     }
   }
 

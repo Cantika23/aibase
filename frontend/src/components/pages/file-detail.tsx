@@ -388,7 +388,12 @@ export function FileDetailPage() {
               <div className="flex items-start gap-4">
                 <span className="text-5xl">{getFileIcon(currentFile.name)}</span>
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-semibold truncate">{currentFile.name}</h1>
+                  {currentFile.title ? (
+                    <h1 className="text-2xl font-semibold truncate">{currentFile.title}</h1>
+                  ) : (
+                    <h1 className="text-2xl font-semibold truncate">{currentFile.name}</h1>
+                  )}
+                  <p className="text-sm text-muted-foreground truncate">{currentFile.name}</p>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                     <span>{formatFileSize(currentFile.size)}</span>
                     <span>•</span>
