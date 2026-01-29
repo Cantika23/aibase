@@ -11,7 +11,6 @@ interface FilePreviewDialogProps {
   initialIndex?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  getConversationTitle: (convId: string) => string;
 }
 
 export function FilePreviewDialog({
@@ -19,7 +18,6 @@ export function FilePreviewDialog({
   initialIndex = 0,
   open,
   onOpenChange,
-  getConversationTitle,
 }: FilePreviewDialogProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -175,10 +173,6 @@ export function FilePreviewDialog({
             <span>{formatFileSize(currentFile.size)}</span>
             <span>•</span>
             <span>{formatRelativeTime(currentFile.uploadedAt)}</span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              in {getConversationTitle(currentFile.convId)}
-            </span>
           </div>
         </DialogHeader>
 

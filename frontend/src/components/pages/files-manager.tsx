@@ -30,7 +30,6 @@ import { Badge } from "@/components/ui/badge";
 import React from "react";
 
 import { FilePreviewDialog } from "@/components/ui/file-preview-dialog";
-import { ConvIdManager, useConvId } from "@/lib/conv-id";
 import {
   deleteFile,
   fetchProjectFiles,
@@ -113,8 +112,7 @@ export function FilesManagerPage() {
   const navigate = useNavigate();
   const { projectId } = useParams();
 
-  const { conversations, loadConversations } = useConversationStore();
-  const { setConvId } = useConvId();
+  const { loadConversations } = useConversationStore();
   const { clearMessages } = useChatStore();
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -277,7 +275,7 @@ export function FilesManagerPage() {
     }
   };
 
-  const handleGoToConversation = (file: FileInfo) => {
+  const handleGoToConversation = () => {
     if (!projectId) return;
 
     clearMessages();
@@ -317,9 +315,7 @@ export function FilesManagerPage() {
             file.name &&
             typeof file.name === "string" &&
             file.size &&
-            typeof file.size === "number" &&
-            file.convId &&
-            typeof file.convId === "string"
+            typeof file.size === "number"
           );
         });
         setFiles(validFiles);
@@ -377,9 +373,7 @@ export function FilesManagerPage() {
             file.name &&
             typeof file.name === "string" &&
             file.size &&
-            typeof file.size === "number" &&
-            file.convId &&
-            typeof file.convId === "string"
+            typeof file.size === "number"
           );
         });
         setFiles(validFiles);
@@ -694,7 +688,7 @@ export function FilesManagerPage() {
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() =>
-                                        handleGoToConversation(file)
+                                        handleGoToConversation()
                                       }
                                     >
                                       <ExternalLink className="h-4 w-4 mr-2" />
@@ -853,7 +847,7 @@ export function FilesManagerPage() {
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleGoToConversation(file);
+                                    handleGoToConversation();
                                   }}
                                 >
                                   <ExternalLink className="h-4 w-4 mr-2" />
