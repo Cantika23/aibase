@@ -8,7 +8,7 @@ import * as path from 'path';
 
 // Dynamically import all dependencies to avoid esbuild transpilation issues
 let documentExtractorModule: any = null;
-async function isExcelFile(fileName: string): boolean {
+async function isExcelFile(fileName: string): Promise<boolean> {
   if (!documentExtractorModule) {
     documentExtractorModule = await import(`${process.cwd()}/backend/src/utils/document-extractor.ts`);
   }
@@ -16,7 +16,7 @@ async function isExcelFile(fileName: string): boolean {
 }
 
 let configPathsModule: any = null;
-async function getProjectFilesDir(projectId: string, tenantId: string | number): string {
+async function getProjectFilesDir(projectId: string, tenantId: string | number): Promise<string> {
   if (!configPathsModule) {
     configPathsModule = await import(`${process.cwd()}/backend/src/config/paths.ts`);
   }
@@ -29,6 +29,9 @@ async function getDuckDBPath(): Promise<string> {
     // Use absolute path from backend directory to avoid relative path resolution issues
     const module = await import(`${process.cwd()}/backend/src/binaries/duckdb.ts`);
     getDuckDBPathFn = module.getDuckDBPath;
+  }
+  if (!getDuckDBPathFn) {
+    throw new Error('getDuckDBPath function not available');
   }
   return getDuckDBPathFn();
 }
@@ -108,7 +111,11 @@ async function executeDuckDB(query: string): Promise<DuckDBQueryResult> {
     }
 
     // First line is headers
-    const columns = parseCSVLine(lines[0]);
+    const firstLine = lines[0];
+    if (!firstLine) {
+      return { columns: [], rows: [] };
+    }
+    const columns = parseCSVLine(firstLine);
     const rows = lines.slice(1).map(line => parseCSVLine(line));
 
     return { columns, rows };
@@ -323,12 +330,13 @@ function generateDescription(structure: ExcelStructure, previewText: string): st
 
   // Preview of first sheet
   if (structure.sheets.length > 0) {
-    lines.push(`## Preview (First Sheet: "${structure.sheets[0].name}")`);
+    const firstSheet = structure.sheets[0]!;
+    lines.push(`## Preview (First Sheet: "${firstSheet.name}")`);
     lines.push('```');
     const previewLines = previewText.split('\n').slice(0, 30);
     lines.push(previewLines.join('\n'));
     if (previewText.split('\n').length > 30) {
-      lines.push(`... (${structure.sheets[0].rowCount.toLocaleString()} total rows)`);
+      lines.push(`... (${firstSheet.rowCount.toLocaleString()} total rows)`);
     }
     lines.push('```');
   }
@@ -532,7 +540,8 @@ if (hookRegistry) {
         // Get preview of first sheet
         let previewText = '';
         if (structure.sheets.length > 0) {
-          const previewData = await getSheetPreview(_context.filePath, structure.sheets[0].name, 20);
+          const firstSheet = structure.sheets[0]!;
+          const previewData = await getSheetPreview(_context.filePath, firstSheet.name, 20);
           previewText = previewData
             .map(row => row.map(cell => cell || '').join(' | '))
             .join('\n');
