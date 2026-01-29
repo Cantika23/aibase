@@ -454,9 +454,7 @@ export function FilesManagerPage() {
   const filteredFiles = files.filter((file) => {
     const matchesSearch =
       searchQuery === "" ||
-      file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
+      file.name.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesType =
       filterType === "all" || getFileTypeCategory(file.name) === filterType;
