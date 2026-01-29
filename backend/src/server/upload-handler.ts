@@ -268,7 +268,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
 
         // Update file metadata with description
         try {
-          await fileStorage.updateFileMeta(, storedFile.name, projectId, tenantId, { description: hookResult.description });
+          await fileStorage.updateFileMeta('', storedFile.name, projectId, tenantId, { description: hookResult.description });
           console.log('[UPLOAD-HANDLER] File metadata updated with description');
         } catch (updateError) {
           console.error('[UPLOAD-HANDLER] Failed to update file metadata:', updateError);
