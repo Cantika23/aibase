@@ -121,15 +121,38 @@ export function generateExtensionContext(extension: Extension): string {
   // First try the exported version (for backwards compatibility)
   let contextMatch = code.match(/export\s+const\s+context\s*=\s*\(\)\s*=>\s*`([\s\S]+?)`/);
 
-  // If not found, try the non-exported version
+  // If not found, try the non-exported version with template string
   if (!contextMatch) {
-    // Match const context = () => '...' + '...'  (string concatenation format)
-    contextMatch = code.match(/const\s+context\s*=\s*\(\)\s*=>\s*'([^']*(?:'\s*\+\s*'[^']*)*)'/);
+    contextMatch = code.match(/const\s+context\s*=\s*\(\)\s*=>\s*`([\s\S]+?)`/);
+  }
+
+  // If not found, try the non-exported version with string concatenation (single quotes)
+  if (!contextMatch) {
+    // Match const context = () => '...' + '...'  (multi-line string concatenation)
+    contextMatch = code.match(/const\s+context\s*=\s*\(\)\s*=>\s*'([\s\S]*?)'\s*(?:;|$)/);
   }
 
   if (contextMatch) {
     // Extension has its own context - use it directly
-    const extractedContext = contextMatch[1];
+    let extractedContext = contextMatch[1];
+
+    // If context was built with string concatenation ('' + '...' + ''), clean it up
+    if (extractedContext.includes("'") || extractedContext.includes('+')) {
+      // Remove quotes, plus signs, and extra whitespace from string concatenation
+      extractedContext = extractedContext
+        .split('\n')
+        .map(line => {
+          // Remove leading/trailing quotes and plus signs
+          return line
+            .replace(/^\s*'?'\s*\+\s*/g, '')  // Remove starting quote and plus
+            .replace(/\s*\+\s*'?'\s*$/g, '')   // Remove ending quote and plus
+            .replace(/''\s*\+\s*'/g, '')       // Remove empty strings in concatenation
+            .trim();
+        })
+        .filter(line => line.length > 0)  // Remove empty lines
+        .join('\n');
+    }
+
     if (extractedContext && extractedContext.trim()) {
       console.log(`[ExtensionContext] Using exported context for ${metadata.id}`);
       return extractedContext.trim();
