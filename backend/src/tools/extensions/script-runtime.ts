@@ -61,21 +61,11 @@ return { total: list.items.length };
   - **When to use:** Call external APIs, download data from web services
   - **How to use:** \`const res = await fetch('https://api.example.com/data'); const data = await res.json();\`
   - **Note:** Only works with http/https URLs, NOT for file system paths or backend endpoints
-  - **For reading files:** Use project extensions like \`excelDocument.summarize()\` instead
 
-**IMPORTANT:** Project extension functions are also available! See the "## Project Extensions" section below for extension functions like:
-- extensionCreator.createOrUpdate() - Create/update staging for extensions
-- extensionCreator.modify({ extensionId, instruction }) - Modify staging for an extension
-- extensionCreator.finalize({ extensionId }) - Promote staging to active extension
-- **Extension Creator validation loop (MANDATORY):**
-  - After createOrUpdate()/modify(), ALWAYS call validate({ extensionId })
-  - If validate() fails: fix staging with createOrUpdate()/modify(), then validate() again
-  - NEVER call finalize() when validate() is failing
-  - If validation keeps failing after a few attempts, return the errors to the user
-- postgresql() - Query PostgreSQL databases
-- duckdb() - Query CSV/Excel/Parquet/JSON files
-- webSearch() - Search the web
-- And more project-specific extensions
+**IMPORTANT:** Project extension functions are also available!
+- Extensions provide additional functionality like database queries, file processing, visualizations, web search, etc.
+- Each extension has its own namespace (e.g., \`extensionName.function()\`)
+- Extension context is provided separately - check available extensions for their specific APIs
 
 - **progress(message, data)** - Send progress updates to the UI
   - **When to use:** Keep users informed during long-running operations

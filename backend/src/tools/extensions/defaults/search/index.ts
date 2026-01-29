@@ -100,7 +100,7 @@ Search the web and find images using Brave Search API.
 #### web(options)
 Search the web for information.
 
-\`\`\`typescript
+```typescript
 await search.web({
   search_query: "latest AI developments 2024",
   count: 10,                   // Optional: number of results (default: 10)
@@ -110,24 +110,24 @@ await search.web({
   freshness: "py",             // Optional: time filter - "pd", "pw", "pm", "py", "pn"
   text_decorrelation: true      // Optional: deduplicate results
 });
-\`\`\`
+```
 
 **Parameters:**
-- \`search_query\` (required): Search query string
-- \`count\` (optional): Number of results to return (default: 10)
-- \`country\` (optional): Country code (e.g., "US", "UK", "ID")
-- \`search_lang\` (optional): Language code (e.g., "en", "id", "es")
-- \`safesearch\` (optional): Safe search level - "off", "moderate", "strict"
-- \`freshness\` (optional): Time filter
-  - \`pd\`: past day
-  - \`pw\`: past week
-  - \`pm\`: past month
-  - \`py\`: past year
-  - \`pn\`: no limit
-- \`text_decorrelation\` (optional): Remove similar results (default: false)
+- `search_query` (required): Search query string
+- `count` (optional): Number of results to return (default: 10)
+- `country` (optional): Country code (e.g., "US", "UK", "ID")
+- `search_lang` (optional): Language code (e.g., "en", "id", "es")
+- `safesearch` (optional): Safe search level - "off", "moderate", "strict"
+- `freshness` (optional): Time filter
+  - `pd`: past day
+  - `pw`: past week
+  - `pm`: past month
+  - `py`: past year
+  - `pn`: no limit
+- `text_decorrelation` (optional): Remove similar results (default: false)
 
 **Returns:**
-\`\`\`typescript
+```typescript
 {
   results: Array<{
     title: string,
@@ -137,12 +137,12 @@ await search.web({
   }>,
   total: number
 }
-\`\`\`
+```
 
 #### image(options)
 Search for images.
 
-\`\`\`typescript
+```typescript
 await search.image({
   search_query: "cute cats",
   count: 10,                    // Optional: number of results (default: 20)
@@ -150,17 +150,17 @@ await search.image({
   safesearch: "moderate",        // Optional: "off", "moderate", "strict"
   spellcheck: true               // Optional: enable spell checking
 });
-\`\`\`
+```
 
 **Parameters:**
-- \`search_query\` (required): Search query string
-- \`count\` (optional): Number of results to return (default: 20)
-- \`country\` (optional): Country code (e.g., "US", "UK", "ID")
-- \`safesearch\` (optional): Safe search level - "off", "moderate", "strict"
-- \`spellcheck\` (optional): Enable spell checking (default: false)
+- `search_query` (required): Search query string
+- `count` (optional): Number of results to return (default: 20)
+- `country` (optional): Country code (e.g., "US", "UK", "ID")
+- `safesearch` (optional): Safe search level - "off", "moderate", "strict"
+- `spellcheck` (optional): Enable spell checking (default: false)
 
 **Returns:**
-\`\`\`typescript
+```typescript
 {
   results: Array<{
     title: string,
@@ -172,47 +172,47 @@ await search.image({
   }>,
   total: number
 }
-\`\`\`
+```
 
 **Examples:**
 
 1. **Basic web search:**
-\`\`\`typescript
+```typescript
 const results = await search.web({
   search_query: "TypeScript vs JavaScript 2024",
   count: 5
 });
 return { count: results.total, results: results.results };
-\`\`\`
+```
 
 2. **Recent news with freshness filter:**
-\`\`\`typescript
+```typescript
 const news = await search.web({
   search_query: "AI news",
   count: 10,
   freshness: "pw"  // Past week
 });
 return news.results;
-\`\`\`
+```
 
 3. **Basic image search:**
-\`\`\`typescript
+```typescript
 const images = await search.image({
   search_query: "sunset over mountains",
   count: 5
 });
 return { count: images.total, images: images.results };
-\`\`\`
+```
 
 4. **Safe image search:**
-\`\`\`typescript
+```typescript
 const images = await search.image({
   search_query: "nature photography",
   count: 10,
   safesearch: "strict"
 });
 return images.results;
-\`\`\`
+```
 
 **Important Notes:**
 - Requires BRAVE_API_KEY environment variable
@@ -283,7 +283,7 @@ return {
       }
 
       const response = await fetch(
-        \`https://api.search.brave.com/res/v1/web/search?\${params.toString()}\`,
+        `https://api.search.brave.com/res/v1/web/search?${params.toString()}`,
         {
           method: "GET",
           headers: {
@@ -296,7 +296,7 @@ return {
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          \`Brave web search failed: \${response.status} \${response.statusText} - \${errorText}\`
+          `Brave web search failed: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
 
@@ -317,7 +317,7 @@ return {
         total: transformedResults.length,
       };
     } catch (error: unknown) {
-      throw new Error(\`Web search failed: \${error instanceof Error ? error.message : String(error)}\`);
+      throw new Error(`Web search failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   },
 
@@ -359,7 +359,7 @@ return {
       }
 
       const response = await fetch(
-        \`https://api.search.brave.com/res/v1/images/search?\${params.toString()}\`,
+        `https://api.search.brave.com/res/v1/images/search?${params.toString()}`,
         {
           method: "GET",
           headers: {
@@ -372,7 +372,7 @@ return {
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          \`Brave image search failed: \${response.status} \${response.statusText} - \${errorText}\`
+          `Brave image search failed: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
 
@@ -393,7 +393,7 @@ return {
         total: transformedResults.length,
       };
     } catch (error: unknown) {
-      throw new Error(\`Image search failed: \${error instanceof Error ? error.message : String(error)}\`);
+      throw new Error(`Image search failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   },
 };
