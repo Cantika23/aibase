@@ -431,7 +431,9 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
                  await fs.writeFile(filePath, Buffer.from(arrayBuffer));
                  console.log(`[WhatsApp] Image saved successfully: ${filename}`);
                  
-                 // Optional: Save metadata
+
+
+                 // Optional: Save technical metadata as JSON too (backup)
                  const metaPath = filePath + ".meta.json";
                  await fs.writeFile(metaPath, JSON.stringify({
                    id: messageData.id,
@@ -621,13 +623,19 @@ function cleanWhatsAppResponse(response: string): string {
   
   // Remove any remaining JSON-like structures that start with { and contain quoted keys
   // Be more aggressive for obvious JSON dumps
-  cleaned = cleaned.replace(/^\s*\{[\s\S]*"[a-zA-Z_]+"\s*:[\s\S]*\}\s*$/gm, '');
+  cleaned = cleaned.replace(/^\s*\{[\s\S]*"[a-zA-Z_]+"\s*:\s*[\s\S]*\}\s*$/gm, '');
 
   // Remove empty or whitespace-only markdown code blocks (```json\n\n```, ```\n```, etc.)
   cleaned = cleaned.replace(/```[a-z]*\s*\n*\s*```/gi, '');
   
   // Remove code blocks that only contain whitespace or very short content
   cleaned = cleaned.replace(/```[a-z]*\s*\n\s*\n*```/gi, '');
+
+  // === NEW: Remove Thinking/Reasoning Tags ===
+  // Removes content like <think>...</think> or just </think> artifacts
+  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  cleaned = cleaned.replace(/<\/think>/gi, ''); // Remove stray closing tags
+  cleaned = cleaned.replace(/<think>/gi, '');   // Remove stray opening tags
 
   // Remove multiple newlines (compress to max 2)
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
@@ -720,7 +728,7 @@ async function processWhatsAppMessageWithAI(
 
     // Save conversation history
     const history = (conversation as any)._history || [];
-    await chatHistoryStorage.saveChatHistory(convId, history, projectId, uid);
+    await chatHistoryStorage.saveChatHistory(convId, history, projectId, tenantId, uid);
 
     // Send response back to WhatsApp
     if (fullResponse.trim()) {
