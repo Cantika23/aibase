@@ -360,33 +360,29 @@ function generateDescription(structure: ExcelStructure, previewText: string): st
 }
 
 /**
- * Context documentation for the DuckDB extension
+ * Context documentation for the Excel Document extension
  */
 const context = () => {
   return `
-### DuckDB Extension
+### Excel Document Extension
 
-Query CSV, Excel, Parquet, and JSON files using SQL. Auto-extracts structure for Excel files on upload.
+Extract and query Excel spreadsheets using DuckDB. Auto-extracts structure for Excel files on upload.
 
 **Available Functions:**
 
-#### duckdb(options)
+#### query(options)
 Execute SQL queries on CSV, Excel, Parquet, or JSON files.
 
 \`\`\`typescript
-await duckdb({
-  query: 'SELECT * FROM data.csv LIMIT 10',
-  format: 'json',        // Optional: 'json' (default), 'csv', 'markdown', 'table'
-  readonly: true,        // Optional: readonly mode (default: true)
-  database: ':memory:'   // Optional: database file path (default: ':memory:')
+await excelDocument.query({
+  query: 'SELECT * FROM read_xlsx(\\'data.xlsx\\') LIMIT 10',
+  format: 'json'        // Optional: 'json' (default), 'csv', 'markdown', 'table'
 });
 \`\`\`
 
 **Parameters:**
 - \`query\` (required): SQL query to execute
 - \`format\` (optional): Output format - 'json' (default), 'csv', 'markdown', 'table'
-- \`readonly\` (optional): Enable readonly mode (default: true)
-- \`database\` (optional): Database file path (default: ':memory:' for in-memory)
 
 **Returns:**
 \`\`\`typescript
@@ -397,114 +393,136 @@ await duckdb({
 }
 \`\`\`
 
-#### read(options) / extract(options)
-Extract data from Excel spreadsheets with optional structure information (convenience wrapper).
+#### summarize(options)
+Get Excel file structure, sheet names, column names, and row counts.
 
 \`\`\`typescript
-await duckdb.read({
+await excelDocument.summarize({
   fileId: 'data.xlsx',    // File ID in conversation storage
-  sheets: ['Sheet1'],     // Optional: specific sheets to extract
-  limit: 100,             // Optional: max rows per sheet
-  includeStructure: true  // Optional: include file structure metadata
+  includeStructure: true  // Include file structure metadata
 });
+\`\`\`
+
+**Parameters:**
+- \`fileId\` (required): File ID in conversation storage
+- \`filePath\` (optional): Full path to the Excel file
+- \`sheets\` (optional): Array of sheet names to extract
+- \`limit\` (optional): Maximum rows per sheet
+- \`includeStructure\` (optional): Return structure metadata
+
+**Returns:**
+\`\`\`typescript
+{
+  text: string,              // Extracted data as formatted text
+  structure?: {              // Only if includeStructure: true
+    sheets: [{
+      name: string,
+      rowCount: number,
+      columns: string[]
+    }],
+    totalRows: number,
+    totalSheets: number
+  }
+}
+\`\`\`
+
+#### listFiles()
+List all available data files (Excel, CSV, TSV) in the project.
+
+\`\`\`typescript
+await excelDocument.listFiles();
+\`\`\`
+
+**Returns:**
+\`\`\`typescript
+{
+  files: Array<{
+    name: string,
+    size: number,
+    sizeHuman: string,
+    modified: string,
+    type: string  // 'XLSX', 'XLS', 'CSV', 'TSV'
+  }>
+}
 \`\`\`
 
 **Examples:**
 
-1. **Query CSV file:**
+1. **Get Excel file structure:**
 \`\`\`typescript
-const result = await duckdb({
-  query: 'SELECT * FROM sales.csv LIMIT 10'
-});
-return { count: result.rowCount, data: result.data };
-\`\`\`
-
-2. **Query Excel file:**
-\`\`\`typescript
-const excel = await duckdb({
-  query: \`SELECT * FROM read_xlsx('report.xlsx',
-    header=true,
-    all_varchar=true,
-    sheet='Sheet1')
-  WHERE revenue IS NOT NULL
-  LIMIT 20\`
-});
-return excel.data;
-\`\`\`
-
-3. **Get Excel structure (easiest):**
-\`\`\`typescript
-const result = await duckdb.read({
+const result = await excelDocument.summarize({
   fileId: 'Product.xlsx',
   includeStructure: true
 });
 return {
   totalRows: result.structure.totalRows,
-  columns: result.structure.sheets[0].columns,
-  sheetNames: result.structure.sheets.map(s => s.name)
+  sheets: result.structure.sheets.map(s => ({ name: s.name, rows: s.rowCount }))
 };
 \`\`\`
 
-4. **Aggregation query:**
+2. **Query Excel file with SQL:**
 \`\`\`typescript
-const summary = await duckdb({
+const data = await excelDocument.query({
+  query: \`SELECT * FROM read_xlsx('Product.xlsx',
+    header=true,
+    all_varchar=true)
+  WHERE Category = 'Electronics'
+  LIMIT 100\`
+});
+return { rows: data.rowCount, results: data.data };
+\`\`\`
+
+3. **List all available files:**
+\`\`\`typescript
+const files = await excelDocument.listFiles();
+return {
+  excelFiles: files.files.filter(f => f.type === 'XLSX' || f.type === 'XLS'),
+  csvFiles: files.files.filter(f => f.type === 'CSV' || f.type === 'TSV'),
+  totalFiles: files.files.length
+};
+\`\`\`
+
+4. **Aggregate data with SQL:**
+\`\`\`typescript
+const summary = await excelDocument.query({
   query: \`SELECT
-    category,
-    SUM(CAST(amount AS DOUBLE)) as total
+    Category,
+    COUNT(*) as count,
+    SUM(CAST(Price AS DOUBLE)) as total
   FROM read_xlsx('sales.xlsx', header=true, all_varchar=true)
-  GROUP BY category
+  GROUP BY Category
   ORDER BY total DESC\`
 });
 return summary.data;
 \`\`\`
 
-5. **Join multiple files:**
-\`\`\`typescript
-const joined = await duckdb({
-  query: \`
-    SELECT u.name, s.score
-    FROM 'users.csv' u
-    JOIN 'scores.parquet' s ON u.id = s.user_id
-    LIMIT 10
-  \`
-});
-return joined.data;
-\`\`\`
-
-6. **Query Parquet/JSON files:**
-\`\`\`typescript
-const data = await duckdb({
-  query: "SELECT * FROM 'data.parquet' WHERE date > '2024-01-01'"
-});
-return data.data;
-\`\`\`
-
 **File Formats Supported:**
-- CSV: 'file.csv' or read_csv_auto('file.csv')
 - Excel: read_xlsx('file.xlsx', header=true, all_varchar=true, sheet='Sheet1')
+- CSV: 'file.csv' or read_csv_auto('file.csv')
+- TSV: 'file.tsv' or read_csv_auto('file.tsv', delim='\\t')
 - Parquet: 'file.parquet'
 - JSON: 'file.json' or read_json_auto('file.json')
 
 **Important Notes:**
-- DuckDB queries files directly without loading into memory
-- Use all_varchar=true for Excel to prevent type inference issues
+- Excel file structure is auto-extracted on upload for quick inspection
+- Use \`summarize()\` to get sheet names, columns, and row counts
+- Use \`query()\` for complex filtering, aggregation, and joins
+- Use \`all_varchar=true\` for Excel to prevent type inference issues
 - Use CAST(column AS DOUBLE) when doing math on string columns
-- In-memory database by default (:memory:)
-- For Excel files, structure is auto-extracted on upload for quick inspection
-- Use read() for simple Excel data extraction, duckdb() for complex SQL queries
+- For large files, query with SQL instead of extracting all data
 `;
 };
 
 /**
- * Extract text from Excel spreadsheet
+ * Summarize Excel file structure - get sheets, columns, row counts
  */
-const extract = async (options: ExtractExcelOptions): Promise<ExtractExcelResult> => {
+async function summarize(options: ExtractExcelOptions): Promise<ExtractExcelResult> {
   if (!options || typeof options !== "object") {
-    throw new Error("extractExcel requires an options object");
+    throw new Error("summarize requires an options object");
   }
 
   if (!options.filePath && !options.fileId) {
-    throw new Error("extractExcel requires either 'filePath' or 'fileId' parameter");
+    throw new Error("summarize requires either 'filePath' or 'fileId' parameter");
   }
 
   let filePath = options.filePath!;
@@ -561,28 +579,28 @@ const extract = async (options: ExtractExcelOptions): Promise<ExtractExcelResult
   } catch (error: unknown) {
     throw new Error(`Excel extraction failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-};
+}
 
 /**
- * Read Excel spreadsheet - alias for extract()
+ * Read Excel spreadsheet - alias for summarize()
  */
-const read = async (options: ExtractExcelOptions): Promise<ExtractExcelResult> => extract(options);
+const read = async (options: ExtractExcelOptions): Promise<ExtractExcelResult> => summarize(options);
 
 /**
- * DuckDB SQL Query - Query any file format using SQL
+ * SQL Query - Query any file format using SQL
  */
-async function duckdb(options: {
+async function query(options: {
   query: string;
   format?: "json" | "csv" | "markdown" | "table";
   readonly?: boolean;
   database?: string;
 }): Promise<{ data: Record<string, unknown>[]; rowCount: number; executionTime: number } | { output: string; executionTime: number }> {
   if (!options || typeof options !== "object") {
-    throw new Error("duckdb requires an options object. Usage: await duckdb({ query: 'SELECT * FROM data.csv' })");
+    throw new Error("query requires an options object. Usage: await excelDocument.query({ query: 'SELECT * FROM data.csv' })");
   }
 
   if (!options.query) {
-    throw new Error("duckdb requires 'query' parameter. Usage: await duckdb({ query: 'SELECT * FROM data.csv' })");
+    throw new Error("query requires 'query' parameter. Usage: await excelDocument.query({ query: 'SELECT * FROM data.csv' })");
   }
 
   const format = options.format || "json";
@@ -678,14 +696,50 @@ async function duckdb(options: {
 }
 
 /**
- * Convenience method - alias for extract()
+ * List available data files in the project (Excel, CSV, TSV)
  */
-const extractXLSX = async (options: ExtractExcelOptions): Promise<ExtractExcelResult> => extract(options);
+async function listFiles(): Promise<{ files: Array<{ name: string; size: number; sizeHuman: string; modified: string; type: string }> }> {
+  const projectId = globalThis.projectId || '';
+  const tenantId = globalThis.tenantId || 'default';
 
-/**
- * Convenience method - alias for read()
- */
-const xlsxReader = async (options: ExtractExcelOptions): Promise<ExtractExcelResult> => extract(options);
+  const projectFilesDir = await getProjectFilesDir(projectId, tenantId);
+
+  try {
+    const entries = await fs.readdir(projectFilesDir, { withFileTypes: true });
+    const files = entries
+      .filter(entry => {
+        if (!entry.isFile()) return false;
+        const name = entry.name.toLowerCase();
+        const ext = name.split('.').pop();
+        return ['xlsx', 'xls', 'csv', 'tsv'].includes(ext || '');
+      })
+      .map(async (entry) => {
+        const filePath = path.join(projectFilesDir, entry.name);
+        const stats = await fs.stat(filePath);
+        const ext = entry.name.split('.').pop() || '';
+        return {
+          name: entry.name,
+          size: stats.size,
+          sizeHuman: formatBytes(stats.size),
+          modified: stats.mtime.toISOString(),
+          type: ext.toUpperCase(),
+        };
+      });
+
+    return { files: await Promise.all(files) };
+  } catch (error) {
+    // Directory doesn't exist or is empty
+    return { files: [] };
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+}
 
 // Register hook for automatic Excel analysis on upload
 if (hookRegistry) {
@@ -738,9 +792,7 @@ if (hookRegistry) {
 
 // @ts-expect-error - Extension loader wraps this code in an async function
 return {
-  read,
-  extract,
-  extractXLSX,
-  xlsxReader,
-  duckdb,
+  query,
+  summarize,
+  listFiles,
 };
