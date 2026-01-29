@@ -93,6 +93,13 @@ function escapeSqlString(str: string): string {
 }
 
 /**
+ * Escape special regex characters
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Execute DuckDB query and parse CSV result
  */
 async function executeDuckDB(query: string): Promise<DuckDBQueryResult> {
@@ -375,15 +382,20 @@ Extract and query Excel spreadsheets using DuckDB. Auto-extracts structure for E
 Execute SQL queries on CSV, Excel, Parquet, or JSON files.
 
 \`\`\`typescript
+// Recommended: Use fileId parameter for automatic path resolution
 await excel.query({
-  query: 'SELECT * FROM read_xlsx(\\'data.xlsx\\') LIMIT 10',
-  format: 'json'        // Optional: 'json' (default), 'csv', 'markdown', 'table'
+  fileId: 'Product.xlsx',  // Optional but recommended - resolves to full path
+  query: \`SELECT * FROM read_xlsx('Product.xlsx', header=true, all_varchar=true) WHERE Category = 'Electronics'\`,
+  format: 'json'           // Optional: 'json' (default), 'csv', 'markdown', 'table'
 });
 \`\`\`
 
 **Parameters:**
+- \`fileId\` (optional): File ID in conversation storage - when provided, automatically replaces the fileId in your query with the full resolved path
 - \`query\` (required): SQL query to execute
 - \`format\` (optional): Output format - 'json' (default), 'csv', 'markdown', 'table'
+- \`database\` (optional): Path to DuckDB database file (default: in-memory)
+- \`readonly\` (optional): Open database in read-only mode (default: true)
 
 **Returns:**
 \`\`\`typescript
@@ -461,9 +473,10 @@ return {
 };
 \`\`\`
 
-2. **Query Excel file with SQL:**
+2. **Query Excel file with SQL (recommended with fileId):**
 \`\`\`typescript
 const data = await excel.query({
+  fileId: 'Product.xlsx',  // Resolves to full path automatically
   query: \`SELECT * FROM read_xlsx('Product.xlsx',
     header=true,
     all_varchar=true)
@@ -486,6 +499,7 @@ return {
 4. **Aggregate data with SQL:**
 \`\`\`typescript
 const summary = await excel.query({
+  fileId: 'sales.xlsx',
   query: \`SELECT
     Category,
     COUNT(*) as count,
@@ -505,6 +519,7 @@ return summary.data;
 - JSON: 'file.json' or read_json_auto('file.json')
 
 **Important Notes:**
+- Use \`fileId\` parameter with \`query()\` for automatic path resolution (recommended)
 - Excel file structure is auto-extracted on upload for quick inspection
 - Use \`summarize()\` to get sheet names, columns, and row counts
 - Use \`query()\` for complex filtering, aggregation, and joins
@@ -592,6 +607,7 @@ const read = async (options: ExtractExcelOptions): Promise<ExtractExcelResult> =
  */
 async function query(options: {
   query: string;
+  fileId?: string;  // Optional: resolve this fileId to full path and replace in query
   format?: "json" | "csv" | "markdown" | "table";
   readonly?: boolean;
   database?: string;
@@ -614,6 +630,76 @@ async function query(options: {
 
     // Get the DuckDB executable path
     const duckdbExecutable = await getDuckDBPath();
+
+    // Resolve fileId to full path if provided
+    let finalQuery = options.query.trim();
+    if (options.fileId) {
+      const projectId = globalThis.projectId || '';
+      const tenantId = globalThis.tenantId || 'default';
+
+      // Get project files directory
+      const projectFilesDir = await getProjectFilesDir(projectId, tenantId);
+      const resolvedPath = path.join(projectFilesDir, options.fileId);
+
+      // Check if file exists with exact match
+      let actualPath = resolvedPath;
+      let fileFound = false;
+      try {
+        await fs.access(actualPath);
+        fileFound = true;
+      } catch {
+        // File not found, try prefix matching
+      }
+
+      // If not found, try prefix matching (like summarize() does)
+      if (!fileFound) {
+        try {
+          const entries = await fs.readdir(projectFilesDir, { withFileTypes: true });
+          const fileEntry = entries.find(e => e.name.startsWith(options.fileId!));
+          if (fileEntry) {
+            actualPath = path.join(projectFilesDir, fileEntry.name);
+            fileFound = true;
+          }
+        } catch {
+          // Directory doesn't exist
+        }
+      }
+
+      if (!fileFound) {
+        throw new Error(`File not found: ${options.fileId}`);
+      }
+
+      // Escape the path for SQL and replace fileId in query
+      const escapedPath = escapeSqlString(actualPath);
+
+      // Replace the fileId in the query with the full path
+      // We need to replace 'Product.xlsx' with '/full/path/Product.xlsx'
+      // The regex captures the quote character so we can preserve it
+      const fileIdPattern = new RegExp(
+        `(['"])${escapeRegex(options.fileId)}\\1|` +  // Quoted with same quotes (captured)
+        `'${escapeRegex(options.fileId)}'|` +           // Single quoted
+        `"${escapeRegex(options.fileId)}"|` +           // Double quoted
+        `${escapeRegex(options.fileId)}(?=[\\s,)])`,    // Unquoted
+        'g'
+      );
+
+      // Use a replacement function to handle different quote styles
+      finalQuery = finalQuery.replace(fileIdPattern, (match, quote) => {
+        if (quote) {
+          // Match was 'file' or "file" - preserve the quote character
+          return quote + escapedPath + quote;
+        } else if (match.startsWith("'")) {
+          // Single quoted (fallback)
+          return "'" + escapedPath + "'";
+        } else if (match.startsWith('"')) {
+          // Double quoted (fallback)
+          return '"' + escapedPath + '"';
+        } else {
+          // Unquoted - add single quotes
+          return "'" + escapedPath + "'";
+        }
+      });
+    }
 
     // Build DuckDB command
     let command;
@@ -639,7 +725,6 @@ async function query(options: {
     const formatFlag = formatFlags[format] || "-json";
 
     // Execute DuckDB query using Bun.$
-    const finalQuery = options.query.trim();
     const result = await $`${command} ${formatFlag} -c ${finalQuery}`.text();
 
     const executionTime = Date.now() - startTime;

@@ -54,7 +54,7 @@ export function ScriptDetailsDialog({
       highlightedResult: state.highlightedResult,
       setHighlightedCode: state.setHighlightedCode,
       setHighlightedResult: state.setHighlightedResult,
-    }))
+    })),
   );
 
   const [copiedCode, setCopiedCode] = useState(false);
@@ -64,7 +64,10 @@ export function ScriptDetailsDialog({
   // Max size for display (100KB) - larger results will be truncated
   const MAX_DISPLAY_SIZE = 100 * 1024;
 
-  const copyToClipboard = async (text: string, type: "code" | "result" | "error") => {
+  const copyToClipboard = async (
+    text: string,
+    type: "code" | "result" | "error",
+  ) => {
     try {
       await navigator.clipboard.writeText(text);
       if (type === "code") {
@@ -86,28 +89,38 @@ export function ScriptDetailsDialog({
    * Truncate large data for display to prevent browser freeze
    * Returns { data: truncatedData, isTruncated: boolean }
    */
-  const truncateForDisplay = (data: any): { data: any; isTruncated: boolean } => {
-    const serialized = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  const truncateForDisplay = (
+    data: any,
+  ): { data: any; isTruncated: boolean } => {
+    const serialized =
+      typeof data === "string" ? data : JSON.stringify(data, null, 2);
 
     if (serialized.length <= MAX_DISPLAY_SIZE) {
       return { data, isTruncated: false };
     }
 
     // Result is too large - truncate it
-    console.warn(`[ScriptDetailsDialog] Result too large (${serialized.length} chars), truncating for display`);
+    console.warn(
+      `[ScriptDetailsDialog] Result too large (${serialized.length} chars), truncating for display`,
+    );
 
     if (typeof data === "string") {
       return {
-        data: serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]",
-        isTruncated: true
+        data:
+          serialized.substring(0, MAX_DISPLAY_SIZE) +
+          "\n\n... [truncated for display]",
+        isTruncated: true,
       };
     } else if (Array.isArray(data)) {
       // For arrays, show first N items
       const itemSize = Math.ceil(serialized.length / data.length);
       const itemsToShow = Math.floor(MAX_DISPLAY_SIZE / itemSize);
       return {
-        data: [...data.slice(0, itemsToShow), `... [${data.length - itemsToShow} more items truncated for display]`],
-        isTruncated: true
+        data: [
+          ...data.slice(0, itemsToShow),
+          `... [${data.length - itemsToShow} more items truncated for display]`,
+        ],
+        isTruncated: true,
       };
     } else if (typeof data === "object" && data !== null) {
       // For objects, show partial
@@ -118,7 +131,8 @@ export function ScriptDetailsDialog({
       for (const key of keys) {
         const valueStr = JSON.stringify(data[key]);
         if (currentSize + valueStr.length > MAX_DISPLAY_SIZE) {
-          truncatedObj["..."] = `[${keys.length - Object.keys(truncatedObj).length} more keys truncated for display]`;
+          truncatedObj["..."] =
+            `[${keys.length - Object.keys(truncatedObj).length} more keys truncated for display]`;
           break;
         }
         truncatedObj[key] = data[key];
@@ -129,8 +143,10 @@ export function ScriptDetailsDialog({
     }
 
     return {
-      data: serialized.substring(0, MAX_DISPLAY_SIZE) + "\n\n... [truncated for display]",
-      isTruncated: true
+      data:
+        serialized.substring(0, MAX_DISPLAY_SIZE) +
+        "\n\n... [truncated for display]",
+      isTruncated: true,
     };
   };
 
@@ -142,8 +158,14 @@ export function ScriptDetailsDialog({
 
   // Debug: Log inspectionData whenever it changes
   useEffect(() => {
-    console.log('[ScriptDetailsDialog] inspectionData changed:', inspectionData);
-    console.log('[ScriptDetailsDialog] inspectionData keys:', inspectionData ? Object.keys(inspectionData) : 'null');
+    console.log(
+      "[ScriptDetailsDialog] inspectionData changed:",
+      inspectionData,
+    );
+    console.log(
+      "[ScriptDetailsDialog] inspectionData keys:",
+      inspectionData ? Object.keys(inspectionData) : "null",
+    );
   }, [inspectionData]);
 
   useEffect(() => {
@@ -180,7 +202,9 @@ export function ScriptDetailsDialog({
       // Truncate large results before highlighting to prevent browser freeze
       const { data: displayData } = truncateForDisplay(result);
       const resultStr =
-        typeof displayData === "string" ? displayData : JSON.stringify(displayData, null, 2);
+        typeof displayData === "string"
+          ? displayData
+          : JSON.stringify(displayData, null, 2);
 
       codeToHtml(resultStr, {
         lang: "json",
@@ -208,7 +232,7 @@ export function ScriptDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] sm:max-w-7xl max-h-[90dvh] flex flex-col p-4 sm:p-6">
+      <DialogContent className="max-w-[95vw] sm:max-w-7xl  h-[90dvh] flex flex-col p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg pr-8">
             <span className="truncate">{purpose}</span>
@@ -241,7 +265,7 @@ export function ScriptDetailsDialog({
                     className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400"
                   >
                     {idx === progressMessages.length - 1 &&
-                      state === "progress" ? (
+                    state === "progress" ? (
                       <Loader2 className="h-4 w-4 animate-spin mt-0.5 shrink-0" />
                     ) : (
                       <span className="text-amber-500">•</span>
@@ -289,23 +313,28 @@ export function ScriptDetailsDialog({
               <div className="w-1/2 min-w-0 flex flex-col">
                 <Tabs defaultValue="result" className="h-full flex flex-col">
                   {/* Tabs for right panel */}
-                  <TabsList className="grid w-full auto-cols-fr">
-                    {(result && state === "result") && (
-                      <TabsTrigger value="result">Result</TabsTrigger>
-                    )}
-                    {inspectionData && Object.keys(inspectionData).length > 0 && Object.keys(inspectionData).map((extensionId) => {
-                      console.log('[ScriptDetailsDialog] Creating tab for extension:', extensionId);
-                      return (
-                        <TabsTrigger key={extensionId} value={`inspection-${extensionId}`}>
-                          {extensionId.charAt(0).toUpperCase() + extensionId.slice(1)}
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
+                  {inspectionData && Object.keys(inspectionData).length > 0 && (
+                    <TabsList className="grid w-full auto-cols-fr mb-2">
+                      {result && state === "result" && (
+                        <TabsTrigger value="result">Result</TabsTrigger>
+                      )}
+                      {Object.keys(inspectionData).map((extensionId) => {
+                        return (
+                          <TabsTrigger
+                            key={extensionId}
+                            value={`inspection-${extensionId}`}
+                          >
+                            {extensionId.charAt(0).toUpperCase() +
+                              extensionId.slice(1)}
+                          </TabsTrigger>
+                        );
+                      })}
+                    </TabsList>
+                  )}
 
                   {/* Result Tab Content */}
-                  {(result && state === "result") && (
-                    <TabsContent value="result" className="flex-1 min-h-0 mt-2">
+                  {result && state === "result" && (
+                    <TabsContent value="result" className="flex-1 min-h-0">
                       {result && (
                         <div className="flex flex-col h-full gap-2">
                           <div className="flex items-center justify-between">
@@ -319,7 +348,7 @@ export function ScriptDetailsDialog({
                                   typeof result === "string"
                                     ? result
                                     : JSON.stringify(result, null, 2),
-                                  "result"
+                                  "result",
                                 )
                               }
                             >
@@ -333,7 +362,8 @@ export function ScriptDetailsDialog({
 
                           {resultTruncated && (
                             <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-700 dark:text-amber-400">
-                              ⚠️ Result truncated for display (too large). Use Copy button for full data.
+                              ⚠️ Result truncated for display (too large). Use
+                              Copy button for full data.
                             </div>
                           )}
 
@@ -391,13 +421,25 @@ export function ScriptDetailsDialog({
                   )}
 
                   {/* Extension-Specific Inspection Tabs */}
-                  {inspectionData && Object.keys(inspectionData).length > 0 && Object.entries(inspectionData).map(([extensionId, data]) => (
-                    <TabsContent key={`inspection-${extensionId}`} value={`inspection-${extensionId}`} className="flex-1 min-h-0 mt-2">
-                      <div className="h-full overflow-auto">
-                        <ExtensionInspector extensionId={extensionId} data={data} error={error} />
-                      </div>
-                    </TabsContent>
-                  ))}
+                  {inspectionData &&
+                    Object.keys(inspectionData).length > 0 &&
+                    Object.entries(inspectionData).map(
+                      ([extensionId, data]) => (
+                        <TabsContent
+                          key={`inspection-${extensionId}`}
+                          value={`inspection-${extensionId}`}
+                          className="flex-1 min-h-0 mt-2"
+                        >
+                          <div className="h-full overflow-auto">
+                            <ExtensionInspector
+                              extensionId={extensionId}
+                              data={data}
+                              error={error}
+                            />
+                          </div>
+                        </TabsContent>
+                      ),
+                    )}
 
                   {/* No result placeholder */}
                   {!result && !error && state !== "executing" && (
