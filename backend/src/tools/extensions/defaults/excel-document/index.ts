@@ -90,7 +90,7 @@ function escapeSqlString(str: string): string {
 /**
  * Execute DuckDB query and parse CSV result
  */
-async function executeDuckDB(query: string): Promise<DuckDBQueryResult | null> {
+async function executeDuckDB(query: string): Promise<DuckDBQueryResult> {
   const { $ } = await import('bun');
 
   try {
@@ -114,8 +114,7 @@ async function executeDuckDB(query: string): Promise<DuckDBQueryResult | null> {
     return { columns, rows };
   } catch (error) {
     console.error('[ExcelDocument] DuckDB query failed:', error);
-    // Return null to indicate DuckDB is not available
-    return null;
+    return { columns: [], rows: [] };
   }
 }
 
