@@ -29,7 +29,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import React from "react";
 
-import { FilePreviewDialog } from "@/components/ui/file-preview-dialog";
 import {
   deleteFile,
   fetchProjectFiles,
@@ -125,8 +124,6 @@ export function FilesManagerPage() {
     "all" | "image" | "video" | "audio" | "document" | "code"
   >("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState(0);
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -266,13 +263,7 @@ export function FilesManagerPage() {
   };
 
   const handleFileClick = (file: FileInfo) => {
-    const index = filteredFiles.findIndex(
-      (f) => f.name === file.name && f.name === file.name,
-    );
-    if (index !== -1) {
-      setPreviewIndex(index);
-      setPreviewOpen(true);
-    }
+    navigate(`/projects/${projectId}/files/${encodeURIComponent(file.name)}`);
   };
 
   const handleGoToConversation = () => {
@@ -988,14 +979,6 @@ export function FilesManagerPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* File Preview Dialog */}
-        <FilePreviewDialog
-          files={filteredFiles}
-          initialIndex={previewIndex}
-          open={previewOpen}
-          onOpenChange={setPreviewOpen}
-        />
 
         {/* Drag and Drop Overlay */}
         <AnimatePresence>

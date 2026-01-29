@@ -1241,13 +1241,16 @@ export function useWebSocketHandlers({
         duration = timestamp ? Math.round((Date.now() - timestamp) / 1000) : undefined;
       }
 
+      // Extract error from data.error or from data.result.error (for script tool errors)
+      const extractedError = data.error || (data.result?.__error && data.result.error);
+
       const toolInvocation = {
         state,
         toolCallId: data.toolCallId,
         toolName: data.toolName,
         args: { ...existingInvocation?.args, ...data.args }, // Preserve existing args
-        result: data.result,
-        error: data.error,
+        result: data.result?.__error ? undefined : data.result, // Don't include error wrapper in result
+        error: extractedError,
         timestamp,
         duration,
         inspectionData: existingInvocation?.inspectionData,

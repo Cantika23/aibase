@@ -21,6 +21,7 @@ const MemoryEditor = lazy(() => import("./pages/memory-editor").then(module => (
 const ContextEditor = lazy(() => import("./pages/context-editor").then(module => ({ default: module.ContextEditor })));
 const ConversationHistoryPage = lazy(() => import("./pages/conversation-history").then(module => ({ default: module.ConversationHistoryPage })));
 const FilesManagerPage = lazy(() => import("./pages/files-manager").then(module => ({ default: module.FilesManagerPage })));
+const FileDetailPage = lazy(() => import("./pages/file-detail").then(module => ({ default: module.FileDetailPage })));
 const ProjectSelectorPage = lazy(() => import("./pages/project-selector").then(module => ({ default: module.ProjectSelectorPage })));
 const UserManagementPage = lazy(() => import("./pages/user-management").then(module => ({ default: module.UserManagementPage })));
 const LoginPage = lazy(() => import("./pages/login").then(module => ({ default: module.LoginPage })));
@@ -205,6 +206,16 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
                     <ProtectedRoute>
                       <ProjectRouteHandler>
                         <FilesManagerPage />
+                      </ProjectRouteHandler>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/projects/:projectId/files/:fileName"
+                  element={
+                    <ProtectedRoute>
+                      <ProjectRouteHandler>
+                        <FileDetailPage />
                       </ProjectRouteHandler>
                     </ProtectedRoute>
                   }

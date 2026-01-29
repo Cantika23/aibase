@@ -3,9 +3,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Sonner Toast styling */
 [data-sonner-toast] {
-  background: white;
-  border-radius: 5px;
+  --unparseable: 1;
+}
+
+.sonner {
+  --font-normal: 16px;
 }
 
 @theme {
