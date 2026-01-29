@@ -1,7 +1,7 @@
 /**
- * DuckDB Extension
- * Query CSV, Excel, Parquet, and JSON files using SQL
- * Auto-extracts structure for Excel files on upload
+ * Excel Document Extension
+ * Extract and explore Excel spreadsheets using DuckDB
+ * Also supports SQL queries on CSV, Parquet, and JSON files
  */
 
 import * as fs from 'fs/promises';
@@ -691,23 +691,23 @@ const xlsxReader = async (options: ExtractExcelOptions): Promise<ExtractExcelRes
 if (hookRegistry) {
   hookRegistry.registerHook(
     'afterFileUpload',
-    'duckdb',
+    'excel-document',
     async (_context: any) => {
-      console.log('[DuckDB] Hook called for file:', _context.fileName, 'type:', _context.fileType);
+      console.log('[ExcelDocument] Hook called for file:', _context.fileName, 'type:', _context.fileType);
 
       // Only process Excel files
       if (!_context.fileType.match(/(^application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))|\.xls|\.xlsx$/)) {
-        console.log('[DuckDB] Skipping non-Excel file');
+        console.log('[ExcelDocument] Skipping non-Excel file');
         return;
       }
 
-      console.log('[DuckDB] Processing Excel file:', _context.fileName);
+      console.log('[ExcelDocument] Processing Excel file:', _context.fileName);
 
       try {
         // Get comprehensive structure (sheets, columns, row counts)
-        console.log('[DuckDB] Getting structure for:', _context.filePath);
+        console.log('[ExcelDocument] Getting structure for:', _context.filePath);
         const structure = await getExcelStructure(_context.filePath);
-        console.log('[DuckDB] Found sheets:', structure.sheets.map(s => `${s.name} (${s.rowCount} rows)`).join(', '));
+        console.log('[ExcelDocument] Found sheets:', structure.sheets.map(s => `${s.name} (${s.rowCount} rows)`).join(', '));
 
         // Get preview of first sheet
         let previewText = '';
@@ -721,28 +721,26 @@ if (hookRegistry) {
 
         // Generate structured description for AI
         const description = generateDescription(structure, previewText);
-        console.log('[DuckDB] Generated structured description for:', _context.fileName, 'length:', description.length);
+        console.log('[ExcelDocument] Generated structured description for:', _context.fileName, 'length:', description.length);
 
         return { description };
       } catch (error) {
-        console.error('[DuckDB] Hook failed:', error);
-        console.error('[DuckDB] Error stack:', error instanceof Error ? error.stack : String(error));
+        console.error('[ExcelDocument] Hook failed:', error);
+        console.error('[ExcelDocument] Error stack:', error instanceof Error ? error.stack : String(error));
         return {};
       }
     }
   );
-  console.log('[DuckDB] Registered afterFileUpload hook');
+  console.log('[ExcelDocument] Registered afterFileUpload hook');
 } else {
-  console.log('[DuckDB] extensionHookRegistry not available, hook not registered');
+  console.log('[ExcelDocument] extensionHookRegistry not available, hook not registered');
 }
 
 // @ts-expect-error - Extension loader wraps this code in an async function
 return {
-  // Excel document functions
-  extract,
   read,
+  extract,
   extractXLSX,
   xlsxReader,
-  // SQL query function
   duckdb,
 };
