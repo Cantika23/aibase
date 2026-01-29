@@ -40,11 +40,11 @@ declare global {
 }
 
 /**
- * Context documentation for the PDF Document extension
+ * Context documentation for the PDF extension
  */
 const context = () =>
   '' +
-  '### PDF Document Extension' +
+  '### PDF Extension' +
   '' +
   'Extract text content from PDF files.' +
   '' +
@@ -53,7 +53,7 @@ const context = () =>
   '#### extract(options)' +
   'Extract text from PDF file.' +
   '`' + '`' + '`' + 'typescript' +
-  'await pdfDocument.extract({' +
+  'await pdf.extract({' +
   '  filePath: "/path/to/document.pdf",  // Full path to file' +
   '  fileId: "document.pdf"              // Or file ID in conversation' +
   '});' +
@@ -77,7 +77,7 @@ const context = () =>
   '' +
   '1. **Extract text from PDF by file ID:**' +
   '`' + '`' + '`' + 'typescript' +
-  'const pdf = await pdfDocument.extract({' +
+  'const pdf = await pdf.extract({' +
   '  fileId: "report.pdf"' +
   '});' +
   'return { text: pdf.text, pages: pdf.pageCount };' +
@@ -85,7 +85,7 @@ const context = () =>
   '' +
   '2. **Extract text from PDF by file path:**' +
   '`' + '`' + '`' + 'typescript' +
-  'const pdf = await pdfDocument.extract({' +
+  'const pdf = await pdf.extract({' +
   '  filePath: "/data/documents/contract.pdf"' +
   '});' +
   'return pdf.text;' +
@@ -236,6 +236,68 @@ const extractPDF = async (options: ExtractPDFOptions): Promise<ExtractPDFResult>
  * Convenience method - alias for read()
  */
 const pdfReader = async (options: ReadPDFOptions): Promise<ReadPDFResult> => read(options);
+
+// Hook registry is passed as global during evaluation (like image-document extension)
+interface ExtensionHookRegistry {
+  registerHook(hookType: string, name: string, handler: (context: any) => Promise<any>): void;
+}
+
+declare const extensionHookRegistry: ExtensionHookRegistry | undefined;
+const hookRegistry = typeof extensionHookRegistry !== 'undefined' ? extensionHookRegistry : null;
+
+// Register hook for automatic PDF analysis on upload
+if (hookRegistry) {
+  hookRegistry.registerHook(
+    'afterFileUpload',
+    'pdf',
+    async (_context: any) => {
+      console.log('[PdfDocument] Hook called for file:', _context.fileName, 'type:', _context.fileType);
+
+      // Only process PDF files
+      if (!_context.fileType.match(/(^application\/pdf)|\.pdf$/i)) {
+        console.log('[PdfDocument] Skipping non-PDF file');
+        return;
+      }
+
+      console.log('[PdfDocument] Processing PDF file:', _context.fileName);
+
+      try {
+        // Extract text content from PDF
+        console.log('[PdfDocument] Extracting text from:', _context.filePath);
+        const text = await extractTextFromPdf(_context.filePath);
+
+        // Calculate page count
+        let pageCount = 0;
+        const pdfjsLib = await import('pdfjs-dist');
+        const pdfjs = await pdfjsLib.getDocument(_context.filePath);
+        pageCount = pdfjs.numPages;
+        await pdfjs.destroy();
+
+        // Generate structured description for AI
+        const preview = text.substring(0, 500);
+        const description = `PDF Document: ${_context.fileName}
+
+Page Count: ${pageCount}
+
+Text Preview (first 500 chars):
+${preview}
+
+Full Text Length: ${text.length} characters`;
+
+        console.log('[PdfDocument] Generated description for:', _context.fileName, 'text length:', text.length);
+
+        return { description };
+      } catch (error) {
+        console.error('[PdfDocument] Hook failed:', error);
+        console.error('[PdfDocument] Error stack:', error instanceof Error ? error.stack : String(error));
+        return {};
+      }
+    }
+  );
+  console.log('[PdfDocument] Registered afterFileUpload hook');
+} else {
+  console.log('[PdfDocument] extensionHookRegistry not available, hook not registered');
+}
 
 // @ts-expect-error - Extension loader wraps this code in an async function
 return {

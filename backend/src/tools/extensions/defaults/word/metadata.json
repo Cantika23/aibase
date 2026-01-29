@@ -1,6 +1,6 @@
 {
-  "id": "word-document",
-  "name": "Word Document",
+  "id": "word",
+  "name": "Word",
   "description": "Extract text content from Word documents (.docx)",
   "author": "AIBase",
   "version": "1.0.0",

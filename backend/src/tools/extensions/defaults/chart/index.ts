@@ -70,20 +70,20 @@ function convertChartJsFormat(options: any): ShowChartOptions {
 }
 
 /**
- * Context documentation for the show-chart extension
+ * Context documentation for the chart extension
  */
 const context = () =>
   '' +
-  '### Show Chart Extension' +
+  '### Chart Extension' +
   '' +
   'Display interactive charts in the chat interface.' +
   '' +
   '**Available Functions:**' +
   '' +
-  '#### showChart(options)' +
+  '#### show(options)' +
   'Display an interactive chart.' +
   '`' + '`' + '`' + 'typescript' +
-  'await showChart({' +
+  'await chart.show({' +
   '  title: "Monthly Sales",' +
   '  chartType: "bar",              // "bar", "line", "pie", "scatter"' +
   '  xAxis: ["Jan", "Feb", "Mar"],    // X-axis labels (optional for pie)' +
@@ -123,7 +123,7 @@ const context = () =>
   '' +
   '1. **Bar chart:**' +
   '`' + '`' + '`' + 'typescript' +
-  'await showChart({' +
+  'await chart.show({' +
   '  title: "Quarterly Revenue",' +
   '  chartType: "bar",' +
   '  xAxis: ["Q1", "Q2", "Q3", "Q4"],' +
@@ -137,7 +137,7 @@ const context = () =>
   '' +
   '2. **Line chart with multiple series:**' +
   '`' + '`' + '`' + 'typescript' +
-  'await showChart({' +
+  'await chart.show({' +
   '  title: "Sales vs Profit",' +
   '  chartType: "line",' +
   '  xAxis: ["Jan", "Feb", "Mar", "Apr"],' +
@@ -154,7 +154,7 @@ const context = () =>
   '' +
   '3. **Pie chart:**' +
   '`' + '`' + '`' + 'typescript' +
-  'await showChart({' +
+  'await chart.show({' +
   '  title: "Market Share",' +
   '  chartType: "pie",' +
   '  series: [{' +
@@ -177,21 +177,21 @@ const context = () =>
   '- Each series item MUST include both `name` AND `data` fields';
 
 /**
- * Show chart extension
+ * Chart extension
  */
-const showChartExtension = {
+const chartExtension = {
   /**
    * Display interactive chart
    *
    * Usage:
-   * await showChart({
+   * await chart.show({
    *   title: 'Monthly Sales',
    *   chartType: 'bar',
    *   xAxis: ['Jan', 'Feb', 'Mar'],
    *   series: [{ name: 'Sales', data: [150, 230, 224] }]
    * });
    */
-  showChart: async (args: ShowChartOptions | ChartJsOptions): Promise<ChartVisualizationResult> => {
+  show: async (args: ShowChartOptions | ChartJsOptions): Promise<ChartVisualizationResult> => {
     // Convert Chart.js format to internal format if needed
     const normalizedArgs = convertChartJsFormat(args);
 
@@ -209,4 +209,4 @@ const showChartExtension = {
 };
 
 // @ts-expect-error - Extension loader wraps this code in an async function
-return showChartExtension;
+return chartExtension.show;

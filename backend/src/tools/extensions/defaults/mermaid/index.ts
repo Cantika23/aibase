@@ -18,20 +18,20 @@ interface ShowMermaidResult {
 }
 
 /**
- * Context documentation for the show-mermaid extension
+ * Context documentation for the mermaid extension
  */
 const context = () =>
   '' +
-  '### Show Mermaid Extension' +
+  '### Mermaid Extension' +
   '' +
   'Display Mermaid diagrams in the chat interface.' +
   '' +
   '**Available Functions:**' +
   '' +
-  '#### showMermaid(options)' +
+  '#### show(options)' +
   'Display a Mermaid diagram.' +
   '`' + '`' + '`' + 'typescript' +
-  'await showMermaid({' +
+  'await mermaid.show({' +
   '  title: "Decision Flow",' +
   '  code: \\`graph TD' +
   '    A[Start] --> B{Decision}' +
@@ -60,7 +60,7 @@ const context = () =>
   '' +
   '1. **Flowchart:**' +
   '`' + '`' + '`' + 'typescript' +
-  'await showMermaid({' +
+  'await mermaid.show({' +
   '  title: "User Registration Flow",' +
   '  code: \\`graph TD' +
   '    A[User] --> B{Registered?}' +
@@ -73,7 +73,7 @@ const context = () =>
   '' +
   '2. **Sequence Diagram:**' +
   '`' + '`' + '`' + 'typescript' +
-  'await showMermaid({' +
+  'await mermaid.show({' +
   '  title: "API Request Flow",' +
   '  code: \\`sequenceDiagram' +
   '    User->>API: Request' +
@@ -85,7 +85,7 @@ const context = () =>
   '' +
   '3. **ER Diagram:**' +
   '`' + '`' + '`' + 'typescript' +
-  'await showMermaid({' +
+  'await mermaid.show({' +
   '  title: "Database Schema",' +
   '  code: \\`erDiagram' +
   '    CUSTOMER ||--o{ ORDER : places' +
@@ -101,19 +101,19 @@ const context = () =>
   '- Reference: https://mermaid.js.org/intro/';
 
 /**
- * Show mermaid extension
+ * Mermaid extension
  */
-const showMermaidExtension = {
+const mermaidExtension = {
   /**
    * Display Mermaid diagram
    *
    * Usage:
-   * await showMermaid({
+   * await mermaid.show({
    *   title: 'Decision Flow',
    *   code: 'graph TD\n    A[Start] --> B[End]'
    * });
    */
-  showMermaid: async (args: ShowMermaidOptions): Promise<ShowMermaidResult> => {
+  show: async (args: ShowMermaidOptions): Promise<ShowMermaidResult> => {
     // Return visualization metadata directly
     // ScriptRuntime will collect this into __visualizations array
     const toolCallId = `viz_mermaid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -128,4 +128,4 @@ const showMermaidExtension = {
 };
 
 // @ts-expect-error - Extension loader wraps this code in an async function
-return showMermaidExtension;
+return mermaidExtension.show;

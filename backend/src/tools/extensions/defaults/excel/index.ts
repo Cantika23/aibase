@@ -290,7 +290,7 @@ async function extractFromExcel(
  * Generate description from Excel structure
  * Includes all sheet names, columns, and row counts for AI to query efficiently
  */
-function generateDescription(structure: ExcelStructure, previewText: string): string {
+function generateDescription(structure: ExcelStructure, previewText: string, fileName: string): string {
   const lines: string[] = [];
 
   lines.push(`## Excel File Structure`);
@@ -302,8 +302,8 @@ function generateDescription(structure: ExcelStructure, previewText: string): st
   lines.push(`## Quick Start - Get Row Count`);
   lines.push(`To get the total row count:`);
   lines.push('```typescript');
-  lines.push(`const result = await excelDocument.read({`);
-  lines.push(`  fileId: "YOUR_FILENAME.xlsx",`);
+  lines.push(`const result = await excel.read({`);
+  lines.push(`  fileId: "${fileName}",`);
   lines.push(`  includeStructure: true`);
   lines.push(`});`);
   lines.push(`return { totalRows: result.structure.totalRows };`);
@@ -331,8 +331,8 @@ function generateDescription(structure: ExcelStructure, previewText: string): st
     lines.push(`## Usage Examples`);
     lines.push(`Get row count and column names:`);
     lines.push('```typescript');
-    lines.push(`const result = await excelDocument.read({`);
-    lines.push(`  fileId: "YOUR_FILE.xlsx",`);
+    lines.push(`const result = await excel.read({`);
+    lines.push(`  fileId: "${fileName}",`);
     lines.push(`  includeStructure: true`);
     lines.push(`});`);
     lines.push(`return {`);
@@ -364,16 +364,9 @@ function generateDescription(structure: ExcelStructure, previewText: string): st
  */
 const context = () => {
   return `
-### Excel Document Extension
+### Excel Extension
 
 Extract and query Excel spreadsheets using DuckDB. Auto-extracts structure for Excel files on upload.
-
-**⚠️ IMPORTANT API CHANGE:**
-All functions are now accessed via the \`excelDocument\` namespace:
-- ✅ CORRECT: \`await excelDocument.query({ query: '...' })\`
-- ✅ CORRECT: \`await excelDocument.summarize({ fileId: '...' })\`
-- ❌ WRONG: \`await duckdb({ ... })\` (no longer available)
-- ❌ WRONG: \`await read({ ... })\` (no longer available)
 
 **Available Functions:**
 
@@ -381,7 +374,7 @@ All functions are now accessed via the \`excelDocument\` namespace:
 Execute SQL queries on CSV, Excel, Parquet, or JSON files.
 
 \`\`\`typescript
-await excelDocument.query({
+await excel.query({
   query: 'SELECT * FROM read_xlsx(\\'data.xlsx\\') LIMIT 10',
   format: 'json'        // Optional: 'json' (default), 'csv', 'markdown', 'table'
 });
@@ -404,7 +397,7 @@ await excelDocument.query({
 Get Excel file structure, sheet names, column names, and row counts.
 
 \`\`\`typescript
-await excelDocument.summarize({
+await excel.summarize({
   fileId: 'data.xlsx',    // File ID in conversation storage
   includeStructure: true  // Include file structure metadata
 });
@@ -437,7 +430,7 @@ await excelDocument.summarize({
 List all available data files (Excel, CSV, TSV) in the project.
 
 \`\`\`typescript
-await excelDocument.listFiles();
+await excel.listFiles();
 \`\`\`
 
 **Returns:**
@@ -457,7 +450,7 @@ await excelDocument.listFiles();
 
 1. **Get Excel file structure:**
 \`\`\`typescript
-const result = await excelDocument.summarize({
+const result = await excel.summarize({
   fileId: 'Product.xlsx',
   includeStructure: true
 });
@@ -469,7 +462,7 @@ return {
 
 2. **Query Excel file with SQL:**
 \`\`\`typescript
-const data = await excelDocument.query({
+const data = await excel.query({
   query: \`SELECT * FROM read_xlsx('Product.xlsx',
     header=true,
     all_varchar=true)
@@ -481,7 +474,7 @@ return { rows: data.rowCount, results: data.data };
 
 3. **List all available files:**
 \`\`\`typescript
-const files = await excelDocument.listFiles();
+const files = await excel.listFiles();
 return {
   excelFiles: files.files.filter(f => f.type === 'XLSX' || f.type === 'XLS'),
   csvFiles: files.files.filter(f => f.type === 'CSV' || f.type === 'TSV'),
@@ -491,7 +484,7 @@ return {
 
 4. **Aggregate data with SQL:**
 \`\`\`typescript
-const summary = await excelDocument.query({
+const summary = await excel.query({
   query: \`SELECT
     Category,
     COUNT(*) as count,
@@ -603,11 +596,11 @@ async function query(options: {
   database?: string;
 }): Promise<{ data: Record<string, unknown>[]; rowCount: number; executionTime: number } | { output: string; executionTime: number }> {
   if (!options || typeof options !== "object") {
-    throw new Error("query requires an options object. Usage: await excelDocument.query({ query: 'SELECT * FROM data.csv' })");
+    throw new Error("query requires an options object. Usage: await excel.query({ query: 'SELECT * FROM data.csv' })");
   }
 
   if (!options.query) {
-    throw new Error("query requires 'query' parameter. Usage: await excelDocument.query({ query: 'SELECT * FROM data.csv' })");
+    throw new Error("query requires 'query' parameter. Usage: await excel.query({ query: 'SELECT * FROM data.csv' })");
   }
 
   const format = options.format || "json";
@@ -781,7 +774,7 @@ if (hookRegistry) {
         }
 
         // Generate structured description for AI
-        const description = generateDescription(structure, previewText);
+        const description = generateDescription(structure, previewText, _context.fileName);
         console.log('[ExcelDocument] Generated structured description for:', _context.fileName, 'length:', description.length);
 
         return { description };

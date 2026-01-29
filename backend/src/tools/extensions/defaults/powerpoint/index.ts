@@ -27,11 +27,11 @@ declare global {
 }
 
 /**
- * Context documentation for the PowerPoint Document extension
+ * Context documentation for the PowerPoint extension
  */
 const context = () =>
   '' +
-  '### PowerPoint Document Extension' +
+  '### PowerPoint Extension' +
   '' +
   'Extract text content from PowerPoint presentations (.pptx, .ppt).' +
   '' +
@@ -40,7 +40,7 @@ const context = () =>
   '#### extract(options)' +
   'Extract text from PowerPoint presentation.' +
   '`' + '`' + '`' + 'typescript' +
-  'await powerpointDocument.extract({' +
+  'await powerpoint.extract({' +
   '  filePath: "/path/to/presentation.pptx",  // Full path to file' +
   '  fileId: "slides.pptx"                   // Or file ID in conversation' +
   '});' +
@@ -64,7 +64,7 @@ const context = () =>
   '' +
   '1. **Extract text from PowerPoint by file ID:**' +
   '`' + '`' + '`' + 'typescript' +
-  'const ppt = await powerpointDocument.extract({' +
+  'const ppt = await powerpoint.extract({' +
   '  fileId: "presentation.pptx"' +
   '});' +
   'return { text: ppt.text, slides: ppt.slideCount };' +
@@ -72,7 +72,7 @@ const context = () =>
   '' +
   '2. **Extract text from PowerPoint by file path:**' +
   '`' + '`' + '`' + 'typescript' +
-  'const ppt = await powerpointDocument.extract({' +
+  'const ppt = await powerpoint.extract({' +
   '  filePath: "/data/presentations/q1_review.pptx"' +
   '});' +
   'return ppt.text;' +
@@ -145,6 +145,64 @@ const extractPPTX = async (options: ExtractOptions): Promise<ExtractResult> => e
  * Convenience method - alias for read()
  */
 const pptxReader = async (options: ExtractOptions): Promise<ExtractResult> => extract(options);
+
+// Hook registry is passed as global during evaluation
+interface ExtensionHookRegistry {
+  registerHook(hookType: string, name: string, handler: (context: any) => Promise<any>): void;
+}
+
+declare const extensionHookRegistry: ExtensionHookRegistry | undefined;
+const hookRegistry = typeof extensionHookRegistry !== 'undefined' ? extensionHookRegistry : null;
+
+// Register hook for automatic PowerPoint analysis on upload
+if (hookRegistry) {
+  hookRegistry.registerHook(
+    'afterFileUpload',
+    'powerpoint',
+    async (_context: any) => {
+      console.log('[PowerPointDocument] Hook called for file:', _context.fileName, 'type:', _context.fileType);
+
+      // Only process PowerPoint files
+      if (!_context.fileType.match(/(^application\/(vnd\.openxmlformats-officedocument\.presentationml\.presentation|vnd\.ms-powerpoint))|\.ppt|\.pptx)/i)) {
+        console.log('[PowerPointDocument] Skipping non-PowerPoint file');
+        return;
+      }
+
+      console.log('[PowerPointDocument] Processing PowerPoint file:', _context.fileName);
+
+      try {
+        // Extract text content from PowerPoint
+        console.log('[PowerPointDocument] Extracting text from:', _context.filePath);
+        const text = await extractTextFromPowerPoint(_context.filePath);
+
+        // Generate structured description for AI
+        const preview = text.substring(0, 500);
+        const lineCount = text.split('\n').length;
+
+        const description = `PowerPoint Presentation: ${_context.fileName}
+
+Content Preview (first 500 chars):
+${preview}
+
+Full Text Length: ${text.length} characters
+Total Lines: ${lineCount}
+
+Slide count can be determined by structure analysis if needed.`;
+
+        console.log('[PowerPointDocument] Generated description for:', _context.fileName, 'text length:', text.length);
+
+        return { description };
+      } catch (error) {
+        console.error('[PowerPointDocument] Hook failed:', error);
+        console.error('[PowerPointDocument] Error stack:', error instanceof Error ? error.stack : String(error));
+        return {};
+      }
+    }
+  );
+  console.log('[PowerPointDocument] Registered afterFileUpload hook');
+} else {
+  console.log('[PowerPointDocument] extensionHookRegistry not available, hook not registered');
+}
 
 // @ts-expect-error - Extension loader wraps this code in an async function
 return {

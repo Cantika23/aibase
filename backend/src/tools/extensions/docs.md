@@ -1203,17 +1203,17 @@ All include inspection UI showing query results, execution time, and database-sp
 
 ### Document Processing
 
-- **pdf-document**: PDF text extraction
-- **excel-document**: Excel file processing
-- **word-document**: Word document text extraction
-- **powerpoint-document**: PowerPoint presentation extraction
-- **image-document**: Image analysis with vision models (needs UI)
+- **pdf**: PDF text extraction
+- **excel**: Excel file processing
+- **word**: Word document text extraction
+- **powerpoint**: PowerPoint presentation extraction
+- **image**: Image analysis with vision models (needs UI)
 
 ### Visualization
 
-- **show-chart**: Interactive charts (bar, line, pie, scatter) using ECharts
-- **show-table**: Data table display
-- **show-mermaid**: Mermaid diagram rendering
+- **chart**: Interactive charts (bar, line, pie, scatter) using ECharts
+- **table**: Data table display
+- **mermaid**: Mermaid diagram rendering
 - **peek**: Quick data inspection with pagination
 
 ### Web Tools

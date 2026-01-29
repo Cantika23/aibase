@@ -174,19 +174,44 @@ export class ExtensionLoader {
         await this.extensionStorage.clearError(projectId, extension.metadata.id, tenantId);
 
         // Create a namespace for the extension using its metadata.id
-        // Convert kebab-case ID to camelCase for valid JavaScript identifier
-        const namespace = extension.metadata.id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+        // Strategy: Use one-word namespace when possible, but use full camelCase for:
+        // 1. Multi-word extensions where first word is a common prefix (show-chart → showChart)
+        // 2. Single-key exports (postgresql → postgresql)
+        // Always use camelCase (first letter lowercase) for valid JavaScript identifiers
+        const fullNamespace = extension.metadata.id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
         const functionNames = Object.keys(exports);
 
-        // Flatten single-function extensions to top level for easier calling
-        // e.g., postgresql = { postgresql: func } → scope.postgresql = func (not scope.postgresql.postgresql = func)
+        // Convert to camelCase (first letter lowercase)
+        const toCamelCase = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+        // Determine namespace based on extension structure
+        let namespace: string;
         if (functionNames.length === 1) {
-          // Single function - add directly to scope
-          Object.assign(scope, exports);
+          // Single-key export: use the key name as namespace (postgresql → postgresql)
+          // But if the key doesn't match the ID, use full camelCase
+          const exportKey = functionNames[0];
+          const expectedKey = toCamelCase(fullNamespace);
+          if (exportKey === expectedKey || exportKey.toLowerCase() === fullNamespace.toLowerCase()) {
+            namespace = exportKey;
+          } else {
+            namespace = toCamelCase(fullNamespace);
+          }
         } else {
-          // Multiple functions - use namespace to avoid conflicts
-          scope[namespace] = exports;
+          // Multi-key export: use one-word namespace for descriptive IDs (excel-document → excel)
+          // But use full camelCase for common prefixes (show-chart → showChart)
+          const firstWord = fullNamespace.split(/(?=[A-Z])/)[0].toLowerCase();
+          const commonPrefixes = ['show', 'web', 'image', 'pdf', 'word', 'powerpoint', 'extension'];
+
+          if (commonPrefixes.includes(firstWord) && fullNamespace !== firstWord) {
+            namespace = toCamelCase(fullNamespace); // Use full camelCase (showChart, webSearch, etc.)
+          } else {
+            namespace = firstWord; // Use one-word namespace (excel, postgresql, etc.)
+          }
         }
+
+        // Always use namespace to avoid conflicts - never flatten to top level
+        // This ensures consistent calling patterns: excel.summarize(), postgresql(), etc.
+        scope[namespace] = exports;
       } catch (error: any) {
         console.error(`[ExtensionLoader] Failed to load extension '${extension.metadata.name}':`, error);
 

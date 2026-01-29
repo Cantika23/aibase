@@ -377,4 +377,4 @@ const clickhouseExtension = {
 };
 
 // @ts-expect-error - Extension loader wraps this code in an async function
-return clickhouseExtension;
+return clickhouseExtension.clickhouse;

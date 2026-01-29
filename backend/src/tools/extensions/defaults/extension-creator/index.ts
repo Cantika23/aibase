@@ -65,6 +65,13 @@ const context = () =>
   "\n" +
   "**IMPORTANT:** Extension Creator always works with project extensions (data/{projectId}/extensions/). It never modifies default extensions.\n" +
   "\n" +
+  "**⚠️ EXTENSION NAMING CONVENTION:**\n" +
+  "- Extension IDs MUST be a SINGLE WORD (no hyphens/spaces)\n" +
+  "- Good: \`weather\`, \`webSearch\`, \`dataParser\`, \`apiClient\`\n" +
+  "- Bad: \`web-search\`, \`data-parser\`, \`my-extension\`\n" +
+  "- Namespace is auto-generated: \`weather\` → called as \`weather.function()\`\n" +
+  "- Multi-word descriptions become camelCase: \"web search\" → \`webSearch\`\n" +
+  "\n" +
   "**Debugging and Output:**\n" +
   "- Use `progress(message)` to send status updates that you WILL see in the response\n" +
   "- Use `console.log()` for developer-side debugging (goes to server logs only, NOT visible to you)\n" +
@@ -87,7 +94,7 @@ const context = () =>
   "`" +
   "\n" +
   "**Parameters:**\n" +
-  "- `description` (required): What the extension does\n" +
+  "- `description` (required): What the extension does (used to generate one-word ID)\n" +
   "- `functions` (optional): Array of functions to create\n" +
   "- `category` (optional): Category ID (inferred if not provided)\n" +
   '- `author` (optional): Author name (default: "AIBase")\n' +
@@ -138,7 +145,7 @@ const context = () =>
   "\n" +
   "**Examples:**\n" +
   "\n" +
-  "1. **Create a new extension:**" +
+  "1. **Create a weather extension:**" +
   "`" +
   "`" +
   "typescript" +
@@ -154,7 +161,21 @@ const context = () =>
   "`" +
   "`" +
   "\n" +
-  "2. **Modify existing extension:**" +
+  "2. **Create a web search extension (multi-word):**" +
+  "`" +
+  "`" +
+  "typescript" +
+  "await createOrUpdate({" +
+  '  description: "webSearch for finding current information",' +
+  "  functions: [" +
+  '    { description: "search the web", parameters: "query (required)" }' +
+  "  ]" +
+  "});" +
+  "// Creates 'webSearch' extension (camelCase from description)" +
+  "`" +
+  "`" +
+  "\n" +
+  "3. **Modify existing extension:**" +
   "`" +
   "`" +
   "typescript" +
@@ -163,7 +184,7 @@ const context = () =>
   "`" +
   "`" +
   "\n" +
-  "3. **Send progress updates (visible to AI):**" +
+  "4. **Send progress updates (visible to AI):**" +
   "`" +
   "`" +
   "typescript" +
@@ -175,6 +196,8 @@ const context = () =>
   "`" +
   "\n" +
   "**Important Notes:**\n" +
+  "- Extension IDs are auto-generated from description as ONE WORD\n" +
+  "- Multi-word descriptions become camelCase: \"data parser\" → \`dataParser\`\n" +
   "- Extensions are created in data/{projectId}/extensions/ (project folder)\n" +
   "- Modifying a default extension automatically copies it to project first\n" +
   "- Default extensions are never modified directly\n" +
@@ -519,15 +542,24 @@ function normalizeFunctionsArray(functions: FunctionDescription[] | Record<strin
 }
 
 /**
- * Generate kebab-case ID from description
+ * Generate one-word ID from description
+ * Extension IDs must be a single word (no hyphens) for namespace consistency
  */
 function generateIdFromDescription(description: string): string {
   const words = description
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .split(/\s+/)
-    .slice(0, 5); // First 5 words
-  return words.join("-");
+    .filter(w => w.length > 0)
+    .slice(0, 3); // First 3 words
+
+  // For multi-word descriptions, use camelCase: "web search" → "webSearch"
+  if (words.length > 1) {
+    return words[0] + words.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("");
+  }
+
+  // Single word
+  return words[0] || "extension";
 }
 
 /**

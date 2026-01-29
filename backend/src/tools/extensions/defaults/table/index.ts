@@ -24,20 +24,20 @@ interface ShowTableResult {
 }
 
 /**
- * Context documentation for the show-table extension
+ * Context documentation for the table extension
  */
 const context = () =>
   '' +
-  '### Show Table Extension' +
+  '### Table Extension' +
   '' +
   'Display tabular data in an interactive table format.' +
   '' +
   '**Available Functions:**' +
   '' +
-  '#### showTable(options)' +
+  '#### show(options)' +
   'Display an interactive table.' +
   '`' + '`' + '`' + 'typescript' +
-  'await showTable({' +
+  'await table.show({' +
   '  title: "Users",' +
   '  columns: [' +
   '    { key: "id", label: "ID" },' +
@@ -65,7 +65,7 @@ const context = () =>
   '  connectionUrl: memory.read(\'database\', \'postgresql_url\')' +
   '});' +
   '' +
-  'await showTable({' +
+  'await table.show({' +
   '  title: "User List",' +
   '  columns: [' +
   '    { key: "id", label: "ID" },' +
@@ -82,7 +82,7 @@ const context = () =>
   '  query: "SELECT * FROM \'sales.csv\' LIMIT 20"' +
   '});' +
   '' +
-  'await showTable({' +
+  'await table.show({' +
   '  title: "Sales Data",' +
   '  columns: Object.keys(sales.data[0]).map(key => ({ key, label: key.toUpperCase() })),' +
   '  data: sales.data' +
@@ -91,7 +91,7 @@ const context = () =>
   '' +
   '3. **Formatted table:**' +
   '`' + '`' + '`' + 'typescript' +
-  'await showTable({' +
+  'await table.show({' +
   '  title: "Financial Summary",' +
   '  columns: [' +
   '    { key: "category", label: "Category" },' +
@@ -113,20 +113,20 @@ const context = () =>
   '- Each row object must have keys matching the column keys';
 
 /**
- * Show table extension
+ * Table extension
  */
-const showTableExtension = {
+const tableExtension = {
   /**
    * Display tabular data
    *
    * Usage:
-   * await showTable({
+   * await table.show({
    *   title: 'Users',
    *   columns: [{ key: 'id', label: 'ID' }, { key: 'name', label: 'Name' }],
    *   data: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }]
    * });
    */
-  showTable: async (args: ShowTableOptions): Promise<ShowTableResult> => {
+  show: async (args: ShowTableOptions): Promise<ShowTableResult> => {
     // Return visualization metadata directly
     // ScriptRuntime will collect this into __visualizations array
     const toolCallId = `viz_table_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -141,4 +141,4 @@ const showTableExtension = {
 };
 
 // @ts-expect-error - Extension loader wraps this code in an async function
-return showTableExtension;
+return tableExtension.show;

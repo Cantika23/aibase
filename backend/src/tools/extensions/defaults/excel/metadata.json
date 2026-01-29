@@ -1,10 +1,10 @@
 {
-  "id": "excel-document",
-  "name": "Excel Document",
+  "id": "excel",
+  "name": "Excel",
   "description": "Extract and query Excel spreadsheets using DuckDB. Includes SQL query capability for CSV, Parquet, and JSON files.",
   "author": "AIBase",
   "version": "2.0.0",
-  "category": "document-tools",
+  "category": "data-tools",
   "enabled": true,
   "isDefault": true,
   "createdAt": 0,

@@ -1,10 +1,10 @@
 {
-  "id": "image-document",
-  "name": "Image Document",
+  "id": "image",
+  "name": "Image",
   "description": "Extract descriptions and analyze images using AI vision (requires OPENAI_API_KEY)",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "document-tools",
+  "category": "image-tools",
   "enabled": true,
   "isDefault": true,
   "createdAt": 0,

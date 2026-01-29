@@ -1,7 +1,7 @@
 {
-  "id": "show-mermaid",
-  "name": "Show Mermaid",
-  "description": "Display Mermaid diagrams (flowcharts, sequence diagrams, etc.)",
+  "id": "chart",
+  "name": "Chart",
+  "description": "Display interactive charts in the frontend (bar, line, pie, area, etc.)",
   "author": "AIBase",
   "version": "1.0.0",
   "category": "visualization-tools",
@@ -11,7 +11,8 @@
   "updatedAt": 0,
   "dependencies": {
     "frontend": {
-      "mermaid": "^11.0.0"
+      "echarts": "^5.5.0",
+      "echarts-for-react": "^6.0.0"
     }
   }
 }

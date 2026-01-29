@@ -27,11 +27,11 @@ declare global {
 }
 
 /**
- * Context documentation for the Word Document extension
+ * Context documentation for the Word extension
  */
 const context = () =>
   '' +
-  '### Word Document Extension' +
+  '### Word Extension' +
   '' +
   'Extract text content from Word documents (.docx).' +
   '' +
@@ -40,7 +40,7 @@ const context = () =>
   '#### extract(options)' +
   'Extract text from Word document.' +
   '`' + '`' + '`' + 'typescript' +
-  'await wordDocument.extract({' +
+  'await word.extract({' +
   '  filePath: "/path/to/document.docx",  // Full path to file' +
   '  fileId: "report.docx"                // Or file ID in conversation' +
   '});' +
@@ -64,7 +64,7 @@ const context = () =>
   '' +
   '1. **Extract text from Word document by file ID:**' +
   '`' + '`' + '`' + 'typescript' +
-  'const doc = await wordDocument.extract({' +
+  'const doc = await word.extract({' +
   '  fileId: "contract.docx"' +
   '});' +
   'return { text: doc.text, paragraphs: doc.paragraphCount };' +
@@ -72,7 +72,7 @@ const context = () =>
   '' +
   '2. **Extract text from Word document by file path:**' +
   '`' + '`' + '`' + 'typescript' +
-  'const doc = await wordDocument.extract({' +
+  'const doc = await word.extract({' +
   '  filePath: "/data/documents/proposal.docx"' +
   '});' +
   'return doc.text;' +
@@ -146,6 +146,64 @@ const extractDOCX = async (options: ExtractOptions): Promise<ExtractResult> => e
  * Convenience method - alias for read()
  */
 const docxReader = async (options: ExtractOptions): Promise<ExtractResult> => extract(options);
+
+// Hook registry is passed as global during evaluation
+interface ExtensionHookRegistry {
+  registerHook(hookType: string, name: string, handler: (context: any) => Promise<any>): void;
+}
+
+declare const extensionHookRegistry: ExtensionHookRegistry | undefined;
+const hookRegistry = typeof extensionHookRegistry !== 'undefined' ? extensionHookRegistry : null;
+
+// Register hook for automatic Word document analysis on upload
+if (hookRegistry) {
+  hookRegistry.registerHook(
+    'afterFileUpload',
+    'word',
+    async (_context: any) => {
+      console.log('[WordDocument] Hook called for file:', _context.fileName, 'type:', _context.fileType);
+
+      // Only process Word documents
+      if (!_context.fileType.match(/(^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)|\.doc|\.docx)/i)) {
+        console.log('[WordDocument] Skipping non-Word file');
+        return;
+      }
+
+      console.log('[WordDocument] Processing Word document:', _context.fileName);
+
+      try {
+        // Extract text content from Word
+        console.log('[WordDocument] Extracting text from:', _context.filePath);
+        const text = await extractTextFromDocx(_context.filePath);
+
+        // Generate structured description for AI
+        const preview = text.substring(0, 500);
+        const wordCount = text.split(/\s+/).length;
+        const paragraphCount = text.split(/\n\n+/).length;
+
+        const description = `Word Document: ${_context.fileName}
+
+Content Preview (first 500 chars):
+${preview}
+
+Full Text Length: ${text.length} characters
+Word Count: ${wordCount}
+Paragraph Count: ${paragraphCount}`;
+
+        console.log('[WordDocument] Generated description for:', _context.fileName, 'text length:', text.length);
+
+        return { description };
+      } catch (error) {
+        console.error('[WordDocument] Hook failed:', error);
+        console.error('[WordDocument] Error stack:', error instanceof Error ? error.stack : String(error));
+        return {};
+      }
+    }
+  );
+  console.log('[WordDocument] Registered afterFileUpload hook');
+} else {
+  console.log('[WordDocument] extensionHookRegistry not available, hook not registered');
+}
 
 // @ts-expect-error - Extension loader wraps this code in an async function
 return {

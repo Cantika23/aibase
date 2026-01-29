@@ -1,7 +1,7 @@
 {
-  "id": "pdf-document",
-  "name": "PDF Document",
-  "description": "Extract text content from PDF files using multiple extraction methods",
+  "id": "powerpoint",
+  "name": "PowerPoint",
+  "description": "Extract text content from PowerPoint presentations (.pptx, .ppt)",
   "author": "AIBase",
   "version": "1.0.0",
   "category": "document-tools",

@@ -1,6 +1,6 @@
 {
-  "id": "show-table",
-  "name": "Show Table",
+  "id": "table",
+  "name": "Table",
   "description": "Display tabular data in the frontend with sortable columns",
   "author": "AIBase",
   "version": "1.0.0",

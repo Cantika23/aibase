@@ -112,9 +112,31 @@ function extractExamplesFromJSDoc(code: string): ExampleEntry[] {
 export function generateExtensionContext(extension: Extension): string {
   const { metadata, code } = extension;
 
-  // Convert kebab-case ID to camelCase for valid JavaScript identifier
-  // This matches the namespace used in extension-loader.ts
-  const namespace = metadata.id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+  // Use same namespace logic as extension-loader
+  // Convert kebab-case to camelCase, always first letter lowercase
+  const fullNamespace = metadata.id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+  const toCamelCase = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+  // Determine namespace using same logic as extension-loader
+  // Parse exports from return statement to determine if single-key export
+  const returnMatch = code.match(/return\s+(\w+(?:\.\w+)*)/);
+  let namespace: string;
+
+  if (returnMatch && returnMatch[1].includes('.')) {
+    // Direct function export like "return postgresqlExtension.postgresql"
+    // Use the base extension name
+    namespace = toCamelCase(fullNamespace);
+  } else {
+    // Regular object export - use namespace logic
+    const firstWord = fullNamespace.split(/(?=[A-Z])/)[0].toLowerCase();
+    const commonPrefixes = ['show', 'web', 'image', 'pdf', 'word', 'powerpoint', 'extension'];
+
+    if (commonPrefixes.includes(firstWord) && fullNamespace !== firstWord) {
+      namespace = toCamelCase(fullNamespace); // Use full camelCase (showChart, webSearch, etc.)
+    } else {
+      namespace = firstWord; // Use one-word namespace (excel, postgresql, etc.)
+    }
+  }
 
   // Try to extract the context from the code
   // Pattern: const context = () => `...` or export const context = () => `...` (multi-line string concatenation)

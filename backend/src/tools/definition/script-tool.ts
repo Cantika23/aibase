@@ -20,28 +20,26 @@ export const context = async () => {
  * - Complex multi-step workflows
  * - Data transformation pipelines
  * - Programmatic tool composition
- * - SQL queries on CSV/Excel/Parquet files via DuckDB
+ * - SQL queries on CSV/Excel/Parquet files via Excel extension
  *
  * Available in execution scope:
  * - All registered tools as async functions
  * - progress(message, data?) for status updates
- *   Note: timelimit values: 'd', 'w', 'm', 'y' (auto-converts to MCP format)
- * - duckdb(options) for SQL queries on data files
- *   Options: { query, database?, format?, readonly? }
- * - postgresql(options) for PostgreSQL database queries
- *   Options: { query, connectionUrl?, format?, timeout? }
- *   Note: Credentials can be stored in memory for security
- * - clickhouse(options) for ClickHouse database queries
- *   Options: { query, serverUrl?, database?, username?, password?, format?, timeout?, params? }
- *   Note: Credentials can be stored in memory for security
- * - trino(options) for Trino distributed queries
- *   Options: { query, serverUrl?, catalog?, schema?, username?, password?, format?, timeout? }
- *   Note: Credentials can be stored in memory for security
- * - pdfReader(options) for extracting text from PDF files
- *   Options: { filePath?, buffer?, password?, maxPages?, debug? }
- *   Note: Passwords can be stored in memory for security
- * - Project extensions (loaded dynamically) - see extension context for available functions
- * - convId, projectId, and CURRENT_UID for context
+ * - memory.read(category, key) for reading stored credentials
+ * - memory({ action, category, key, value }) for setting credentials
+ * - todo({ action, texts, itemId, text }) for managing todo lists
+ * - peek(outputId, offset, limit) for reading large script results
+ * - peekInfo(outputId) for getting metadata about large outputs
+ * - Project extensions (loaded dynamically) with one-word namespaces:
+ *   - excel.query(), excel.summarize() for Excel/CSV files
+ *   - postgresql() for PostgreSQL queries
+ *   - clickhouse() for ClickHouse queries
+ *   - trino() for Trino queries
+ *   - search.web(), search.image() for web and image search
+ *   - image.extract() for image analysis
+ *   - chart.show(), table.show(), mermaid.show() for visualizations
+ *   - extensionCreator.create() for creating new extensions
+ * - convId, projectId, CURRENT_UID for context
  * - console for debugging
  * - fetch for HTTP requests
  */
