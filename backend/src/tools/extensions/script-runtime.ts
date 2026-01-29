@@ -39,67 +39,92 @@ Use for: API calls, batch operations, complex workflows, data transformations.
 }
 \`\`\`
 
-#### 3. BATCH PROCESS FILES (multi-line - use actual newlines!):
+#### 3. MEMORY STORAGE:
 \`\`\`typescript
-progress('Listing...');
-const filesResult = await file({ action: 'list' });
-const files = JSON.parse(filesResult).files;
-const tsFiles = files.filter(f => f.name.endsWith('.ts'));
-let count = 0;
-for (const f of tsFiles) {
-  progress(\`Reading \${f.name}\`);
-  const contentResult = await file({ action: 'read', path: f.name });
-  const content = JSON.parse(contentResult).content;
-  count += (content.match(/export /g) || []).length;
-}
-return { analyzed: tsFiles.length, totalExports: count };
+progress('Storing API key...');
+await memory({ action: 'set', category: 'api', key: 'openai', value: 'sk-...' });
+const key = memory.read('api', 'openai');
+return { stored: key.substring(0, 10) + '...' };
 \`\`\`
 
-#### 4. MULTI-TOOL WORKFLOWS:
+#### 4. TODO LIST:
 \`\`\`typescript
-const filesResult = await file({ action: 'list' });
-const files = JSON.parse(filesResult).files;
-progress(\`Found \${files.length} files\`);
-const texts = files.slice(0, 10).map(f => \`Review: \${f.name}\`);
-await todo({ action: 'add', texts });
-return { created: texts.length };
+progress('Creating tasks...');
+await todo({ action: 'add', texts: ['Task 1', 'Task 2', 'Task 3'] });
+const list = await todo({ action: 'list' });
+return { total: list.items.length };
 \`\`\`
 
-**Available:** fetch, progress(msg), memory.read(category, key), file(...), todo(...), memory(...), peek(outputId, offset, limit), peekInfo(outputId), webSearch(...), imageSearch(...), showChart(...), showTable(...), showMermaid(...), convertDocument(...), imageDocument(...), convId, projectId, CURRENT_UID (user ID from authentication, empty string "" if not authenticated), console (goes to server logs, not visible to AI - use progress() or return values for AI-visible output)
+**Available built-in functions:**
 
-**IMPORTANT:** Project extension functions are also available! See the "## 🧩 Project Extensions" section below for extension functions like:
-- extensionCreator.createOrUpdate() - Create extensions
-- postgresql() - Query PostgreSQL databases
-- duckdb() - Query CSV/Excel/Parquet/JSON files
-- webSearch() - Search the web
-- And more project-specific extensions
+- **fetch(url, options)** - Make HTTP requests
+  - **When to use:** Call external APIs, download data, interact with web services
+  - **How to use:** \`const res = await fetch('https://api.example.com/data'); const data = await res.json();\`
 
-These extension functions can be called directly in your code just like the built-in functions above.
+- **progress(message)** - Send progress updates to the UI
+  - **When to use:** Keep users informed during long-running operations
+  - **How to use:** \`progress('Processing data...'); progress('Step 1 of 3');\`
+
+- **memory.read(category, key)** - Read stored values synchronously
+  - **When to use:** Retrieve credentials, API keys, configuration stored in memory
+  - **How to use:** \`const apiKey = memory.read('api', 'openai');\`
+  - **Note:** Always use memory.read() for credentials to avoid hardcoding secrets
+
+- **memory({ action, category, key, value })** - Set/remove values
+  - **When to use:** Store API keys, database URLs, configuration for later use
+  - **How to use:** \`await memory({ action: 'set', category: 'db', key: 'host', value: 'localhost' });\`
+  - **Actions:** \`set\`, \`remove\`
+
+- **todo({ action, texts, itemId, text })** - Manage todo list
+  - **When to use:** Create task lists, track action items, organize work
+  - **How to use:** \`await todo({ action: 'add', texts: ['Task 1', 'Task 2'] });\`
+  - **Actions:** \`add\`, \`list\`, \`update\`, \`remove\`, \`clear\`
+
+- **peek(outputId, offset, limit)** - Read large script results in chunks
+  - **When to use:** When your script returns data larger than 50KB, it gets stored and returns \`{ _truncated: true, _outputId: '...', _totalSize: number }\` instead of the actual data
+  - **How to use:** \`const result = await peek(truncatedResult._outputId, 0, 100);\`
+  - **Returns:** \`{ outputId, data, metadata: { totalSize, rowCount, hasMore, ... } }\`
+  - **Example:**
+    \`\`\`typescript
+    // Your script returned huge array
+    const hugeResult = await fetchHugeData();
+    return hugeResult;  // If > 50KB, gets stored automatically
+
+    // In another script call, read it in chunks:
+    const { _outputId } = await previousScriptResult;
+    const page1 = await peek(_outputId, 0, 100);    // First 100 items
+    const page2 = await peek(_outputId, 100, 100);  // Next 100 items
+    console.log(page1.metadata.rowCount);  // Total items in array
+    console.log(page1.metadata.hasMore);    // true if more data available
+    \`\`\`
+
+- **peekInfo(outputId)** - Get metadata about large output without retrieving data
+  - **When to use:** Check size/row count before deciding to read large output
+  - **How to use:** \`const info = await peekInfo(_outputId); console.log(info.rowCount, info.sizeFormatted);\`
+  - **Returns:** \`{ outputId, totalSize, sizeFormatted, dataType, rowCount, storageType, storedAt }\`
+
+- **convId** - Current conversation ID
+  - **When to use:** Logging, debugging, or passing to other functions
+  - **How to use:** \`console.log('Processing conversation:', convId);\`
+
+- **projectId** - Current project ID
+  - **When to use:** Project-specific operations, logging
+  - **How to use:** \`console.log('Working in project:', projectId);\`
+
+- **CURRENT_UID** - Authenticated user ID
+  - **When to use:** User-specific operations, access control
+  - **How to use:** \`if (CURRENT_UID) { console.log('User:', CURRENT_UID); }\`
+  - **Note:** Empty string if not authenticated
+
+- **console** - Server logs
+  - **When to use:** Debugging (outputs to server logs only, NOT visible to AI)
+  - **How to use:** \`console.log('Debug info:', data);\`
+  - **Note:** Use progress() or return values for AI-visible output
 
 **BACKEND DEPENDENCIES:** If the active extension has declared backend dependencies in metadata.json, they are available via the \`deps\` object:
 - \`deps.packageName\` - For packages without hyphens (e.g., deps.lodash)
 - \`deps['package-name']\` - For packages with hyphens (e.g., deps['csv-parse'])
 - Example: \`const { groupBy } = deps.lodash; const { format } = deps['date-fns'];\`
-
-**VISUALIZATION FUNCTIONS (must use object parameters):**
-- \`showChart({ title, type, data: { labels, datasets } })\` - Line/bar/pie/doughnut charts
-- \`showTable({ title, columns, rows })\` - Data tables with columns and rows
-- \`showMermaid({ title, code })\` - Mermaid diagrams (code must be valid Mermaid syntax)
-- \`showMermaid({ title, code: \`graph TD; A-->B\` })\` - Example flowchart
-
-**IMPORTANT:** Always use object syntax for visualizations. DO NOT pass strings directly:
-- ✓ CORRECT: \`await showMermaid({ title: "Flow", code: "graph TD; A-->B" })\`
-- ✗ WRONG: \`await showMermaid("graph TD; A-->B")\` (will fail silently)
-
-**FILE ACTIONS:**
-- \`file({ action: 'write', path: 'filename.txt', content: '...' })\` - Write/create a file
-- \`file({ action: 'read', path: 'filename.txt' })\` - Read file (max 8000 chars ~2000 tokens)
-- \`file({ action: 'peek', path: 'file.log', offset: 0, limit: 1000 })\` - Paginated read
-
-**IMAGE OCR (extract text from images):**
-- \`imageDocument.extractText({ filePath: 'photo.png' })\` - Extract text from image using OCR
-- \`imageDocument.extractText({ fileId: 'KTP MAYLATUN SARI.png' })\` - Extract text from uploaded file
-- \`imageDocument.extractText({ fileId: 'photo.png', prompt: 'What is the NIK number?' })\` - Use custom prompt for specific information (recommended!)
 
 **SECURITY MANDATORY:** NEVER hardcode credentials (API keys, passwords, database URLs) in script code. Always store credentials in memory first, then use \`memory.read('category', 'key')\` to access them securely. Hardcoding credentials exposes secrets and is a security violation.`;
 };
