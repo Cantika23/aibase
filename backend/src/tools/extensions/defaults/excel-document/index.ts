@@ -297,6 +297,18 @@ function generateDescription(structure: ExcelStructure, previewText: string): st
   lines.push(`**Total Rows:** ${structure.totalRows.toLocaleString()}`);
   lines.push('');
 
+  // Quick start for common operations
+  lines.push(`## Quick Start - Get Row Count`);
+  lines.push(`To get the total row count:`);
+  lines.push('```typescript');
+  lines.push(`const result = await excelDocument.read({`);
+  lines.push(`  fileId: "YOUR_FILENAME.xlsx",`);
+  lines.push(`  includeStructure: true`);
+  lines.push(`});`);
+  lines.push(`return { totalRows: result.structure.totalRows };`);
+  lines.push('```');
+  lines.push('');
+
   // Detailed structure for each sheet
   lines.push(`## Sheets Detail`);
   for (const sheet of structure.sheets) {
@@ -312,21 +324,23 @@ function generateDescription(structure: ExcelStructure, previewText: string): st
     lines.push('');
   }
 
-  // Query examples for AI
-  lines.push(`## Query Examples`);
-  lines.push(`Use the duckdb extension to query this Excel file:`);
-  lines.push('```');
-  lines.push(`// Query specific sheet`);
-  lines.push(`await duckdb({`);
-  lines.push(`  query: \`SELECT * FROM read_xlsx('FILE_PATH', sheet='SHEET_NAME', all_varchar=true) LIMIT 10\``);
-  lines.push(`});`);
-  lines.push('');
-  lines.push(`// Filter by column`);
-  lines.push(`await duckdb({`);
-  lines.push(`  query: \`SELECT * FROM read_xlsx('FILE_PATH', sheet='SHEET_NAME', all_varchar=true) WHERE COLUMN_NAME = 'value'\``);
-  lines.push(`});`);
-  lines.push('```');
-  lines.push('');
+  // Usage examples with actual sheet info
+  if (structure.sheets.length > 0) {
+    const firstSheet = structure.sheets[0]!;
+    lines.push(`## Usage Examples`);
+    lines.push(`Get row count and column names:`);
+    lines.push('```typescript');
+    lines.push(`const result = await excelDocument.read({`);
+    lines.push(`  fileId: "YOUR_FILE.xlsx",`);
+    lines.push(`  includeStructure: true`);
+    lines.push(`});`);
+    lines.push(`return {`);
+    lines.push(`  totalRows: result.structure.totalRows,`);
+    lines.push(`  columns: result.structure.sheets[0].columns`);
+    lines.push(`};`);
+    lines.push('```');
+    lines.push('');
+  }
 
   // Preview of first sheet
   if (structure.sheets.length > 0) {
@@ -352,6 +366,22 @@ const context = () =>
   '### Excel Document Extension' +
   '' +
   'Extract and explore Excel spreadsheets (.xlsx, .xls) using DuckDB for efficient analysis.' +
+  '' +
+  '**🚀 QUICK START - Get Row Count (Most Common):**' +
+  '`' + '`' + '`' + 'typescript' +
+  '// Get total rows without reading all data' +
+  'const result = await excelDocument.read({' +
+  '  fileId: "your_file.xlsx",' +
+  '  includeStructure: true  // REQUIRED to get row count!' +
+  '});' +
+  'return { totalRows: result.structure.totalRows };' +
+  '`' + '`' + '`' +
+  '' +
+  '**⚠️ IMPORTANT:**' +
+  '- Always use **includeStructure: true** to get row counts and column names' +
+  '- Do NOT access result.data (it does not exist)' +
+  '- Use result.structure.totalRows for row count' +
+  '- Use result.structure.sheets[0].columns for column names' +
   '' +
   '**Automatic Structure Detection:**' +
   'When an Excel file is uploaded, the extension automatically extracts and stores the complete structure (all sheet names, column names, and row counts) in the file metadata. The AI can immediately see what data is available without reading the entire file.' +
@@ -449,7 +479,33 @@ const context = () =>
   '};' +
   '`' + '`' + '`' +
   '' +
+  '**❌ Common Mistakes (DO NOT DO THIS):**' +
+  '`' + '`' + '`' + 'typescript' +
+  '// ❌ WRONG - result.data does not exist!' +
+  'const result = await excelDocument.read({ fileId: "file.xlsx" });' +
+  'const count = result.data.length;  // ERROR: undefined!' +
+  '' +
+  '// ❌ WRONG - duckdb requires options object!' +
+  'const data = await duckdb(`SELECT * FROM file`);  // ERROR!' +
+  '' +
+  '// ❌ WRONG - Using fileName instead of fileId!' +
+  'const result = await excelDocument.read({ fileName: "file.xlsx" });  // ERROR!' +
+  '`' + '`' + '`' +
+  '' +
+  '**✅ Correct Usage:**' +
+  '`' + '`' + '`' + 'typescript' +
+  '// ✅ CORRECT - Use structure to get row count' +
+  'const result = await excelDocument.read({ fileId: "file.xlsx", includeStructure: true });' +
+  'const count = result.structure.totalRows;' +
+  '' +
+  '// ✅ CORRECT - duckdb requires options object' +
+  'const data = await duckdb({ query: "SELECT * FROM read_xlsx(...)" });' +
+  '`' + '`' + '`' +
+  '' +
   '**Important Notes:**' +
+  '- **includeStructure: true** is REQUIRED to access result.structure' +
+  '- result has only TWO properties: \\`text\\` (string) and \\`structure\\` (object, optional)' +
+  '- There is NO \\`data\\`, \\`rows\\`, or \\`parsed\\` property' +
   '- **Automatic structure extraction** happens on upload - check file metadata first' +
   '- Use \\`duckdb\\` extension for SQL queries (more efficient than extracting all data)' +
   '- DuckDB can filter, aggregate, and join Excel data directly' +
