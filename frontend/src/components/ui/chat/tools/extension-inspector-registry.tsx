@@ -91,7 +91,7 @@ async function loadInspectorFromAPI(
     const url = URL.createObjectURL(blob);
 
     // Dynamic import
-    const module = await import(url);
+    const module = await import(/* @vite-ignore */ url);
 
     // Clean up blob URL
     URL.revokeObjectURL(url);

@@ -128,7 +128,7 @@ async function loadDependenciesFromBackend(
 
     try {
       // Import the bundled module
-      await import(bundleUrl);
+      await import(/* @vite-ignore */ bundleUrl);
 
       // Mark as loaded
       for (const [name, version] of Object.entries(dependencies)) {

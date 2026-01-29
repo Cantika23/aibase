@@ -49,7 +49,6 @@ export class ExtensionLoader {
     const useDefaults = process.env.USE_DEFAULT_EXTENSIONS === 'true';
 
     if (useDefaults) {
-      console.log(`[ExtensionLoader] USE_DEFAULT_EXTENSIONS=true, skipping copy to project folder`);
       return;
     }
 
@@ -61,7 +60,6 @@ export class ExtensionLoader {
 
     // If project already has extensions, don't overwrite
     if (existingExtensions.length > 0) {
-      console.log(`[ExtensionLoader] Project ${projectId} already has ${existingExtensions.length} extensions`);
       return;
     }
 
@@ -78,8 +76,6 @@ export class ExtensionLoader {
       // Read default extensions directory
       const entries = await fs.readdir(this.defaultsPath, { withFileTypes: true });
       const extensionDirs = entries.filter(entry => entry.isDirectory());
-
-      console.log(`[ExtensionLoader] Copying ${extensionDirs.length} default extensions to project ${projectId}`);
 
       for (const dir of extensionDirs) {
         try {
@@ -107,8 +103,6 @@ export class ExtensionLoader {
             enabled: metadata.enabled,
             isDefault: true,
           });
-
-          console.log(`[ExtensionLoader] Copied default extension: ${metadata.name}`);
         } catch (error) {
           console.warn(`[ExtensionLoader] Failed to copy extension ${dir.name}:`, error);
         }
@@ -138,8 +132,6 @@ export class ExtensionLoader {
     if (useDefaults) {
       // Development mode: Load from defaults directory with project overrides
       // Project extensions override defaults with the same ID
-      console.log(`[ExtensionLoader] USE_DEFAULT_EXTENSIONS=true, loading from defaults + project override`);
-
       const [defaultExts, projectExts] = await Promise.all([
         this.loadDefaults(),
         this.extensionStorage.getAll(projectId, tenantId)
@@ -152,7 +144,6 @@ export class ExtensionLoader {
       extensions = defaultExts.map(d => {
         const override = projectMap.get(d.metadata.id);
         if (override) {
-          console.log(`[ExtensionLoader] Using project version for ${d.metadata.id}`);
           return override;
         }
         return d;
@@ -162,21 +153,15 @@ export class ExtensionLoader {
       const defaultIds = new Set(defaultExts.map(d => d.metadata.id));
       const projectOnly = projectExts.filter(p => !defaultIds.has(p.metadata.id));
       extensions.push(...projectOnly);
-
-      console.log(`[ExtensionLoader] Loaded ${extensions.length} extensions (${projectMap.size} overridden by project, ${projectOnly.length} project-only)`);
     } else {
       // Production mode: Load from project's extensions folder
       // Each project can have different extension versions
-      console.log(`[ExtensionLoader] USE_DEFAULT_EXTENSIONS=false, loading from data/${projectId}/extensions/`);
       extensions = await this.extensionStorage.getEnabled(projectId, tenantId);
     }
 
     if (extensions.length === 0) {
-      console.log(`[ExtensionLoader] No enabled extensions for project ${projectId}`);
       return {};
     }
-
-    console.log(`[ExtensionLoader] Loading ${extensions.length} extensions for project ${projectId}`);
 
     const scope: Record<string, any> = {};
 
@@ -198,16 +183,9 @@ export class ExtensionLoader {
         if (functionNames.length === 1) {
           // Single function - add directly to scope
           Object.assign(scope, exports);
-          console.log(`[ExtensionLoader] Loaded extension '${extension.metadata.name}' with ${functionNames.length} function (flattened to scope): ${functionNames.join(', ')}`);
-          console.log(`[ExtensionLoader] Scope keys:`, Object.keys(scope));
-          const funcName = functionNames[0];
-          if (funcName) {
-            console.log(`[ExtensionLoader] Export type for '${funcName}':`, typeof exports[funcName]);
-          }
         } else {
           // Multiple functions - use namespace to avoid conflicts
           scope[namespace] = exports;
-          console.log(`[ExtensionLoader] Loaded extension '${extension.metadata.name}' as namespace '${namespace}' with ${functionNames.length} functions: ${functionNames.join(', ')}`);
         }
       } catch (error: any) {
         console.error(`[ExtensionLoader] Failed to load extension '${extension.metadata.name}':`, error);
@@ -232,6 +210,7 @@ export class ExtensionLoader {
       }
     }
 
+    console.log(`[ExtensionLoader] Loaded ${Object.keys(scope).length} tools from ${extensions.length} extensions`);
     return scope;
   }
 
@@ -282,13 +261,60 @@ export class ExtensionLoader {
 
   /**
    * Transpile TypeScript to JavaScript using esbuild
+   *
+   * Extensions use top-level return to export their API, which is not valid in ES modules.
+   * We work around this by converting the top-level return to a variable assignment before transpiling.
    */
   private async transpileExtension(code: string, extensionId: string): Promise<string> {
-    console.log(`[ExtensionLoader] BEFORE transpile '${extensionId}', length: ${code.length}`);
-    console.log(`[ExtensionLoader] First 100 chars:`, code.substring(0, 100));
-
     try {
-      const result = await esbuild.transform(code, {
+      // Convert top-level return to a variable assignment
+      // This allows esbuild to transpile the code without ESM errors
+      let transformedCode = code;
+
+      // Check if code has a top-level return statement
+      // Extensions use a specific pattern: // @ts-expect-error comment followed by return
+      // We need to match ONLY the top-level return, not returns inside functions
+      //
+      // Strategy: Look for return statements that come after the @ts-expect-error comment
+      // OR are at the end of the file (last 5 lines) to avoid matching function returns
+      const lines = code.split('\n');
+      let converted = false;
+      let convertedLine = -1;
+
+      // Method 1: Look for @ts-expect-error pattern
+      for (let i = 0; i < lines.length - 1; i++) {
+        if (lines[i].includes('@ts-expect-error') && lines[i].includes('Extension loader wraps')) {
+          const nextLine = lines[i + 1];
+          const returnMatch = nextLine.match(/^\s*return\s+(.+)/);
+          if (returnMatch) {
+            lines[i + 1] = nextLine.replace(/^\s*return\s+(.+)/, 'module.exports = $1');
+            converted = true;
+            convertedLine = i + 1;
+            break;
+          }
+        }
+      }
+
+      // Method 2: If no @ts-expect-error pattern, look for return in last 5 lines
+      if (!converted && lines.length > 5) {
+        const lastLines = lines.slice(-5);
+        for (let i = 0; i < lastLines.length; i++) {
+          const returnMatch = lastLines[i].match(/^\s*return\s+(.+)/);
+          if (returnMatch) {
+            const actualIndex = lines.length - 5 + i;
+            lines[actualIndex] = lastLines[i].replace(/^\s*return\s+(.+)/, 'module.exports = $1');
+            converted = true;
+            convertedLine = actualIndex;
+            break;
+          }
+        }
+      }
+
+      if (converted) {
+        transformedCode = lines.join('\n');
+      }
+
+      const result = await esbuild.transform(transformedCode, {
         loader: 'ts',
         target: 'esnext',
         format: 'cjs',
@@ -301,12 +327,9 @@ export class ExtensionLoader {
         },
       });
 
-      console.log(`[ExtensionLoader] AFTER transpile '${extensionId}', original: ${code.length}, transpiled: ${result.code.length}`);
-      console.log(`[ExtensionLoader] Transpiled first 100 chars:`, result.code.substring(0, 100));
-
       // Check if transpilation actually changed anything
-      if (result.code === code) {
-        console.error(`[ExtensionLoader] WARNING: Transpiled code is IDENTICAL to original! esbuild didn't transpile.`);
+      if (result.code === transformedCode) {
+        console.error(`[ExtensionLoader] WARNING: Transpiled code is IDENTICAL to input! esbuild didn't transpile.`);
       }
 
       return result.code;
@@ -326,17 +349,11 @@ export class ExtensionLoader {
    */
   private async evaluateExtension(extension: Extension): Promise<Record<string, any>> {
     try {
-      console.log(`[ExtensionLoader] Evaluating '${extension.metadata.name}' in main thread`);
-
       // Transpile TypeScript to JavaScript
       const jsCode = await this.transpileExtension(extension.code, extension.metadata.id);
 
       // Load backend dependencies if declared
       const backendDeps = extension.metadata.dependencies?.backend || {};
-
-      if (Object.keys(backendDeps).length > 0) {
-        console.log(`[ExtensionLoader] Loading ${Object.keys(backendDeps).length} backend dependencies for '${extension.metadata.name}'`);
-      }
 
       // Load dependencies
       const loadedDeps: Record<string, any> = {};
@@ -369,6 +386,9 @@ export class ExtensionLoader {
 
         // Extension hook registry placeholder
         globalThis.extensionHookRegistry = arguments[0];
+
+        // Get require from arguments (passed as third parameter)
+        const require = arguments[2];
 
         // Execute extension code (already transpiled to JavaScript)
         let extensionResult;
@@ -403,10 +423,9 @@ export class ExtensionLoader {
         unregisterHook: () => {},
       };
 
-      // Evaluate the extension
-      const result = await fn(hookRegistry, loadedDeps);
-
-      console.log(`[ExtensionLoader] Result from extension '${extension.metadata.name}':`, Object.keys(result || {}));
+      // Evaluate the extension (pass require as third argument)
+      // In Bun, require is available globally
+      const result = await fn(hookRegistry, loadedDeps, require);
 
       return result || {};
     } catch (error: any) {
@@ -433,7 +452,6 @@ export class ExtensionLoader {
 
     // Copy defaults
     await this.copyDefaultExtensions(projectId);
-    console.log(`[ExtensionLoader] Reset extensions to defaults for project ${projectId}`);
   }
 
   /**
