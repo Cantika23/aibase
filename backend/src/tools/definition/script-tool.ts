@@ -71,18 +71,17 @@ CRITICAL - Multi-line Code Format:
 - ✗ WRONG: NEVER write "line1;\\nline2;" - this will cause syntax errors!
 - Think of it like writing code in a text editor, not escaping for display
 
+Available built-in functions: fetch, progress, memory, todo, peek, peekInfo.
+Project extensions are also available (see extension context for details).
+
 Example (single line):
   return await fetch('https://api.example.com').then(r => r.json());
 
 Example (multi-line):
   progress("Starting batch operation...");
-  const filesResult = await file({ action: 'list' });
-  const files = JSON.parse(filesResult).files;
-  for (const f of files) {
-    progress(\`Processing \${f.name}\`);
-    // process file...
-  }
-  return { processed: files.length };
+  await memory({ action: 'set', category: 'cache', key: 'timestamp', value: Date.now() });
+  const stored = memory.read('cache', 'timestamp');
+  return { processedAt: stored };
 `,
       },
     },

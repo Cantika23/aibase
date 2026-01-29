@@ -57,9 +57,11 @@ return { total: list.items.length };
 
 **Available built-in functions:**
 
-- **fetch(url, options)** - Make HTTP requests
-  - **When to use:** Call external APIs, download data, interact with web services
+- **fetch(url, options)** - Make HTTP requests to web URLs only
+  - **When to use:** Call external APIs, download data from web services
   - **How to use:** \`const res = await fetch('https://api.example.com/data'); const data = await res.json();\`
+  - **Note:** Only works with http/https URLs, NOT for file system paths or backend endpoints
+  - **For reading files:** Use project extensions like \`excelDocument.summarize()\` instead
 
 - **progress(message, data)** - Send progress updates to the UI
   - **When to use:** Keep users informed during long-running operations
