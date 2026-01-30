@@ -69,7 +69,7 @@ export async function generateTitle(options: TitleGenerationOptions): Promise<st
     systemPrompt = 'Generate a concise 3-8 word title for a file based on its content. Return only the title, no quotes.',
     content,
     timeoutMs = 8000,
-    model: customModel,
+    model,
     temperature = 0.5,
     maxTokens = 25,
     label = 'TitleGenerator',
@@ -92,9 +92,9 @@ export async function generateTitle(options: TitleGenerationOptions): Promise<st
       setTimeout(() => reject(new Error('Title generation timeout')), timeoutMs);
     });
 
-    const titleModel = customModel || process.env.TITLE_GENERATION_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const titleModel = model || process.env.TITLE_GENERATION_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-    logger.debug({ label, model: titleModel, contentLength: content.length }, 'Calling OpenAI API for title generation');
+    logger.info({ label, model: titleModel, contentLength: content.length }, 'Calling OpenAI API for title generation');
 
     const response = await Promise.race([
       openai.chat.completions.create({
@@ -116,7 +116,7 @@ export async function generateTitle(options: TitleGenerationOptions): Promise<st
     ]) as any;
 
     const rawTitle = response.choices[0]?.message?.content?.trim();
-    logger.debug({ label, rawTitle: rawTitle ? `"${rawTitle}"` : 'empty/undefined' }, 'Raw title from API');
+    logger.info({ label, rawTitle: rawTitle ? `"${rawTitle}"` : 'empty/undefined' }, 'Raw title from API');
 
     if (rawTitle && rawTitle.length > 0 && rawTitle.length < 100) {
       // Remove any surrounding quotes
