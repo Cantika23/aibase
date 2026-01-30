@@ -38,6 +38,20 @@ RUN $(go env GOPATH)/bin/swag init
 # Build aimeow for Linux with CGO (required for mattn/go-sqlite3)
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o aimeow.linux .
 
+# Stage 2.5: Build duckdb-manager
+FROM golang:1.25-bookworm AS duckdb-build
+
+WORKDIR /app/bins/duckdb
+
+# Copy duckdb source files
+COPY bins/duckdb/go.mod ./
+RUN go mod download
+
+COPY bins/duckdb/ ./
+
+# Build duckdb-manager for Linux
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o duckdb-manager .
+
 # Stage 3: Production stage
 FROM node:20-bookworm-slim
 
@@ -74,6 +88,10 @@ RUN chmod +x ./bins/aimeow/aimeow.linux
 # Copy aimeow docs from aimeow-build stage
 COPY --from=aimeow-build /app/bins/aimeow/docs ./bins/aimeow/docs
 
+# Copy duckdb-manager binary from duckdb-build stage
+COPY --from=duckdb-build /app/bins/duckdb/duckdb-manager ./bins/duckdb/
+RUN chmod +x ./bins/duckdb/duckdb-manager
+
 # Copy pre-built start binary (built locally without CGO)
 COPY start.linux ./
 RUN chmod +x ./start.linux
@@ -100,9 +118,10 @@ RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 
 # Skip frontend dependency install (dist is pre-built)
-# aimeow is built in Docker with CGO
+# aimeow and duckdb-manager are built in Docker
 ENV SKIP_FRONTEND_INSTALL=1
 ENV SKIP_AIMEOW_BUILD=1
+ENV SKIP_DUCKDB_BUILD=1
 
 # Start all services via start.linux (which runs backend, Qdrant, and aimeow)
 CMD ["./start.linux"]
