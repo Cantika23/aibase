@@ -75,7 +75,7 @@ RUN chmod +x ./bins/aimeow/aimeow.linux
 COPY --from=aimeow-build /app/bins/aimeow/docs ./bins/aimeow/docs
 
 # Copy pre-built start binary (built locally without CGO)
-COPY bins/start/start.linux ./
+COPY start.linux ./
 RUN chmod +x ./start.linux
 
 # Copy .env file if it exists (for production configuration)
