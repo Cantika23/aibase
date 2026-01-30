@@ -967,12 +967,17 @@ if (hookRegistry) {
           description.length,
         );
 
+        console.log('[ExcelDocument] About to call utils.generateTitle, utils is:', typeof utils);
+        console.log('[ExcelDocument] utils.generateTitle is:', typeof utils?.generateTitle);
+
         // Generate title using AI helper (injected utility)
         const title = await utils.generateTitle({
           systemPrompt: "Generate a concise 3-8 word title for an Excel spreadsheet based on its content. Return only the title, no quotes.",
           content: `File: ${_context.fileName}\n\nSheets: ${structure.sheets.map((s) => `${s.name} (${s.rowCount} rows)`).join(", ")}\n\nPreview:\n${previewText}`,
           label: "ExcelDocument",
         });
+
+        console.log('[ExcelDocument] generateTitle returned:', title);
 
         return { description, title };
       } catch (error) {

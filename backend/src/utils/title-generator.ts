@@ -65,6 +65,9 @@ export interface TitleGenerationOptions {
  * ```
  */
 export async function generateTitle(options: TitleGenerationOptions): Promise<string | undefined> {
+  console.log('[TitleGenerator] ====================================');
+  console.log('[TitleGenerator] generateTitle called with options:', JSON.stringify(options, null, 2));
+
   const {
     systemPrompt = 'Generate a concise 3-8 word title for a file based on its content. Return only the title, no quotes.',
     content,
@@ -75,11 +78,15 @@ export async function generateTitle(options: TitleGenerationOptions): Promise<st
     label = 'TitleGenerator',
   } = options;
 
+  console.log('[TitleGenerator] Destructured options:', { label, contentLength: content?.length, timeoutMs, model });
+
   try {
     // Check if API key is configured
     const apiKey = process.env.OPENAI_API_KEY;
+    console.log('[TitleGenerator] OPENAI_API_KEY exists:', !!apiKey);
+
     if (!apiKey) {
-      logger.warn({ label }, 'OPENAI_API_KEY not configured, skipping title generation');
+      console.warn('[TitleGenerator] OPENAI_API_KEY not configured, skipping title generation');
       return undefined;
     }
 
@@ -93,8 +100,9 @@ export async function generateTitle(options: TitleGenerationOptions): Promise<st
     });
 
     const titleModel = model || process.env.TITLE_GENERATION_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    console.log('[TitleGenerator] Using model:', titleModel);
 
-    logger.info({ label, model: titleModel, contentLength: content.length }, 'Calling OpenAI API for title generation');
+    console.log('[TitleGenerator] Calling OpenAI API...');
 
     const response = await Promise.race([
       openai.chat.completions.create({
@@ -115,20 +123,23 @@ export async function generateTitle(options: TitleGenerationOptions): Promise<st
       timeoutPromise,
     ]) as any;
 
+    console.log('[TitleGenerator] API Response received, choices length:', response?.choices?.length);
+
     const rawTitle = response.choices[0]?.message?.content?.trim();
-    logger.info({ label, rawTitle: rawTitle ? `"${rawTitle}"` : 'empty/undefined' }, 'Raw title from API');
+    console.log('[TitleGenerator] Raw title from API:', rawTitle ? `"${rawTitle}"` : 'empty/undefined', 'length:', rawTitle?.length);
 
     if (rawTitle && rawTitle.length > 0 && rawTitle.length < 100) {
       // Remove any surrounding quotes
       const title = rawTitle.replace(/^["']|["']$/g, '');
-      logger.info({ label, title }, 'Generated title successfully');
+      console.log('[TitleGenerator] Generated title successfully:', title);
       return title;
     } else {
-      logger.warn({ label, rawTitle }, 'Title validation failed');
+      console.warn('[TitleGenerator] Title validation failed, rawTitle:', rawTitle);
       return undefined;
     }
   } catch (error: any) {
-    logger.warn({ label, error: error.message }, 'Failed to generate title');
+    console.error('[TitleGenerator] Failed to generate title:', error);
+    console.error('[TitleGenerator] Error stack:', error?.stack);
     return undefined;
   }
 }
