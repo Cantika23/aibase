@@ -48,7 +48,6 @@ import {
 import { uploadFilesWithProgress, type UploadProgress } from "@/lib/file-upload";
 import { useChatStore } from "@/stores/chat-store";
 import { useConversationStore } from "@/stores/conversation-store";
-import { useFileContextStore } from "@/stores/file-context-store";
 import {
   AlertCircle,
   Download,

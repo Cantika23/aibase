@@ -3,7 +3,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Info, Copy, Check, FileJson, FileText } from "lucide-react";
+import { Info, Copy, Check, FileJson } from "lucide-react";
 import { useChatStore } from "@/stores/chat-store";
 import { useFileContextStore } from "@/stores/file-context-store";
 import { useState } from "react";

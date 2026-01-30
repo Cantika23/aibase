@@ -9,6 +9,7 @@ import { buildApiUrl } from "@/lib/base-path";
 const API_BASE_URL = buildApiUrl("");
 
 export interface FileInfo {
+  id?: string;
   name: string;
   size: number;
   type: string;

@@ -32,6 +32,8 @@ export type MessageType =
   | "user_message"
   | "control"
   | "ping"
+  | "get_file_context"
+  | "set_file_context"
   // Server to Client
   | "llm_chunk"
   | "llm_complete"
@@ -43,7 +45,8 @@ export type MessageType =
   | "status"
   | "todo_update"
   | "conversation_title_update"
-  | "notification";
+  | "notification"
+  | "file_context_update";
 
 export interface UserMessageData {
   text: string;
@@ -98,7 +101,8 @@ export interface ConnectionState {
 
 // Enhanced types for the comprehensive WebSocket client
 export interface ControlMessage {
-  type: "abort" | "clear_history" | "get_history" | "get_status" | "compact_chat" | "get_compaction_status";
+  type: "abort" | "clear_history" | "get_history" | "get_status" | "compact_chat" | "get_compaction_status" | "get_file_context" | "set_file_context";
+  data?: any;
 }
 
 export interface ConnectionStats {
