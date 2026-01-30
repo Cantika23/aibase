@@ -340,10 +340,15 @@ function generateDescription(
   structure: ExcelStructure,
   previewText: string,
   fileName: string,
+  title?: string,
 ): string {
   const lines: string[] = [];
 
-  lines.push(`## Excel File Structure`);
+  // Use title if available, otherwise use filename
+  const displayName = title ? `"${title}" (${fileName})` : fileName;
+  const codeIdentifier = fileName; // Always use filename for code examples (fileId)
+
+  lines.push(`## Excel File: ${displayName}`);
   lines.push(`**Total Sheets:** ${structure.totalSheets}`);
   lines.push(`**Total Rows:** ${structure.totalRows.toLocaleString()}`);
   lines.push("");
@@ -353,7 +358,7 @@ function generateDescription(
   lines.push(`To get the total row count:`);
   lines.push("```typescript");
   lines.push(`const result = await excel.read({`);
-  lines.push(`  fileId: "${fileName}",`);
+  lines.push(`  fileId: "${codeIdentifier}",`);
   lines.push(`  includeStructure: true`);
   lines.push(`});`);
   lines.push(`return { totalRows: result.structure.totalRows };`);
@@ -382,7 +387,7 @@ function generateDescription(
     lines.push(`Get row count and column names:`);
     lines.push("```typescript");
     lines.push(`const result = await excel.read({`);
-    lines.push(`  fileId: "${fileName}",`);
+    lines.push(`  fileId: "${codeIdentifier}",`);
     lines.push(`  includeStructure: true`);
     lines.push(`});`);
     lines.push(`return {`);
@@ -954,23 +959,10 @@ if (hookRegistry) {
             .join("\n");
         }
 
-        // Generate structured description for AI
-        const description = generateDescription(
-          structure,
-          previewText,
-          _context.fileName,
-        );
-        console.log(
-          "[ExcelDocument] Generated structured description for:",
-          _context.fileName,
-          "length:",
-          description.length,
-        );
-
         console.log('[ExcelDocument] About to call utils.generateTitle, utils is:', typeof utils);
         console.log('[ExcelDocument] utils.generateTitle is:', typeof utils?.generateTitle);
 
-        // Generate title using AI helper (injected utility)
+        // Generate title using AI helper (injected utility) - BEFORE description
         const title = await utils.generateTitle({
           systemPrompt: "Generate a concise 3-8 word title for an Excel spreadsheet based on its content. Return only the title, no quotes.",
           content: `File: ${_context.fileName}\n\nSheets: ${structure.sheets.map((s) => `${s.name} (${s.rowCount} rows)`).join(", ")}\n\nPreview:\n${previewText}`,
@@ -978,6 +970,20 @@ if (hookRegistry) {
         });
 
         console.log('[ExcelDocument] generateTitle returned:', title);
+
+        // Generate structured description for AI, now with title
+        const description = generateDescription(
+          structure,
+          previewText,
+          _context.fileName,
+          title || undefined,
+        );
+        console.log(
+          "[ExcelDocument] Generated structured description for:",
+          _context.fileName,
+          "length:",
+          description.length,
+        );
 
         return { description, title };
       } catch (error) {

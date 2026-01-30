@@ -524,6 +524,10 @@ function formatFilesForContext(files: FileInfo[]): string {
     for (const file of publicFiles) {
       const displayName = formatFileDisplayName(file);
       context += `\n  • ${displayName} (${file.sizeHuman}, type: .${file.type})`;
+      // Include description if available (e.g., Excel structure, PDF summary)
+      if (file.description) {
+        context += `\n    ${file.description}`;
+      }
     }
   }
 
@@ -532,6 +536,10 @@ function formatFilesForContext(files: FileInfo[]): string {
     for (const file of userFiles) {
       const displayName = formatFileDisplayName(file);
       context += `\n  • ${displayName} (${file.sizeHuman}, type: .${file.type})`;
+      // Include description if available (e.g., Excel structure, PDF summary)
+      if (file.description) {
+        context += `\n    ${file.description}`;
+      }
     }
   }
 
