@@ -269,11 +269,14 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     console.log("[WhatsApp] Webhook received:", {
       clientId,
       from: messageData?.from,
+      isLID: messageData?.isLID,
+      rawChat: messageData?.rawChat,
+      rawSender: messageData?.rawSender,
+      rawSenderAlt: messageData?.rawSenderAlt,
       type: messageData?.type,
       fromMe: messageData?.fromMe,
-      fileUrl: messageData?.fileUrl,
-      mimeType: messageData?.mimeType,
-      caption: messageData?.caption,
+      isGroup: messageData?.isGroup,
+      pushName: messageData?.pushName,
     });
 
     // Ignore messages sent by the bot/device itself (self-messages)
@@ -330,6 +333,25 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       });
     }
 
+    // CHECK: Is this an unresolved LID?
+    // aimeow sends isLID=true when it couldn't resolve the LID to a phone number
+    // In this case, we cannot reply because we don't have a valid phone number
+    if (messageData.isLID) {
+      console.error("[WhatsApp] ❌ CANNOT REPLY: Unresolved LID detected from:", messageData.from);
+      console.error("[WhatsApp] Raw fields provided by aimeow:", {
+        rawChat: messageData.rawChat,
+        rawSender: messageData.rawSender,
+        rawSenderAlt: messageData.rawSenderAlt,
+      });
+      // Return early - we cannot reply to an LID
+      return Response.json({
+        success: true,
+        ignored: true,
+        reason: "Unresolved LID - cannot reply",
+        from: messageData.from,
+      });
+    }
+
     // Extract WhatsApp phone number for reply target
     // For DM: rawChat contains the phone number JID (e.g. "6281803417004@s.whatsapp.net")
     // For Group: rawSender contains the sender JID, but we still reply to rawChat (group)
@@ -337,24 +359,52 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     let whatsappNumber: string;
 
     // PRIORITY 1: For DM, use rawChat (the chat JID is the phone number)
-    if (!messageData.isGroup && messageData.rawChat && messageData.rawChat.includes('@s.whatsapp.net')) {
-      whatsappNumber = messageData.rawChat.split('@')[0];
-      console.log("[WhatsApp] Using rawChat for DM reply target:", whatsappNumber);
+    // Accept both @s.whatsapp.net and @lid (though @lid should be filtered above)
+    if (!messageData.isGroup && messageData.rawChat) {
+      const rawChatClean = messageData.rawChat.split('@')[0];
+      // Skip if it's obviously an LID (too long)
+      if (rawChatClean.length < 15) {
+        whatsappNumber = rawChatClean;
+        console.log("[WhatsApp] Using rawChat for DM reply target:", whatsappNumber);
+      }
     }
     // PRIORITY 2: For Group, use rawSender (who sent the message)
-    else if (messageData.isGroup && messageData.rawSender && messageData.rawSender.includes('@s.whatsapp.net')) {
-      whatsappNumber = messageData.rawSender.split('@')[0];
-      console.log("[WhatsApp] Using rawSender for Group reply target:", whatsappNumber);
+    else if (messageData.isGroup && messageData.rawSender) {
+      const rawSenderClean = messageData.rawSender.split('@')[0];
+      if (rawSenderClean.length < 15) {
+        whatsappNumber = rawSenderClean;
+        console.log("[WhatsApp] Using rawSender for Group reply target:", whatsappNumber);
+      }
     }
-    // PRIORITY 3: Try rawSenderAlt if available
-    else if (messageData.rawSenderAlt && messageData.rawSenderAlt.includes('@s.whatsapp.net')) {
-      whatsappNumber = messageData.rawSenderAlt.split('@')[0];
-      console.log("[WhatsApp] Using rawSenderAlt for reply target:", whatsappNumber);
+    // PRIORITY 3: Try rawSenderAlt if available (this is usually the real phone number)
+    else if (messageData.rawSenderAlt) {
+      const rawSenderAltClean = messageData.rawSenderAlt.split('@')[0];
+      if (rawSenderAltClean.length < 15) {
+        whatsappNumber = rawSenderAltClean;
+        console.log("[WhatsApp] Using rawSenderAlt for reply target:", whatsappNumber);
+      }
     }
-    // FALLBACK: Use 'from' field (may be LID, may fail)
+    // FALLBACK: Use 'from' field - but validate it's not an LID
     else {
-      whatsappNumber = messageData.from;
-      console.warn("[WhatsApp] WARNING: Using 'from' field as fallback. This may be an LID and reply may fail:", whatsappNumber);
+      const fromCandidate = messageData.from.replace(/[^0-9]/g, '');
+      // Check if it's an obvious LID (too long for a phone number)
+      if (fromCandidate.length >= 15) {
+        console.error("[WhatsApp] ❌ CANNOT REPLY: 'from' field contains LID, no valid phone number available");
+        console.error("[WhatsApp] Message data received:", {
+          from: messageData.from,
+          rawChat: messageData.rawChat,
+          rawSender: messageData.rawSender,
+          rawSenderAlt: messageData.rawSenderAlt,
+          isLID: messageData.isLID,
+        });
+        return Response.json({
+          success: false,
+          error: "Cannot reply - no valid phone number found (LID detected)",
+          from: messageData.from,
+        });
+      }
+      whatsappNumber = fromCandidate;
+      console.warn("[WhatsApp] WARNING: Using 'from' field as fallback:", whatsappNumber);
     }
 
     // Ensure format is clean (digits only)
