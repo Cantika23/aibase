@@ -270,7 +270,10 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       clientId,
       from: messageData?.from,
       type: messageData?.type,
-      fromMe: messageData?.fromMe
+      fromMe: messageData?.fromMe,
+      fileUrl: messageData?.fileUrl,
+      mimeType: messageData?.mimeType,
+      caption: messageData?.caption,
     });
 
     // Ignore messages sent by the bot/device itself (self-messages)
@@ -936,12 +939,101 @@ async function processWhatsAppMessageWithAI(
 ): Promise<void> {
   try {
     console.log("[WhatsApp] Starting AI processing for message:", messageText);
+    console.log("[WhatsApp] Received attachments:", JSON.stringify(attachments, null, 2));
 
     // Get ChatHistoryStorage instance (singleton, already imported)
     const chatHistoryStorage = ChatHistoryStorage.getInstance();
     const projectStorage = ProjectStorage.getInstance();
     const project = projectStorage.getById(projectId);
     const tenantId = project?.tenant_id ?? 'default';
+
+    // === PRE-PROCESS IMAGE ATTACHMENTS ===
+    // Analyze images using Vision API and add descriptions to message
+    let enhancedMessage = messageText;
+    
+    for (const attachment of attachments) {
+      if (attachment.type === "image" && attachment.url) {
+        console.log("[WhatsApp] Processing image attachment:", attachment.url);
+        
+        try {
+          // Download image from URL
+          const imgResponse = await fetch(attachment.url);
+          if (!imgResponse.ok) {
+            console.error("[WhatsApp] Failed to download image:", imgResponse.status);
+            continue;
+          }
+          
+          const arrayBuffer = await imgResponse.arrayBuffer();
+          const base64Image = Buffer.from(arrayBuffer).toString('base64');
+          const mimeType = attachment.mimeType || 'image/jpeg';
+          
+          console.log("[WhatsApp] Image downloaded, size:", arrayBuffer.byteLength, "bytes");
+          
+          // Call Vision API to analyze image
+          const apiKey = process.env.OPENAI_API_KEY;
+          if (!apiKey) {
+            console.warn("[WhatsApp] OPENAI_API_KEY not set, skipping image analysis");
+            continue;
+          }
+          
+          const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.z.ai/v1';
+          const endpoint = `${baseUrl}/chat/completions`;
+          
+          // Construct prompt based on user message
+          const userPrompt = messageText.trim() 
+            ? `User's question about this image: "${messageText}"\n\nPlease describe what you see in this image and answer the user's question if applicable.`
+            : "Describe this image in detail, including the main subjects, colors, composition, mood, and any text visible in the image.";
+          
+          console.log("[WhatsApp] Calling Vision API...");
+          const visionResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'GLM-4.6V',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: userPrompt },
+                    { 
+                      type: 'image_url', 
+                      image_url: { url: `data:${mimeType};base64,${base64Image}` } 
+                    },
+                  ],
+                },
+              ],
+              max_tokens: 1000,
+            }),
+          });
+          
+          if (!visionResponse.ok) {
+            const errorText = await visionResponse.text();
+            console.error("[WhatsApp] Vision API error:", visionResponse.status, errorText);
+            continue;
+          }
+          
+          const visionData = await visionResponse.json() as any;
+          const description = visionData.choices?.[0]?.message?.content || 
+                             visionData.choices?.[0]?.message?.reasoning_content;
+          
+          if (description) {
+            console.log("[WhatsApp] Image analyzed:", description.substring(0, 100) + "...");
+            
+            // Add image description to message for AI context
+            enhancedMessage = `[User sent an image]\n\n**Image Analysis:**\n${description}\n\n${messageText ? `**User's message:** ${messageText}` : "Please respond to the image."}`;
+          }
+        } catch (err) {
+          console.error("[WhatsApp] Error analyzing image:", err);
+        }
+      }
+    }
+    
+    // Use enhanced message if we processed images
+    const finalMessage = enhancedMessage;
+    console.log("[WhatsApp] Final message to AI:", finalMessage.substring(0, 200) + "...");
 
     // Load existing conversation history
     console.log("[WhatsApp] Loading client history...");
@@ -1039,7 +1131,7 @@ async function processWhatsAppMessageWithAI(
 
     const streamPromise = (async () => {
       try {
-        for await (const chunk of conversation.sendMessage(messageText)) {
+        for await (const chunk of conversation.sendMessage(finalMessage, attachments)) {
           chunkCount++;
           if (chunkCount === 1) console.log("[WhatsApp] First chunk received!");
           fullResponse += chunk;
