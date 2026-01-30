@@ -123,6 +123,8 @@ export async function generateTitle(options: TitleGenerationOptions): Promise<st
       timeoutPromise,
     ]) as any;
 
+    console.log('[TitleGenerator] Full API response:', JSON.stringify(response, null, 2));
+    console.log('[TitleGenerator] response.choices:', JSON.stringify(response?.choices, null, 2));
     console.log('[TitleGenerator] API Response received, choices length:', response?.choices?.length);
 
     const rawTitle = response.choices[0]?.message?.content?.trim();
