@@ -82,7 +82,7 @@ export function Chat({
               state: "result",
               result: {
                 content: "Tool execution was cancelled",
-                __cancelled: true, // Special marker to indicate cancellation
+                __cancelled: true,
               },
             } as const;
           }
@@ -193,34 +193,34 @@ export function Chat({
   });
 
   return (
-    <ChatContainer className={className}>
+    <div className={cn("flex flex-col h-full w-full", className)}>
       {/* Global tool dialogs - single instance for entire chat */}
       <GlobalToolDialogs toolInvocations={allToolInvocations} />
 
-      {isEmpty ? (
-        <div className="flex flex-1 items-center justify-center px-4">
-          {isHistoryLoading ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading conversation...</p>
-            </div>
-          ) : (
-            welcomeMessage || "Welcome"
-          )}
-        </div>
-      ) : null}
-
-      {messages.length > 0 ? (
-        <ChatMessages messages={messages}>
-          <MessageList
-            messages={messages}
+      {/* Scrollable messages area */}
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        {isEmpty ? (
+          <div className="h-full flex items-center justify-center px-4">
+            {isHistoryLoading ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading conversation...</p>
+              </div>
+            ) : (
+              welcomeMessage || "Welcome"
+            )}
+          </div>
+        ) : (
+          <ChatMessagesList 
+            messages={messages} 
             messageOptions={messageOptions}
           />
-        </ChatMessages>
-      ) : null}
+        )}
+      </div>
 
+      {/* Fixed input area at bottom */}
       <ChatForm
-        className="mt-auto mx-auto w-full md:max-w-[650px] px-3 md:px-0 pb-4 md:pb-0"
+        className="flex-shrink-0 w-full md:max-w-[650px] mx-auto px-3 md:px-0 py-2 md:py-0 border-t md:border-0 bg-background"
         handleSubmit={handleSubmit}
       >
         {({ files, setFiles }) => (
@@ -236,17 +236,19 @@ export function Chat({
           />
         )}
       </ChatForm>
-    </ChatContainer>
+    </div>
   );
 }
 Chat.displayName = "Chat";
 
-export function ChatMessages({
+// Separate component for the scrollable message list
+function ChatMessagesList({
   messages,
-  children,
-}: React.PropsWithChildren<{
+  messageOptions,
+}: {
   messages: Message[];
-}>) {
+  messageOptions: (message: Message) => { actions: React.ReactNode };
+}) {
   const {
     containerRef,
     scrollToBottom,
@@ -257,46 +259,31 @@ export function ChatMessages({
 
   return (
     <div
-      className="h-full min-h-0 flex flex-col overflow-y-auto"
+      className="h-full overflow-y-auto overflow-x-hidden scroll-smooth"
       ref={containerRef}
       onScroll={handleScroll}
       onTouchStart={handleTouchStart}
     >
-      <div className="grid grid-cols-1 max-w-[650px] w-full mx-auto pt-10 pb-4">
-        <div className="max-w-full col-[1/1] md:px-0 px-4 md:mt-4 mt-12 row-[1/1]">{children}</div>
-
-        {!shouldAutoScroll && (
-          <div className="pointer-events-none flex flex-1 items-end justify-end cursor-pointer col-[1/1] row-[1/1]">
-            <div className="sticky bottom-0 left-0 flex w-full justify-end">
-              <Button
-                onClick={scrollToBottom}
-                className="pointer-events-auto h-8 w-8 rounded-full ease-in-out animate-in fade-in-0 slide-in-from-bottom-1"
-                size="icon"
-                variant="ghost"
-              >
-                <ArrowDown className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+      <div className="max-w-[650px] mx-auto px-4 py-4">
+        <MessageList messages={messages} messageOptions={messageOptions} />
       </div>
+
+      {/* Scroll to bottom button */}
+      {!shouldAutoScroll && (
+        <div className="sticky bottom-2 right-2 flex justify-end pointer-events-none">
+          <Button
+            onClick={scrollToBottom}
+            className="pointer-events-auto h-8 w-8 rounded-full shadow-md"
+            size="icon"
+            variant="secondary"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
-
-export const ChatContainer = forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => {
-  return (
-    <div
-      ref={ref}
-      className={cn("grid max-h-full w-full grid-rows-[1fr_auto]", className)}
-      {...props}
-    />
-  );
-});
-ChatContainer.displayName = "ChatContainer";
 
 interface ChatFormProps {
   className?: string;
@@ -310,7 +297,7 @@ interface ChatFormProps {
   }) => ReactElement;
 }
 
-export const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(
+const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(
   ({ children, handleSubmit, className }, ref) => {
     const { files, setFiles, clearFiles } = useFileStore(
       useShallow((state) => ({

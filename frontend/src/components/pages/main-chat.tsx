@@ -12,7 +12,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useFileStore } from "@/stores/file-store";
 import { AlertCircle, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, type ChangeEvent } from "react";
-import { PageActionButton, PageActionGroup } from "@/components/ui/page-action-button";
+import { PageActionButton } from "@/components/ui/page-action-button";
 import { useWebSocketHandlers } from "@/hooks/use-websocket-handlers";
 import { useMessageSubmission } from "@/hooks/use-message-submission";
 import { useShallow } from "zustand/react/shallow";
@@ -275,53 +275,52 @@ export function MainChat({
   }, [messages.length]);
 
   return (
-    <div className={`flex h-screen-mobile ${className} relative`}>
-      {/* New Conversation Button - Absolute positioned top right (hidden in embed mode) */}
-      {!isEmbedMode && messages.length > 0 && (
-        <PageActionGroup isFixedOnMobile={true}>
-          <PageActionButton
-            icon={Plus}
-            label="New"
-            onClick={handleNewConversation}
-            variant="outline"
-            size="sm"
-            title="Start a new conversation"
-            className="mb-2 py-1"
-          />
-        </PageActionGroup>
-      )}
-
-      {/* Token Status - Bottom right corner */}
-      <div className={`absolute md:left-2  left-auto md:right-auto right-2 z-10 ${isEmbedMode ? 'top-2 hidden md:block' : 'md:top-2 top-auto bottom-20 md:bottom-auto'}`}>
-        <TokenStatus convId={convId} />
+    <div className={`flex flex-col h-full ${className} relative overflow-hidden`}>
+      {/* Top bar with New Conversation Button and Token Status */}
+      <div className="flex items-center justify-between px-4 py-2 border-b md:border-0 flex-shrink-0">
+        <div>
+          {!isEmbedMode && messages.length > 0 && (
+            <PageActionButton
+              icon={Plus}
+              label="New"
+              onClick={handleNewConversation}
+              variant="outline"
+              size="sm"
+              title="Start a new conversation"
+            />
+          )}
+        </div>
+        <div className={`${isEmbedMode ? 'hidden md:block' : ''}`}>
+          <TokenStatus convId={convId} />
+        </div>
       </div>
 
-      {/* Todo Panel - Sticky on left */}
-      {(todos?.items?.length > 0 || isLoading) && (
-        <div className="mt-[60px] ml-3.5">
-          <TodoPanel
-            todos={todos}
-            isVisible={isTodoPanelVisible}
-          />
+      {/* Error Alert - shown below top bar */}
+      {error && (
+        <Alert className="mx-4 md:mx-auto mb-2 md:w-[650px] border-red-200 bg-red-50 flex-shrink-0">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Compaction Status - Show when messages exist */}
+      {messages.length > 0 && (
+        <div className="mx-4 mb-2 flex-shrink-0">
+          <CompactionStatus wsClient={wsClient} />
         </div>
       )}
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Error Alert */}
-        {error && (
-          <Alert className="mt-[60px] mx-4 md:mx-auto mb-2 md:w-[650px] border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              {error}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Compaction Status - Show when messages exist */}
-        {messages.length > 0 && (
-          <div className="mx-4 mb-2">
-            <CompactionStatus wsClient={wsClient} />
+      {/* Main Chat Area - takes remaining space */}
+      <div className="flex-1 min-h-0 relative">
+        {/* Todo Panel - Absolute positioned on left */}
+        {(todos?.items?.length > 0 || isLoading) && (
+          <div className="absolute left-2 top-2 z-10">
+            <TodoPanel
+              todos={todos}
+              isVisible={isTodoPanelVisible}
+            />
           </div>
         )}
 
