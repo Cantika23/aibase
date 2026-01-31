@@ -152,7 +152,7 @@ export function Chat({
         ref={containerRef}
         onScroll={handleScroll}
         onTouchStart={handleTouchStart}
-        className="flex-1 overflow-y-auto overflow-x-hidden"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
       >
         {isEmpty ? (
           <div className="h-full flex items-center justify-center px-4">
@@ -186,8 +186,8 @@ export function Chat({
         )}
       </div>
 
-      {/* Input area - fixed height */}
-      <div className="h-16 md:h-20 border-t bg-background px-3 md:px-0">
+      {/* Input area - fixed height, never shrink */}
+      <div className="h-16 md:h-20 shrink-0 border-t bg-background px-3 md:px-0">
         <ChatForm
           className="h-full max-w-[650px] mx-auto flex items-center"
           handleSubmit={handleSubmit}
