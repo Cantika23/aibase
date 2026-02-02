@@ -92,7 +92,7 @@ export function MainChatMobile(props: MainChatProps) {
           
           {/* Token Status - compact for mobile */}
           <div className={isEmbedMode ? "hidden" : ""}>
-            <TokenStatus convId={convId} compact />
+            <TokenStatus convId={convId} />
           </div>
         </div>
       </div>
@@ -146,10 +146,9 @@ export function MainChatMobile(props: MainChatProps) {
             </Button>
           </SheetHeader>
           <div className="mt-4 overflow-y-auto h-[calc(70vh-80px)]">
-            <TodoPanel 
-              todos={todos} 
+            <TodoPanel
+              todos={todos}
               isVisible={true}
-              variant="mobile"
             />
           </div>
         </SheetContent>
