@@ -102,14 +102,14 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	// Format the message
 	message := fmt.Sprintf(format, args...)
 
-	// Use AIMEOW as app name instead of level name
-	appName := "AIMEOW"
+	// Use executable name instead of level name
+	executableName := "AIMEOW"
 
 	// Build the log line
 	logLine := fmt.Sprintf("%s %s[%s]%s %s[%s]%s %s\n",
 		timestamp,
 		level.Color(),
-		appName,
+		executableName,
 		reset,
 		categoryColor(l.category),
 		l.category,

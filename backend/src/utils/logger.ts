@@ -8,7 +8,7 @@ import { PATHS } from '../config/paths';
 const logLevel = process.env.LOG_LEVEL || 'info';
 
 // Executable name for log prefix (hardcoded as this is the backend service)
-const EXECUTABLE_NAME = 'backend';
+const EXECUTABLE_NAME = 'BACKEND';
 
 // Get log categories filter from environment variable (default: '*' = show all)
 // Example: LOG_CATEGORIES=Server,WebSocket,Auth or LOG_CATEGORIES=*Storage
