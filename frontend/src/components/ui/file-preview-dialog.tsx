@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import type { FileInfo } from "@/lib/files-api";
 import { formatFileSize, getFileIcon } from "@/lib/files-api";
 import { formatRelativeTime } from "@/lib/time-utils";
+import { useLogger } from "@/hooks/use-logger";
 
 interface FilePreviewDialogProps {
   files: FileInfo[];
@@ -19,6 +20,7 @@ export function FilePreviewDialog({
   open,
   onOpenChange,
 }: FilePreviewDialogProps) {
+  const log = useLogger('files');
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -84,7 +86,7 @@ export function FilePreviewDialog({
           setIsLoading(false);
         })
         .catch((err) => {
-          console.error('Error loading file:', err);
+          log.error("Error loading file", { error: err });
           setError('Failed to load file content');
           setIsLoading(false);
         });
@@ -92,7 +94,7 @@ export function FilePreviewDialog({
       setFileContent(null);
       setError(null);
     }
-  }, [open, currentFile]);
+  }, [open, currentFile, log]);
 
   const getFileTypeCategory = (fileName: string): string => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';

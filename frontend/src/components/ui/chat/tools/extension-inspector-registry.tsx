@@ -8,6 +8,7 @@
 
 import type { ComponentType } from "react";
 import { loadExtensionDependencies } from "@/lib/extension-dependency-loader";
+import { logger } from "@/lib/logger";
 
 export interface InspectorComponentProps {
   data: any;
@@ -20,6 +21,9 @@ const inspectorComponents: Record<string, ComponentType<InspectorComponentProps>
 // Cache for dynamically loaded inspector components
 const inspectorCache: Record<string, ComponentType<InspectorComponentProps>> = {};
 
+// Module logger
+const log = logger.for('extensions');
+
 /**
  * Register an extension's inspector component
  * @param extensionId - The extension ID (e.g., 'postgresql', 'duckdb')
@@ -30,7 +34,7 @@ export function registerInspector(
   component: ComponentType<InspectorComponentProps>
 ): void {
   inspectorComponents[extensionId] = component;
-  console.log(`[ExtensionInspectorRegistry] Registered inspector for extension: ${extensionId}`);
+  log.debug("Registered inspector for extension", { extensionId });
 }
 
 /**
@@ -60,7 +64,7 @@ export async function getInspector(
     const tenantParam = tenantId !== undefined ? String(tenantId) : undefined;
     await loadExtensionDependencies(extensionId, projectId, tenantParam);
   } catch (error) {
-    console.warn(`[ExtensionInspectorRegistry] Failed to load dependencies for ${extensionId}:`, error);
+    log.warn(`Failed to load dependencies for ${extensionId}`, { error });
     // Continue anyway - dependencies might be optional
   }
 
@@ -72,7 +76,7 @@ export async function getInspector(
       return component;
     }
   } catch (error) {
-    console.warn(`[ExtensionInspectorRegistry] Failed to load inspector for ${extensionId}:`, error);
+    log.warn(`Failed to load inspector for ${extensionId}`, { error });
   }
 
   return null;
@@ -89,7 +93,7 @@ async function loadInspectorFromAPI(
   tenantId?: string | number
 ): Promise<ComponentType<InspectorComponentProps> | null> {
   try {
-    console.log(`[ExtensionInspectorRegistry] Loading inspector for ${extensionId} from API`);
+    log.debug(`Loading inspector for ${extensionId} from API`);
 
     // Fetch bundled UI from backend
     const url = new URL(`/api/extensions/${extensionId}/ui`, window.location.origin);
@@ -100,7 +104,7 @@ async function loadInspectorFromAPI(
     const response = await fetch(url.toString());
 
     if (!response.ok) {
-      console.warn(`[ExtensionInspectorRegistry] API returned ${response.status} for ${extensionId}`);
+      log.warn(`API returned ${response.status} for ${extensionId}`, { status: response.status });
       return null;
     }
 
@@ -120,13 +124,13 @@ async function loadInspectorFromAPI(
     const component = module.default || module.PostgreSQLInspector || module[Object.keys(module)[0]];
 
     if (component) {
-      console.log(`[ExtensionInspectorRegistry] Successfully loaded inspector for ${extensionId}`);
+      log.debug(`Successfully loaded inspector for ${extensionId}`);
       return component as ComponentType<InspectorComponentProps>;
     }
 
     return null;
   } catch (error) {
-    console.error(`[ExtensionInspectorRegistry] Error loading inspector for ${extensionId}:`, error);
+    log.error(`Error loading inspector for ${extensionId}`, { error });
     return null;
   }
 }
@@ -166,5 +170,5 @@ export function clearInspectorCache(): void {
   Object.keys(inspectorCache).forEach(key => {
     delete inspectorCache[key];
   });
-  console.log('[ExtensionInspectorRegistry] Inspector cache cleared');
+  log.debug("Inspector cache cleared");
 }

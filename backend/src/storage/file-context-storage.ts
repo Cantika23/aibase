@@ -6,6 +6,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getProjectDir } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('FileContextStorage');
 
 /**
  * File context mapping: file ID (e.g., "file_1234567890_abc123") -> included in context
@@ -65,7 +68,7 @@ export class FileContextStorage {
       const content = await fs.readFile(filePath, 'utf-8');
       const data: FileContextData = JSON.parse(content);
       this.cache.set(cacheKey, data);
-      console.log(`[FileContextStorage] Loaded file context for ${projectId}: ${Object.keys(data.files).length} files`);
+      logger.info(`Loaded file context for ${projectId}: ${Object.keys(data.files).length} files`);
       return data;
     } catch (error: any) {
       // File doesn't exist or is invalid, return default
@@ -75,10 +78,10 @@ export class FileContextStorage {
           updatedAt: Date.now(),
           files: {},
         };
-        console.log(`[FileContextStorage] No file context found for ${projectId}, using default`);
+        logger.info(`No file context found for ${projectId}, using default`);
         return defaultData;
       }
-      console.error(`[FileContextStorage] Error loading file context for ${projectId}:`, error);
+      logger.error({ error }, `Error loading file context for ${projectId}`);
       return {
         version: '1.0',
         updatedAt: Date.now(),
@@ -106,7 +109,7 @@ export class FileContextStorage {
     // Update cache
     this.cache.set(cacheKey, data);
 
-    console.log(`[FileContextStorage] Saved file context for ${projectId}: ${Object.keys(data.files).length} files`);
+    logger.info(`Saved file context for ${projectId}: ${Object.keys(data.files).length} files`);
   }
 
   /**
@@ -135,7 +138,7 @@ export class FileContextStorage {
     }
 
     await this.saveFileContext(projectId, tenantId, data);
-    console.log(`[FileContextStorage] Set file ${fileId} in context: ${included}`);
+    logger.info(`Set file ${fileId} in context: ${included}`);
   }
 
   /**
@@ -167,7 +170,7 @@ export class FileContextStorage {
     }
 
     await this.saveFileContext(projectId, tenantId, data);
-    console.log(`[FileContextStorage] Bulk set ${fileIds.length} files in context: ${included}`);
+    logger.info(`Bulk set ${fileIds.length} files in context: ${included}`);
   }
 
   /**
@@ -179,7 +182,7 @@ export class FileContextStorage {
     if (fileId in data.files) {
       delete data.files[fileId];
       await this.saveFileContext(projectId, tenantId, data);
-      console.log(`[FileContextStorage] Removed file ${fileId} from context`);
+      logger.info(`Removed file ${fileId} from context`);
     }
   }
 

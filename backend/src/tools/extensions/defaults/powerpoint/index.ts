@@ -8,6 +8,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractTextFromPowerPoint, isPowerPointFile } from '../../../../utils/document-extractor';
 import { getProjectFilesDir } from '../../../../config/paths';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('PowerPointExtension');
 
 // Type definition for injected utilities
 interface ExtensionUtils {
@@ -175,19 +178,19 @@ if (hookRegistry) {
     'afterFileUpload',
     'powerpoint',
     async (_context: any) => {
-      console.log('[PowerPointDocument] Hook called for file:', _context.fileName, 'type:', _context.fileType);
+      logger.info({ fileName: _context.fileName, fileType: _context.fileType }, 'Hook called for file');
 
       // Only process PowerPoint files
       if (!_context.fileType.match(/(^application\/(vnd\.openxmlformats-officedocument\.presentationml\.presentation|vnd\.ms-powerpoint))|\.ppt|\.pptx)/i)) {
-        console.log('[PowerPointDocument] Skipping non-PowerPoint file');
+        logger.info('Skipping non-PowerPoint file');
         return;
       }
 
-      console.log('[PowerPointDocument] Processing PowerPoint file:', _context.fileName);
+      logger.info({ fileName: _context.fileName }, 'Processing PowerPoint file');
 
       try {
         // Extract text content from PowerPoint
-        console.log('[PowerPointDocument] Extracting text from:', _context.filePath);
+        logger.info({ filePath: _context.filePath }, 'Extracting text');
         const text = await extractTextFromPowerPoint(_context.filePath);
 
         // Generate structured description for AI
@@ -211,19 +214,18 @@ Slide count can be determined by structure analysis if needed.`;
           label: "PowerPointDocument",
         });
 
-        console.log('[PowerPointDocument] Generated description for:', _context.fileName, 'text length:', text.length);
+        logger.info({ fileName: _context.fileName, textLength: text.length }, 'Generated description');
 
         return { description, title };
       } catch (error) {
-        console.error('[PowerPointDocument] Hook failed:', error);
-        console.error('[PowerPointDocument] Error stack:', error instanceof Error ? error.stack : String(error));
+        logger.error({ error }, 'Hook failed');
         return {};
       }
     }
   );
-  console.log('[PowerPointDocument] Registered afterFileUpload hook');
+  logger.info('Registered afterFileUpload hook');
 } else {
-  console.log('[PowerPointDocument] extensionHookRegistry not available, hook not registered');
+  logger.info('extensionHookRegistry not available, hook not registered');
 }
 
 // @ts-expect-error - Extension loader wraps this code in an async function

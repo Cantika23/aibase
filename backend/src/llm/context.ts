@@ -2,6 +2,9 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { getConversationDir, getProjectDir, getProjectFilesDir } from "../config/paths";
 import { FileContextStorage } from "../storage/file-context-storage";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("ContextBuilder");
 
 interface TodoItem {
   id: string;
@@ -168,7 +171,7 @@ async function ensureContextTemplate(projectId: string, tenantId: number | strin
     await fs.access(templatePath);
   } catch (error: any) {
     // File doesn't exist, create it
-    console.log(`Context template not found at ${templatePath}, creating default template...`);
+    logger.info({ templatePath }, "Context template not found, creating default template");
 
     try {
       // Ensure project directory exists
@@ -176,9 +179,9 @@ async function ensureContextTemplate(projectId: string, tenantId: number | strin
 
       // Write default template
       await fs.writeFile(templatePath, DEFAULT_TEMPLATE, "utf-8");
-      console.log(`Created default context template at ${templatePath}`);
+    logger.info({ templatePath }, "Created default context template");
     } catch (writeError: any) {
-      console.error("Failed to create context template:", writeError);
+        logger.error({ error: writeError }, "Failed to create context template");
       throw writeError;
     }
   }
@@ -197,7 +200,7 @@ async function loadContextTemplate(projectId: string, tenantId: number | string)
     const content = await fs.readFile(templatePath, "utf-8");
     return content;
   } catch (error: any) {
-    console.error("Failed to load context template:", error);
+    logger.error({ error }, "Failed to load context template");
     // Fallback to default template if reading fails
     return DEFAULT_TEMPLATE;
   }
@@ -243,7 +246,7 @@ async function loadToolExamples(projectId?: string, tenantId?: number | string, 
     // Join all examples with newlines
     return examples.join("\n\n");
   } catch (error) {
-    console.error("Failed to load tool examples:", error);
+    logger.error({ error }, "Failed to load tool examples");
     return "";
   }
 }
@@ -342,7 +345,7 @@ async function injectDynamicContent(
 
   // Replace URL parameter placeholders (support both {{param}} and ${param})
   if (urlParams && Object.keys(urlParams).length > 0) {
-    console.log(`[Context] URL Parameters received:`, urlParams);
+    logger.debug({ urlParams }, "URL Parameters received");
     for (const [key, value] of Object.entries(urlParams)) {
       // Try ${param} format first
       let placeholder = `${key}`;
@@ -352,10 +355,10 @@ async function injectDynamicContent(
       placeholder = `{{${key}}}`;
       context = context.replace(new RegExp(placeholder, 'g'), value);
 
-      console.log(`[Context] Replaced ${key} = ${value}`);
+        logger.debug({ key, value }, "Replaced URL parameter");
     }
   } else {
-    console.log(`[Context] No URL parameters provided`);
+    logger.debug("No URL parameters provided");
   }
 
   // Replace tool context placeholder (now includes extensions if projectId provided)
@@ -406,7 +409,7 @@ async function loadFiles(
       const fileContextStorage = FileContextStorage.getInstance();
       const includedIds = await fileContextStorage.getIncludedFileIds(projectId, tenantId);
       includedFileIds = new Set(includedIds);
-      console.log(`[Context] Filtering files by context: ${includedIds.length} files included`);
+      logger.debug({ includedCount: includedIds.length }, "Filtering files by context");
     }
 
     for (const entry of entries) {
@@ -423,7 +426,7 @@ async function loadFiles(
 
       // Skip if not in context (when filtering is enabled)
       if (filterByContext && includedFileIds && !includedFileIds.has(fileId)) {
-        console.log(`[Context] Skipping file ${entry.name} (not in context)`);
+        logger.debug({ fileName: entry.name }, "Skipping file (not in context)");
         continue;
       }
 

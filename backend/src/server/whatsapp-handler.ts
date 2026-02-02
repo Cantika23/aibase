@@ -12,6 +12,9 @@ import { PATHS, getProjectDir } from "../config/paths";
 import { ScriptRuntime } from "../tools/extensions/script-runtime";
 import { ExtensionLoader } from "../tools/extensions/extension-loader";
 import { getBuiltinTools } from "../tools";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('WhatsAppHandler');
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || "http://localhost:7031/api/v1";
 
@@ -69,12 +72,12 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
 
     // Get client from aimeow API
     const url = `${WHATSAPP_API_URL}/clients`;
-    console.log("[WhatsApp] Fetching clients from:", url);
+    logger.info({ url }, "[WhatsApp] Fetching clients");
     const response = await fetch(url);
 
     if (!response.ok) {
       const text = await response.text();
-      console.error("[WhatsApp] Failed to fetch clients, status:", response.status, "response:", text);
+      logger.error({ status: response.status, response: text }, "[WhatsApp] Failed to fetch clients");
       throw new Error(`Failed to fetch clients from WhatsApp service: ${response.status} ${text}`);
     }
 
@@ -103,7 +106,7 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
       },
     });
   } catch (error) {
-    console.error("[WhatsApp] Error getting client:", error);
+    logger.error({ error }, "[WhatsApp] Error getting client");
     return Response.json(
       { success: false, error: "Failed to get WhatsApp client" },
       { status: 500 }
@@ -151,7 +154,7 @@ export async function handleCreateWhatsAppClient(req: Request): Promise<Response
 
     if (!response.ok) {
       const error = await response.text();
-      console.error("[WhatsApp] Error creating client:", error);
+      logger.error({ error }, "[WhatsApp] Error creating client");
       throw new Error("Failed to create WhatsApp client");
     }
 
@@ -166,7 +169,7 @@ export async function handleCreateWhatsAppClient(req: Request): Promise<Response
       },
     });
   } catch (error) {
-    console.error("[WhatsApp] Error creating client:", error);
+    logger.error({ error }, "[WhatsApp] Error creating client");
     return Response.json(
       { success: false, error: "Failed to create WhatsApp client" },
       { status: 500 }
@@ -202,7 +205,7 @@ export async function handleDeleteWhatsAppClient(req: Request): Promise<Response
       success: true,
     });
   } catch (error) {
-    console.error("[WhatsApp] Error deleting client:", error);
+    logger.error({ error }, "[WhatsApp] Error deleting client");
     return Response.json(
       { success: false, error: "Failed to delete WhatsApp client" },
       { status: 500 }
@@ -250,7 +253,7 @@ export async function handleGetWhatsAppQRCode(req: Request): Promise<Response> {
       qrCode: data.qrCode,
     });
   } catch (error) {
-    console.error("[WhatsApp] Error getting QR code:", error);
+    logger.error({ error }, "[WhatsApp] Error getting QR code");
     return Response.json(
       { success: false, error: "Failed to get QR code" },
       { status: 500 }
@@ -266,7 +269,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     const body = await req.json() as any;
     const { clientId, message: messageData, timestamp } = body;
 
-    console.log("[WhatsApp] Webhook received:", {
+    logger.info({
       clientId,
       from: messageData?.from,
       isLID: messageData?.isLID,
@@ -277,12 +280,12 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       fromMe: messageData?.fromMe,
       isGroup: messageData?.isGroup,
       pushName: messageData?.pushName,
-    });
+    }, "[WhatsApp] Webhook received");
 
     // Ignore messages sent by the bot/device itself (self-messages)
     // This prevents the AI from replying to itself or syncing manual replies as user input
     if (messageData?.fromMe) {
-      console.log("[WhatsApp] Ignoring self-message fromMe=true");
+      logger.info("[WhatsApp] Ignoring self-message fromMe=true");
       return Response.json({ success: true, ignored: true });
     }
 
@@ -294,7 +297,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     const project = projectStorage.getById(projectId);
 
     if (!project) {
-      console.error("[WhatsApp] Project not found:", projectId);
+      logger.error({ projectId }, "[WhatsApp] Project not found");
       return Response.json({ success: false, error: "Project not found" });
     }
 
@@ -305,7 +308,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
 
       // If no mentions at all, ignore
       if (mentions.length === 0) {
-        console.log("[WhatsApp] Ignoring group message (no mentions)");
+        logger.info("[WhatsApp] Ignoring group message (no mentions)");
         return Response.json({ success: true, ignored: true });
       }
 
@@ -314,35 +317,32 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
         // Mentions are JIDs (e.g., 12345@s.whatsapp.net), myPhone is usually just digits (12345)
         const isMentioned = mentions.some((m: string) => m.includes(myPhone));
         if (!isMentioned) {
-          console.log("[WhatsApp] Ignoring group message (bot not mentioned)", { myPhone, mentions });
+          logger.info({ myPhone, mentions }, "[WhatsApp] Ignoring group message (bot not mentioned)");
           return Response.json({ success: true, ignored: true });
         }
       } else {
         // If we don't know our phone number but there are mentions, 
         // we conservatively ignore it to prevent spamming groups.
-        console.log("[WhatsApp] Ignoring group message (unknown bot identity)");
+        logger.info("[WhatsApp] Ignoring group message (unknown bot identity)");
         return Response.json({ success: true, ignored: true });
       }
 
-      console.log("[WhatsApp] Processing group message (bot mentioned)", { myPhone, mentions });
+      logger.info({ myPhone, mentions }, "[WhatsApp] Processing group message (bot mentioned)");
     } else {
       // Logic for Private Chat (DM)
-      console.log("[WhatsApp] Processing PRIVATE message (DM)", { 
-        from: messageData.from, 
-        pushName: messageData.pushName 
-      });
+      logger.info({ from: messageData.from, pushName: messageData.pushName }, "[WhatsApp] Processing PRIVATE message (DM)");
     }
 
     // CHECK: Is this an unresolved LID?
     // aimeow sends isLID=true when it couldn't resolve the LID to a phone number
     // In this case, we cannot reply because we don't have a valid phone number
     if (messageData.isLID) {
-      console.error("[WhatsApp] ❌ CANNOT REPLY: Unresolved LID detected from:", messageData.from);
-      console.error("[WhatsApp] Raw fields provided by aimeow:", {
+      logger.error({ from: messageData.from }, "[WhatsApp] ❌ CANNOT REPLY: Unresolved LID detected");
+      logger.error({
         rawChat: messageData.rawChat,
         rawSender: messageData.rawSender,
         rawSenderAlt: messageData.rawSenderAlt,
-      });
+      }, "[WhatsApp] Raw fields provided by aimeow");
       // Return early - we cannot reply to an LID
       return Response.json({
         success: true,
@@ -355,7 +355,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     // CHECK: If 'from' field is empty, aimeow couldn't resolve the phone number
     // Try to extract from raw fields, but if we can't find one, we cannot reply
     if (!messageData.from || messageData.from === "") {
-      console.warn("[WhatsApp] 'from' field is empty (LID not resolved), attempting extraction from raw fields");
+      logger.warn("[WhatsApp] 'from' field is empty (LID not resolved), attempting extraction from raw fields");
       // Don't return early - try to extract from raw fields below
     }
 
@@ -372,7 +372,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       const phoneClean = rawSenderAltClean.split(':')[0];
       if (phoneClean.length >= 8 && phoneClean.length < 15) {
         whatsappNumber = phoneClean;
-        console.log("[WhatsApp] Using rawSenderAlt for reply target:", whatsappNumber);
+        logger.info({ whatsappNumber }, "[WhatsApp] Using rawSenderAlt for reply target");
       }
     }
 
@@ -383,7 +383,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       // Skip if it's obviously an LID (too long)
       if (phoneClean.length < 15) {
         whatsappNumber = phoneClean;
-        console.log("[WhatsApp] Using rawChat for DM reply target:", whatsappNumber);
+        logger.info({ whatsappNumber }, "[WhatsApp] Using rawChat for DM reply target");
       }
     }
 
@@ -393,7 +393,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       const phoneClean = rawSenderClean.split(':')[0];
       if (phoneClean.length < 15) {
         whatsappNumber = phoneClean;
-        console.log("[WhatsApp] Using rawSender for Group reply target:", whatsappNumber);
+        logger.info({ whatsappNumber }, "[WhatsApp] Using rawSender for Group reply target");
       }
     }
 
@@ -402,14 +402,14 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       const fromCandidate = messageData.from.replace(/[^0-9]/g, '');
       // Check if it's an obvious LID (too long for a phone number)
       if (fromCandidate.length >= 15) {
-        console.error("[WhatsApp] ❌ CANNOT REPLY: 'from' field contains LID, no valid phone number available");
-        console.error("[WhatsApp] Message data received:", {
+        logger.error("[WhatsApp] ❌ CANNOT REPLY: 'from' field contains LID, no valid phone number available");
+        logger.error({
           from: messageData.from,
           rawChat: messageData.rawChat,
           rawSender: messageData.rawSender,
           rawSenderAlt: messageData.rawSenderAlt,
           isLID: messageData.isLID,
-        });
+        }, "[WhatsApp] Message data received");
         return Response.json({
           success: false,
           error: "Cannot reply - no valid phone number found (LID detected)",
@@ -417,7 +417,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
         });
       }
       whatsappNumber = fromCandidate;
-      console.warn("[WhatsApp] WARNING: Using 'from' field as fallback:", whatsappNumber);
+      logger.warn({ whatsappNumber }, "[WhatsApp] WARNING: Using 'from' field as fallback");
     }
 
     // Ensure format is clean (digits only)
@@ -435,7 +435,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       if (whatsappNumber.endsWith('33') || whatsappNumber.endsWith('24') || whatsappNumber.endsWith('25')) {
         const trimmed = whatsappNumber.slice(0, -2);
         if (trimmed.length >= 10) {
-           console.log(`[WhatsApp] Correcting phone number from ${whatsappNumber} to ${trimmed}`);
+           logger.info({ from: whatsappNumber, to: trimmed }, '[WhatsApp] Correcting phone number');
            whatsappNumber = trimmed;
         }
       }
@@ -443,7 +443,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       else if (whatsappNumber.length > 14) {
          const trimmed = whatsappNumber.slice(0, -1);
          if (trimmed.length >= 10) {
-            console.log(`[WhatsApp] trimming extra digit from phone number ${whatsappNumber} to ${trimmed}`);
+            logger.info({ from: whatsappNumber, to: trimmed }, '[WhatsApp] trimming extra digit from phone number');
             whatsappNumber = trimmed;
          }
       }
@@ -474,7 +474,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       convId = `wa_${whatsappNumber}`;
       const title = `WhatsApp - ${messageData.pushName || whatsappNumber}`;
 
-      console.log("[WhatsApp] Creating new conversation:", convId, "with title:", title);
+      logger.info({ convId, title }, "[WhatsApp] Creating new conversation");
       // Note: Conversation will be created automatically when ChatHistoryStorage.saveChatHistory() is called
     }
 
@@ -517,14 +517,14 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
               const filename = `${messageData.id || Date.now()}${ext}`;
               const filePath = path.join(whatsappFilesDir, filename);
 
-              console.log(`[WhatsApp] saving image to: ${filePath}`);
+              logger.info({ filePath }, '[WhatsApp] saving image');
 
               // Download file
               const imgResponse = await fetch(messageData.fileUrl);
               if (imgResponse.ok) {
                  const arrayBuffer = await imgResponse.arrayBuffer();
                  await fs.writeFile(filePath, Buffer.from(arrayBuffer));
-                 console.log(`[WhatsApp] Image saved successfully: ${filename}`);
+                 logger.info({ filename }, '[WhatsApp] Image saved successfully');
                  
 
 
@@ -539,10 +539,10 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
                    originalUrl: messageData.fileUrl
                  }, null, 2));
               } else {
-                 console.error(`[WhatsApp] Failed to download image from ${messageData.fileUrl}: ${imgResponse.status}`);
+                 logger.error({ url: messageData.fileUrl, status: imgResponse.status }, '[WhatsApp] Failed to download image');
               }
             } catch (err) {
-              console.error("[WhatsApp] Error saving image file:", err);
+              logger.error({ err }, "[WhatsApp] Error saving image file");
             }
           })();
         }
@@ -634,38 +634,38 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       autoReply += `🗺️ Maps: https://maps.google.com/?q=${lat},${lng}\n\n`;
       autoReply += `_Lokasi ini akan dilampirkan dalam laporan pengaduan Anda._`;
       
-      console.log("[WhatsApp] Location handler: Sending instant response for location message");
+      logger.info("[WhatsApp] Location handler: Sending instant response for location message");
       
       // Kirim respons langsung tanpa AI
       sendWhatsAppMessage(projectId, whatsappNumber, { text: autoReply })
-        .then(() => console.log("[WhatsApp] Location auto-reply sent successfully"))
-        .catch((err) => console.error("[WhatsApp] Error sending location auto-reply:", err));
+        .then(() => logger.info("[WhatsApp] Location auto-reply sent successfully"))
+        .catch((err) => logger.error({ err }, "[WhatsApp] Error sending location auto-reply"));
       
       return Response.json({ success: true, convId, uid, handledBy: "location_handler" });
     }
 
     // Process the message through the AI system
-    console.log("[WhatsApp] Processing message:", {
+    logger.info({
       projectId,
       convId,
       from: whatsappNumber,
       messageText,
       attachments,
-    });
+    }, "[WhatsApp] Processing message");
 
     // Process message through AI (async, don't block webhook response)
     processWhatsAppMessageWithAI(projectId, convId, whatsappNumber, messageText, attachments, uid)
       .catch((error) => {
-        console.error("[WhatsApp] Error processing message with AI:", error);
+        logger.error({ error }, "[WhatsApp] Error processing message with AI");
         // Send error message to user
         sendWhatsAppMessage(projectId, whatsappNumber, {
           text: "Sorry, I encountered an error processing your message. Please try again.",
-        }).catch(console.error);
+        }).catch((err) => logger.error({ err }, "[WhatsApp] Error sending error message"));
       });
 
     return Response.json({ success: true, convId, uid });
   } catch (error) {
-    console.error("[WhatsApp] Error handling webhook:", error);
+    logger.error({ error }, "[WhatsApp] Error handling webhook");
     return Response.json(
       { success: false, error: "Failed to handle webhook" },
       { status: 500 }
@@ -718,8 +718,8 @@ async function executeWhatsAppScript(
   whatsappNumber: string
 ): Promise<string | null> {
   try {
-    console.log("[WhatsApp] Executing script with ScriptRuntime:", scriptData.purpose || "Unknown purpose");
-    console.log("[WhatsApp] Script code:", scriptData.code.substring(0, 200) + "...");
+    logger.info({ purpose: scriptData.purpose || "Unknown purpose" }, "[WhatsApp] Executing script with ScriptRuntime");
+    logger.info({ code: scriptData.code.substring(0, 200) + "..." }, "[WhatsApp] Script code");
     
     // Load extensions via ExtensionLoader
     const extensionLoader = new ExtensionLoader();
@@ -728,12 +728,12 @@ async function executeWhatsAppScript(
     try {
       await extensionLoader.initializeProject(projectId);
     } catch (initError) {
-      console.warn("[WhatsApp] Extension initialization failed (non-critical):", initError);
+      logger.warn({ initError }, "[WhatsApp] Extension initialization failed (non-critical)");
     }
     
     // Load all enabled extensions
     const extensions = await extensionLoader.loadExtensions(projectId);
-    console.log("[WhatsApp] Loaded extensions:", Object.keys(extensions).join(", ") || "none");
+    logger.info({ extensions: Object.keys(extensions).join(", ") || "none" }, "[WhatsApp] Loaded extensions");
 
     // Create a broadcast function that sends progress to WhatsApp
     const broadcast = (type: "tool_call" | "tool_result", data: any) => {
@@ -741,7 +741,7 @@ async function executeWhatsAppScript(
         // Send progress update to WhatsApp
         sendWhatsAppMessage(projectId, whatsappNumber, {
           text: `⏳ ${data.result.message}`,
-        }).catch(console.error);
+        }).catch((err: any) => logger.error({ err }, "[WhatsApp] Error sending progress message"));
       }
     };
 
@@ -766,7 +766,7 @@ async function executeWhatsAppScript(
       ),
     ]);
 
-    console.log("[WhatsApp] Script execution result:", JSON.stringify(result).substring(0, 200));
+    logger.info({ result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Script execution result");
 
     // Format result for WhatsApp
     if (result === undefined || result === null) {
@@ -783,7 +783,7 @@ async function executeWhatsAppScript(
     return formatted || String(result);
 
   } catch (error) {
-    console.error("[WhatsApp] Error executing script:", error);
+    logger.error({ error }, "[WhatsApp] Error executing script");
     return `❌ Maaf, terjadi kesalahan saat memproses permintaan: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
@@ -916,7 +916,7 @@ function formatToolResultForWhatsApp(toolName: string, args: any, result: any): 
     // Fallback for other types
     return String(result);
   } catch (error) {
-    console.error("[WhatsApp] Error formatting tool result:", error);
+    logger.error({ error }, "[WhatsApp] Error formatting tool result");
     return null;
   }
 }
@@ -1001,8 +1001,8 @@ async function processWhatsAppMessageWithAI(
   uid: string
 ): Promise<void> {
   try {
-    console.log("[WhatsApp] Starting AI processing for message:", messageText);
-    console.log("[WhatsApp] Received attachments:", JSON.stringify(attachments, null, 2));
+    logger.info({ messageText }, "[WhatsApp] Starting AI processing for message");
+    logger.info({ attachments: JSON.stringify(attachments, null, 2) }, "[WhatsApp] Received attachments");
 
     // Start typing indicator immediately
     await startWhatsAppTyping(projectId, whatsappNumber);
@@ -1021,24 +1021,24 @@ async function processWhatsAppMessageWithAI(
     const hasImages = attachments.some(a => a.type === "image" && a.url);
     if (hasImages) {
       try {
-        console.log("[WhatsApp] Sending image analysis notification");
+        logger.info("[WhatsApp] Sending image analysis notification");
         await sendWhatsAppMessage(projectId, whatsappNumber, {
           text: `⏳ Analyzing image(s)...`,
         }, true); // keep typing
       } catch (err) {
-        console.error("[WhatsApp] Failed to send image analysis notification:", err);
+        logger.error({ err }, "[WhatsApp] Failed to send image analysis notification");
       }
     }
     
     for (const attachment of attachments) {
       if (attachment.type === "image" && attachment.url) {
-        console.log("[WhatsApp] Processing image attachment:", attachment.url);
+        logger.info({ url: attachment.url }, "[WhatsApp] Processing image attachment");
         
         try {
           // Download image from URL
           const imgResponse = await fetch(attachment.url);
           if (!imgResponse.ok) {
-            console.error("[WhatsApp] Failed to download image:", imgResponse.status);
+            logger.error({ status: imgResponse.status }, "[WhatsApp] Failed to download image");
             continue;
           }
           
@@ -1046,12 +1046,12 @@ async function processWhatsAppMessageWithAI(
           const base64Image = Buffer.from(arrayBuffer).toString('base64');
           const mimeType = attachment.mimeType || 'image/jpeg';
           
-          console.log("[WhatsApp] Image downloaded, size:", arrayBuffer.byteLength, "bytes");
+          logger.info({ size: arrayBuffer.byteLength }, "[WhatsApp] Image downloaded");
           
           // Call Vision API to analyze image
           const apiKey = process.env.OPENAI_API_KEY;
           if (!apiKey) {
-            console.warn("[WhatsApp] OPENAI_API_KEY not set, skipping image analysis");
+            logger.warn("[WhatsApp] OPENAI_API_KEY not set, skipping image analysis");
             continue;
           }
           
@@ -1063,7 +1063,7 @@ async function processWhatsAppMessageWithAI(
             ? `User's question about this image: "${messageText}"\n\nPlease describe what you see in this image and answer the user's question if applicable.`
             : "Describe this image in detail, including the main subjects, colors, composition, mood, and any text visible in the image.";
           
-          console.log("[WhatsApp] Calling Vision API...");
+          logger.info("[WhatsApp] Calling Vision API...");
           const visionResponse = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -1090,7 +1090,7 @@ async function processWhatsAppMessageWithAI(
           
           if (!visionResponse.ok) {
             const errorText = await visionResponse.text();
-            console.error("[WhatsApp] Vision API error:", visionResponse.status, errorText);
+            logger.error({ status: visionResponse.status, errorText }, "[WhatsApp] Vision API error");
             continue;
           }
           
@@ -1099,25 +1099,25 @@ async function processWhatsAppMessageWithAI(
                              visionData.choices?.[0]?.message?.reasoning_content;
           
           if (description) {
-            console.log("[WhatsApp] Image analyzed:", description.substring(0, 100) + "...");
+            logger.info({ description: description.substring(0, 100) + "..." }, "[WhatsApp] Image analyzed");
             
             // Add image description to message for AI context
             enhancedMessage = `[User sent an image]\n\n**Image Analysis:**\n${description}\n\n${messageText ? `**User's message:** ${messageText}` : "Please respond to the image."}`;
           }
         } catch (err) {
-          console.error("[WhatsApp] Error analyzing image:", err);
+          logger.error({ err }, "[WhatsApp] Error analyzing image");
         }
       }
     }
     
     // Use enhanced message if we processed images
     const finalMessage = enhancedMessage;
-    console.log("[WhatsApp] Final message to AI:", finalMessage.substring(0, 200) + "...");
+    logger.info({ finalMessage: finalMessage.substring(0, 200) + "..." }, "[WhatsApp] Final message to AI");
 
     // Load existing conversation history
-    console.log("[WhatsApp] Loading client history...");
+    logger.info("[WhatsApp] Loading client history...");
     const existingHistory = await chatHistoryStorage.loadChatHistory(convId, projectId, tenantId);
-    console.log("[WhatsApp] Loaded history, messages:", existingHistory?.length || 0);
+    logger.info({ messageCount: existingHistory?.length || 0 }, "[WhatsApp] Loaded history");
 
     // Track tool execution results to send if AI response is empty
     const toolResults: Array<{ toolName: string; result: any }> = [];
@@ -1128,10 +1128,10 @@ async function processWhatsAppMessageWithAI(
 
     // Load built-in tools for this conversation (includes script tool with extensions)
     const tools = getBuiltinTools(convId, projectId, tenantId, uid);
-    console.log("[WhatsApp] Loaded tools:", tools.map(t => t.name).join(", "));
+    logger.info({ tools: tools.map(t => t.name).join(", ") }, "[WhatsApp] Loaded tools");
 
     // Create conversation instance with custom hooks for script progress and tool results
-    console.log("[WhatsApp] Creating conversation instance...");
+    logger.info("[WhatsApp] Creating conversation instance...");
     const conversation = await Conversation.create({
       projectId,
       tenantId,
@@ -1164,7 +1164,7 @@ Always answer in the same language as the user (Indonesian/English).`,
             // The script tool injects __status and __result via the broadcast function
             if (toolName === "script" && args.__status === "progress" && args.__result) {
               const progressMessage = args.__result.message;
-              console.log("[WhatsApp] Script progress:", progressMessage);
+              logger.info({ progressMessage }, "[WhatsApp] Script progress");
 
               // Check if we already sent this exact notification
               const notificationKey = `progress:${progressMessage}`;
@@ -1180,7 +1180,7 @@ Always answer in the same language as the user (Indonesian/English).`,
                   text: `⏳ ${progressMessage}`,
                 }, true); // keep typing
               } catch (err) {
-                console.error("[WhatsApp] Failed to send progress message:", err);
+                logger.error({ err }, "[WhatsApp] Failed to send progress message");
                 // Don't throw - progress messages are optional
               }
               return;
@@ -1202,20 +1202,20 @@ Always answer in the same language as the user (Indonesian/English).`,
             // Check if we already sent this exact notification
             const notificationKey = `tool:${notificationText}`;
             if (sentNotifications.has(notificationKey)) {
-              console.log("[WhatsApp] Skipping duplicate tool notification:", notificationText);
+              logger.debug({ notificationText }, "[WhatsApp] Skipping duplicate tool notification");
               return;
             }
             sentNotifications.add(notificationKey);
 
-            console.log("[WhatsApp] Tool started:", toolName, notificationText);
+            logger.info({ toolName, notificationText }, "[WhatsApp] Tool started");
             try {
               await sendWhatsAppMessage(projectId, whatsappNumber, { text: notificationText }, true); // keep typing
             } catch (err) {
-              console.error("[WhatsApp] Failed to send tool start notification:", err);
+              logger.error({ err }, "[WhatsApp] Failed to send tool start notification");
             }
           },
           after: async (toolCallId: string, toolName: string, args: any, result: any) => {
-            console.log("[WhatsApp] Tool executed:", toolName, "Result:", JSON.stringify(result).substring(0, 200));
+            logger.info({ toolName, result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Tool executed");
             
             // Store tool result for later use
             toolResults.push({ toolName, result });
@@ -1223,41 +1223,41 @@ Always answer in the same language as the user (Indonesian/English).`,
             // For script tool, immediately send result to user
             // This ensures user gets data even if AI follow-up is empty
             if (toolName === "script" && result && !toolResultSent) {
-              console.log("[WhatsApp] Formatting script tool result for WhatsApp...");
+              logger.info("[WhatsApp] Formatting script tool result for WhatsApp...");
               const formattedResult = formatToolResultForWhatsApp(toolName, args, result);
-              console.log("[WhatsApp] Formatted result:", formattedResult ? formattedResult.substring(0, 200) + "..." : "NULL");
+              logger.info({ formattedResult: formattedResult ? formattedResult.substring(0, 200) + "..." : "NULL" }, "[WhatsApp] Formatted result");
               if (formattedResult) {
-                console.log("[WhatsApp] Sending tool result directly to user");
+                logger.info("[WhatsApp] Sending tool result directly to user");
                 try {
                   await sendWhatsAppMessage(projectId, whatsappNumber, {
                     text: formattedResult,
                   });
                   toolResultSent = true;
-                  console.log("[WhatsApp] Tool result sent successfully");
+                  logger.info("[WhatsApp] Tool result sent successfully");
                 } catch (err) {
-                  console.error("[WhatsApp] Failed to send tool result:", err);
+                  logger.error({ err }, "[WhatsApp] Failed to send tool result");
                 }
               } else {
-                console.warn("[WhatsApp] formatToolResultForWhatsApp returned null, not sending");
+                logger.warn("[WhatsApp] formatToolResultForWhatsApp returned null, not sending");
               }
             }
           },
         },
       },
     });
-    console.log("[WhatsApp] Conversation created");
+    logger.info("[WhatsApp] Conversation created");
 
     // Load history if exists
     if (existingHistory && existingHistory.length > 0) {
       (conversation as any)._history = existingHistory;
     }
-    console.log("[WhatsApp] Sending user message to AI...");
+    logger.info("[WhatsApp] Sending user message to AI...");
 
     // Initialize response accumulator
     let fullResponse = "";
 
     // Add user message to conversation and stream response
-    console.log("[WhatsApp] Stream started. Waiting for first chunk...");
+    logger.info("[WhatsApp] Stream started. Waiting for first chunk...");
     let chunkCount = 0;
     
     // Create a timeout promise - increased to 60s for slow networks
@@ -1275,13 +1275,13 @@ Always answer in the same language as the user (Indonesian/English).`,
       try {
         for await (const chunk of conversation.sendMessage(finalMessage, attachments)) {
           chunkCount++;
-          if (chunkCount === 1) console.log("[WhatsApp] First chunk received!");
+          if (chunkCount === 1) logger.info("[WhatsApp] First chunk received!");
           fullResponse += chunk;
           // Log progress every 50 chunks to avoid spam
-          if (chunkCount % 50 === 0) console.log(`[WhatsApp] Received ${chunkCount} chunks...`);
+          if (chunkCount % 50 === 0) logger.info({ chunkCount }, `[WhatsApp] Received chunks...`);
         }
       } catch (err) {
-        console.error("[WhatsApp] Error during AI streaming:", err);
+        logger.error({ err }, "[WhatsApp] Error during AI streaming");
         throw err;
       }
     })();
@@ -1290,7 +1290,7 @@ Always answer in the same language as the user (Indonesian/English).`,
     await Promise.race([streamPromise, timeoutPromise]);
     isComplete = true;
 
-    console.log("[WhatsApp] AI response complete, total chunks:", chunkCount, "length:", fullResponse.length);
+    logger.info({ chunkCount, fullResponseLength: fullResponse.length }, "[WhatsApp] AI response complete");
 
     // Save conversation history
     const history = (conversation as any)._history || [];
@@ -1299,7 +1299,7 @@ Always answer in the same language as the user (Indonesian/English).`,
     // If tool result was already sent, we may not need to send AI's response
     // unless it contains additional useful information
     if (toolResultSent) {
-      console.log("[WhatsApp] Tool result already sent to user");
+      logger.info("[WhatsApp] Tool result already sent to user");
       
       // Check if AI generated a meaningful follow-up response
       if (fullResponse.trim()) {
@@ -1318,12 +1318,12 @@ Always answer in the same language as the user (Indonesian/English).`,
         const isGenericResponse = genericPatterns.some(p => p.test(cleanedResponse));
         
         if (cleanedResponse.trim() && !isGenericResponse && cleanedResponse.length > 50) {
-          console.log("[WhatsApp] Sending additional AI context:", cleanedResponse.substring(0, 50) + "...");
+          logger.info({ cleanedResponse: cleanedResponse.substring(0, 50) + "..." }, "[WhatsApp] Sending additional AI context");
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: cleanedResponse,
           });
         } else {
-          console.log("[WhatsApp] Skipping generic/short AI response since tool result already sent");
+          logger.info("[WhatsApp] Skipping generic/short AI response since tool result already sent");
         }
       }
       return;
@@ -1335,17 +1335,17 @@ Always answer in the same language as the user (Indonesian/English).`,
       const inlineScript = detectInlineScriptJSON(fullResponse);
       
       if (inlineScript) {
-        console.log("[WhatsApp] Detected inline script JSON, executing...");
+        logger.info("[WhatsApp] Detected inline script JSON, executing...");
         const scriptResult = await executeWhatsAppScript(inlineScript, projectId, String(tenantId), whatsappNumber);
         
         if (scriptResult) {
-          console.log("[WhatsApp] Script executed, sending result:", scriptResult.substring(0, 100) + "...");
+          logger.info({ scriptResult: scriptResult.substring(0, 100) + "..." }, "[WhatsApp] Script executed, sending result");
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: scriptResult,
           });
-          console.log("[WhatsApp] Script result sent successfully");
+          logger.info("[WhatsApp] Script result sent successfully");
         } else {
-          console.warn("[WhatsApp] Script execution returned no result");
+          logger.warn("[WhatsApp] Script execution returned no result");
         }
         return;
       }
@@ -1354,15 +1354,15 @@ Always answer in the same language as the user (Indonesian/English).`,
       const cleanedResponse = cleanWhatsAppResponse(fullResponse);
       
       if (!cleanedResponse.trim()) {
-        console.warn("[WhatsApp] WARNING: Response is empty after cleaning. Checking for tool results...");
-        console.warn("[WhatsApp] Full raw response was:", fullResponse);
+        logger.warn("[WhatsApp] WARNING: Response is empty after cleaning. Checking for tool results...");
+        logger.warn({ fullResponse }, "[WhatsApp] Full raw response");
         
         // If we have tool results but didn't send them yet, send now
         if (toolResults.length > 0) {
           for (const { toolName, result } of toolResults) {
             const formatted = formatToolResultForWhatsApp(toolName, {}, result);
             if (formatted) {
-              console.log("[WhatsApp] Sending stored tool result as fallback");
+              logger.info("[WhatsApp] Sending stored tool result as fallback");
               await sendWhatsAppMessage(projectId, whatsappNumber, {
                 text: formatted,
               });
@@ -1373,14 +1373,14 @@ Always answer in the same language as the user (Indonesian/English).`,
         return;
       }
 
-      console.log("[WhatsApp] Sending response back to WhatsApp:", cleanedResponse.substring(0, 100) + "...");
+      logger.info({ cleanedResponse: cleanedResponse.substring(0, 100) + "..." }, "[WhatsApp] Sending response back to WhatsApp");
       await sendWhatsAppMessage(projectId, whatsappNumber, {
         text: cleanedResponse,
       });
-      console.log("[WhatsApp] Response sent successfully");
+      logger.info("[WhatsApp] Response sent successfully");
     } else if (toolResults.length > 0) {
       // No AI response but we have tool results
-      console.log("[WhatsApp] No AI response, sending tool results");
+      logger.info("[WhatsApp] No AI response, sending tool results");
       for (const { toolName, result } of toolResults) {
         const formatted = formatToolResultForWhatsApp(toolName, {}, result);
         if (formatted) {
@@ -1394,8 +1394,8 @@ Always answer in the same language as the user (Indonesian/English).`,
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : 'No stack trace';
-    console.error("[WhatsApp] Error in AI processing. Message:", errorMessage);
-    console.error("[WhatsApp] Error stack:", errorStack);
+    logger.error({ errorMessage }, "[WhatsApp] Error in AI processing");
+    logger.error({ errorStack }, "[WhatsApp] Error stack");
     throw error;
   }
 }
@@ -1423,13 +1423,13 @@ async function startWhatsAppTyping(projectId: string, phone: string): Promise<vo
       // Don't log 404s loudly as it might mean feature not supported or client not ready
       if (response.status !== 404) {
         const errorText = await response.text();
-        console.warn("[WhatsApp] Failed to start typing indicator:", errorText);
+        logger.warn({ errorText }, "[WhatsApp] Failed to start typing indicator");
       }
     } else {
-      console.log("[WhatsApp] Started typing indicator for", phone);
+      logger.info({ phone }, "[WhatsApp] Started typing indicator");
     }
   } catch (error) {
-    console.warn("[WhatsApp] Error starting typing:", error);
+    logger.warn({ error }, "[WhatsApp] Error starting typing");
   }
 }
 
@@ -1448,13 +1448,13 @@ async function stopWhatsAppTyping(projectId: string, phone: string): Promise<voi
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn("[WhatsApp] Failed to stop typing indicator:", errorText);
+      logger.warn({ errorText }, "[WhatsApp] Failed to stop typing indicator");
       // Don't throw - this is not critical
     } else {
-      console.log("[WhatsApp] Stopped typing indicator for", phone);
+      logger.info({ phone }, "[WhatsApp] Stopped typing indicator");
     }
   } catch (error) {
-    console.warn("[WhatsApp] Error stopping typing:", error);
+    logger.warn({ error }, "[WhatsApp] Error stopping typing");
     // Don't throw - this is not critical
   }
 }
@@ -1469,7 +1469,7 @@ async function sendWhatsAppMessage(
   keepTyping: boolean = false
 ): Promise<void> {
   try {
-    console.log("[WhatsApp] Sending to WhatsApp:", phone, "message:", message.text?.substring(0, 50) + "...");
+    logger.info({ phone, message: message.text?.substring(0, 50) + "..." }, "[WhatsApp] Sending to WhatsApp");
     const response = await fetch(`${WHATSAPP_API_URL}/clients/${projectId}/send-message`, {
       method: "POST",
       headers: {
@@ -1484,11 +1484,11 @@ async function sendWhatsAppMessage(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[WhatsApp] Failed to send WhatsApp message:", errorText);
+      logger.error({ errorText }, "[WhatsApp] Failed to send WhatsApp message");
       throw new Error("Failed to send WhatsApp message");
     }
 
-    console.log("[WhatsApp] Message sent successfully to", phone);
+    logger.info({ phone }, "[WhatsApp] Message sent successfully");
 
     // Stop typing indicator after message is sent, UNLESS keepTyping is true
     // Typing should continue during AI processing and tool execution
@@ -1497,17 +1497,17 @@ async function sendWhatsAppMessage(
     } else {
       // FORCE restart typing if keepTyping is true
       // Sending a message usually stops the typing indicator on the client side
-      console.log("[WhatsApp] keepTyping=true, restarting typing indicator...");
-      startWhatsAppTyping(projectId, phone).catch(e => console.warn("[WhatsApp] Failed to restart typing:", e));
+      logger.info("[WhatsApp] keepTyping=true, restarting typing indicator...");
+      startWhatsAppTyping(projectId, phone).catch((e: any) => logger.warn({ e }, "[WhatsApp] Failed to restart typing"));
     }
   } catch (error) {
-    console.error("[WhatsApp] Error sending message to URL:", `${WHATSAPP_API_URL}/clients/${projectId}/send-message`);
-    console.error("[WhatsApp] Error details:", error);
+    logger.error({ url: `${WHATSAPP_API_URL}/clients/${projectId}/send-message` }, "[WhatsApp] Error sending message to URL");
+    logger.error({ error }, "[WhatsApp] Error details");
     
     const errorStr = String(error);
     if (errorStr.includes("fetch failed") || errorStr.includes("ECONNREFUSED")) {
-      console.error("\x1b[31m[WhatsApp] CRITICAL: Could not connect to WhatsApp Service!\x1b[0m");
-      console.error("\x1b[33m[WhatsApp] Please ensure the WhatsApp automation service is running on port 7031.\x1b[0m");
+      logger.error("[WhatsApp] CRITICAL: Could not connect to WhatsApp Service!");
+      logger.error("[WhatsApp] Please ensure the WhatsApp automation service is running on port 7031.");
     }
     throw error;
   }
@@ -1522,7 +1522,7 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
     const body = await req.json() as any;
     const { clientId, event, data } = body;
 
-    console.log("[WhatsApp] Connection status update:", { clientId, event, data });
+    logger.info({ clientId, event, data }, "[WhatsApp] Connection status update");
 
     if (!clientId) {
       return Response.json(
@@ -1539,7 +1539,7 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
     const project = projectStorage.getById(projectId);
 
     if (!project) {
-      console.error("[WhatsApp] Project not found:", projectId);
+      logger.error({ projectId }, "[WhatsApp] Project not found");
       return Response.json({ success: false, error: "Project not found" }, { status: 404 });
     }
 
@@ -1572,7 +1572,7 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
             });
           }
         } catch (err) {
-          console.error("[WhatsApp] Error fetching phone number:", err);
+          logger.error({ err }, "[WhatsApp] Error fetching phone number");
           notifyWhatsAppStatus(projectId, {
             connected: true,
             connectedAt: new Date().toISOString(),
@@ -1580,7 +1580,7 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
             phone: data?.phone || null,
           });
         }
-        console.log("[WhatsApp] Client connected:", projectId);
+        logger.info({ projectId }, "[WhatsApp] Client connected");
         break;
 
       case "disconnected":
@@ -1588,7 +1588,7 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
         notifyWhatsAppStatus(projectId, {
           connected: false,
         });
-        console.log("[WhatsApp] Client disconnected:", projectId);
+        logger.info({ projectId }, "[WhatsApp] Client disconnected");
         break;
 
       case "qr_code":
@@ -1611,12 +1611,12 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
         break;
 
       default:
-        console.log("[WhatsApp] Unknown event:", event);
+        logger.info({ event }, "[WhatsApp] Unknown event");
     }
 
     return Response.json({ success: true });
   } catch (error) {
-    console.error("[WhatsApp] Error handling connection status:", error);
+    logger.error({ error }, "[WhatsApp] Error handling connection status");
     return Response.json(
       { success: false, error: "Failed to handle connection status" },
       { status: 500 }
@@ -1679,7 +1679,7 @@ export async function handleGetWhatsAppConversations(req: Request): Promise<Resp
       conversations: whatsappConversations,
     });
   } catch (error) {
-    console.error("[WhatsApp] Error getting conversations:", error);
+    logger.error({ error }, "[WhatsApp] Error getting conversations");
     return Response.json(
       { success: false, error: "Failed to get conversations" },
       { status: 500 }
@@ -1731,14 +1731,14 @@ export async function handleDeleteWhatsAppConversation(req: Request): Promise<Re
     const uid = `whatsapp_user_${phoneNumber}`;
     await chatHistoryStorage.deleteChatHistory(convId, projectId, uid);
 
-    console.log("[WhatsApp] Deleted conversation:", convId, "for project:", projectId);
+    logger.info({ convId, projectId }, "[WhatsApp] Deleted conversation");
 
     return Response.json({
       success: true,
       message: "Conversation deleted successfully",
     });
   } catch (error) {
-    console.error("[WhatsApp] Error deleting conversation:", error);
+    logger.error({ error }, "[WhatsApp] Error deleting conversation");
     return Response.json(
       { success: false, error: "Failed to delete conversation" },
       { status: 500 }

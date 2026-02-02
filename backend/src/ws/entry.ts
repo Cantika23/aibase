@@ -20,6 +20,9 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { AuthService } from "../services/auth-service";
 import { ProjectStorage } from "../storage/project-storage";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('WebSocketServer');
 import { FileStorage } from "../storage/file-storage";
 import { FileContextStorage } from "../storage/file-context-storage";
 import { ExtensionLoader } from "../tools/extensions/extension-loader";
@@ -59,7 +62,7 @@ class StreamingManager {
 
   startStream(convId: string, messageId: string): void {
     const key = `${convId}_${messageId}`;
-    console.log(`[StreamingManager] Starting stream: ${key}`);
+    logger.info({ key }, '[StreamingManager] Starting stream');
     this.activeStreams.set(key, {
       convId,
       messageId,
@@ -68,8 +71,8 @@ class StreamingManager {
       startTime: Date.now(),
       lastChunkTime: Date.now(),
     });
-    console.log(
-      `[StreamingManager] Total active streams: ${this.activeStreams.size}`
+    logger.info(
+      { activeStreamsCount: this.activeStreams.size }, '[StreamingManager] Total active streams'
     );
   }
 
@@ -92,14 +95,14 @@ class StreamingManager {
     const key = `${convId}_${messageId}`;
     const stream = this.activeStreams.get(key);
     if (stream) {
-      console.log(
-        `[StreamingManager] Completing stream: ${key} (had ${stream.fullResponse.length} chars)`
+      logger.info(
+        { key, responseLength: stream.fullResponse.length }, '[StreamingManager] Completing stream'
       );
     }
     // Remove the stream immediately after completion
     this.activeStreams.delete(key);
-    console.log(
-      `[StreamingManager] Total active streams: ${this.activeStreams.size}`
+    logger.info(
+      { activeStreamsCount: this.activeStreams.size }, '[StreamingManager] Total active streams'
     );
   }
 
@@ -160,7 +163,7 @@ export class WSServer extends WSEventEmitter {
    */
   registerWhatsAppHandlers(handlers: { open: any; message: any; close: any }) {
     this.whatsappHandlers = handlers;
-    console.log('[WSServer] WhatsApp handlers registered');
+    logger.info('[WSServer] WhatsApp handlers registered');
   }
 
   /**
@@ -318,15 +321,15 @@ export class WSServer extends WSEventEmitter {
   private async sendAccumulatedChunks(ws: ServerWebSocket, convId: string, projectId: string, userId?: string): Promise<void> {
     const activeStreams = this.streamingManager.getActiveStreamsForConv(convId);
 
-    console.log(
-      `sendAccumulatedChunks: Found ${activeStreams.length} active streams for convId: ${convId}`
+    logger.info(
+      { activeStreamsCount: activeStreams.length, convId }, 'sendAccumulatedChunks: Found active streams'
     );
 
     for (const stream of activeStreams) {
       // Always send accumulated chunks (or at least startTime) if there's an active stream
       // Even if fullResponse is empty, client needs startTime to show "Thinking... 0s"
-      console.log(
-        `Sending accumulated active stream: ${stream.messageId}, accumulated length: ${stream.fullResponse.length}`
+      logger.info(
+        { messageId: stream.messageId, accumulatedLength: stream.fullResponse.length }, 'Sending accumulated active stream'
       );
       this.sendToWebSocket(ws, {
         type: "llm_chunk",
@@ -356,8 +359,8 @@ export class WSServer extends WSEventEmitter {
         !lastMessage.completionTime &&
         !lastMessage.aborted &&
         lastMessage.content) {
-        console.log(
-          `sendAccumulatedChunks: Found incomplete message in history without active stream, sending completion for ${lastMessage.id}`
+        logger.info(
+          { messageId: lastMessage.id }, 'sendAccumulatedChunks: Found incomplete message in history without active stream, sending completion'
         );
         this.sendToWebSocket(ws, {
           type: "llm_complete",
@@ -378,7 +381,7 @@ export class WSServer extends WSEventEmitter {
   private async handleConnectionOpen(ws: ServerWebSocket): Promise<void> {
     // Check if this is a WhatsApp WebSocket connection
     if (ws.data?.isWhatsAppWS) {
-      console.log('[WSServer] WhatsApp WebSocket connection detected, delegating to WhatsApp handler');
+      logger.info('[WSServer] WhatsApp WebSocket connection detected, delegating to WhatsApp handler');
       if (this.whatsappHandlers?.open) {
         await this.whatsappHandlers.open(ws);
       }
@@ -394,7 +397,7 @@ export class WSServer extends WSEventEmitter {
       urlClientId = ws.data?.convId || null;
       urlProjectId = ws.data?.projectId || null;
     } catch (error) {
-      console.warn("Failed to extract IDs from WebSocket data:", error);
+      logger.warn({ error }, "Failed to extract IDs from WebSocket data");
     }
 
     // Extract authentication token from URL or protocol
@@ -406,7 +409,7 @@ export class WSServer extends WSEventEmitter {
       // Bun's upgrade allows passing `data`. We should update handleHttpUpgrade to extract token and pass it in data.
       token = ws.data?.token || null;
     } catch (error) {
-      console.warn("Failed to extract token:", error);
+      logger.warn({ error }, "Failed to extract token");
     }
 
     // Extract embedUid for embed connections (used as CURRENT_UID instead of database user ID)
@@ -415,7 +418,7 @@ export class WSServer extends WSEventEmitter {
     // Extract URL parameters for context replacement (from embed connections)
     const urlParams: Record<string, string> | undefined = ws.data?.urlParams;
     if (urlParams && Object.keys(urlParams).length > 0) {
-      console.log(`[WSServer] URL parameters extracted for context:`, urlParams);
+      logger.info({ urlParams }, '[WSServer] URL parameters extracted for context');
     }
 
     // Validate token if present
@@ -423,9 +426,9 @@ export class WSServer extends WSEventEmitter {
     if (token) {
       authenticatedUser = await authService.validateSession(token);
       if (authenticatedUser) {
-        console.log(`[WSServer] Authenticated user: ${authenticatedUser.username} (${authenticatedUser.id})`);
+        logger.info({ userId: authenticatedUser.id, username: authenticatedUser.username }, '[WSServer] Authenticated user');
       } else {
-        console.warn(`[WSServer] Invalid token provided: ${token}`);
+        logger.warn({ token }, '[WSServer] Invalid token provided');
         this.sendToWebSocket(ws, {
           type: "error",
           id: this.generateMessageId(),
@@ -446,7 +449,7 @@ export class WSServer extends WSEventEmitter {
 
     // Project ID is required
     if (!projectId) {
-      console.error("Project ID is required for WebSocket connection");
+      logger.error("Project ID is required for WebSocket connection");
       this.sendToWebSocket(ws, {
         type: "error",
         id: this.generateMessageId(),
@@ -465,7 +468,7 @@ export class WSServer extends WSEventEmitter {
     const project = projectStorage.getById(projectId);
     const tenantId = project?.tenant_id ?? 'default';
     if (!projectId) {
-      console.error("Project ID is required for WebSocket connection");
+      logger.error("Project ID is required for WebSocket connection");
       this.sendToWebSocket(ws, {
         type: "error",
         id: this.generateMessageId(),
@@ -481,16 +484,14 @@ export class WSServer extends WSEventEmitter {
 
     const sessionId = this.generateSessionId();
 
-    console.log(`=== New Connection ===`);
-    console.log(`convId: ${convId} (from URL: ${!!urlClientId})`);
-    console.log(`projectId: ${projectId}`);
-    console.log(
-      `Total active streams in manager: ${Array.from(this.streamingManager["activeStreams"].keys()).length
-      }`
+    logger.info('=== New Connection ===');
+    logger.info({ convId, fromUrl: !!urlClientId }, 'convId info');
+    logger.info({ projectId }, 'projectId info');
+    logger.info(
+      { activeStreamsCount: Array.from(this.streamingManager["activeStreams"].keys()).length }, 'Total active streams in manager'
     );
-    console.log(
-      `Active stream keys:`,
-      Array.from(this.streamingManager["activeStreams"].keys())
+    logger.info(
+      { activeStreamKeys: Array.from(this.streamingManager["activeStreams"].keys()) }, 'Active stream keys'
     );
 
     // For embed connections with uid, check if project allows uid-based identification
@@ -502,7 +503,7 @@ export class WSServer extends WSEventEmitter {
       if (project?.use_client_uid) {
         // Use the external uid as CURRENT_UID (not the database user ID)
         effectiveUserId = embedUid;
-        console.log(`[WSServer] Using embedUid as CURRENT_UID: ${embedUid}`);
+        logger.info({ embedUid }, '[WSServer] Using embedUid as CURRENT_UID');
       }
     }
 
@@ -601,7 +602,7 @@ export class WSServer extends WSEventEmitter {
 
       await this.processMessage(ws, connectionInfo, wsMessage);
     } catch (error) {
-      console.error("Failed to process message:", error);
+      logger.error({ error }, "Failed to process message");
       this.sendError(ws, "INVALID_MESSAGE", "Failed to parse message");
     }
   }
@@ -650,7 +651,7 @@ export class WSServer extends WSEventEmitter {
 
     // Check if already processing a message for this conversation
     if (this.processingConversations.has(connectionInfo.convId)) {
-      console.log(`[UserMessage] Already processing a message for convId: ${connectionInfo.convId}, ignoring duplicate`);
+      logger.info({ convId: connectionInfo.convId }, '[UserMessage] Already processing a message for convId, ignoring duplicate');
       return;
     }
 
@@ -662,7 +663,7 @@ export class WSServer extends WSEventEmitter {
     // Process message asynchronously without blocking
     this.processUserMessageAsync(ws, connectionInfo, message, userData)
       .catch((error) => {
-        console.error("Error processing user message:", error);
+        logger.error({ error }, "Error processing user message");
         this.sendError(ws, "PROCESSING_ERROR", error.message);
       })
       .finally(() => {
@@ -734,7 +735,7 @@ export class WSServer extends WSEventEmitter {
       // Log file IDs for debugging
       let attachments: any[] | undefined = undefined;
       if (userData.fileIds && userData.fileIds.length > 0) {
-        console.log("[UserMessage] Processing message with file IDs:", userData.fileIds);
+        logger.info({ fileIds: userData.fileIds }, "[UserMessage] Processing message with file IDs");
 
         // Fetch file metadata for attachments
         try {
@@ -747,7 +748,7 @@ export class WSServer extends WSEventEmitter {
 
           // Format all files as attachments (fileIds are just for logging/verification)
           attachments = allFiles.map(file => {
-            console.log('[UserMessage] File description for', file.name, ':', file.description ? `present (${file.description.substring(0, 50)}...)` : 'MISSING');
+            logger.info({ fileName: file.name, hasDescription: !!file.description }, '[UserMessage] File description status');
             return {
               id: `file_${file.uploadedAt}_${Math.random().toString(36).slice(2, 11)}`,
               name: file.name,
@@ -761,10 +762,9 @@ export class WSServer extends WSEventEmitter {
             };
           });
 
-          console.log("[UserMessage] Fetched attachment metadata:", attachments.length, "files");
-          console.log("[UserMessage] Attachment URLs:", attachments.map((a: any) => a.url));
+          logger.info({ attachmentCount: attachments.length, urls: attachments.map((a: any) => a.url) }, "[UserMessage] Fetched attachment metadata");
         } catch (error) {
-          console.error("[UserMessage] Error fetching file metadata:", error);
+          logger.error({ error }, "[UserMessage] Error fetching file metadata");
           // Continue without attachments if fetch fails
         }
       }
@@ -803,26 +803,21 @@ export class WSServer extends WSEventEmitter {
         this.broadcastToConv(connectionInfo.convId, chunkMessage);
       }
 
-      console.log(
-        `[Backend Complete] Streaming finished. Total chunks: ${chunkCount}, Final fullResponse length: ${fullResponse.length}`
+      logger.info(
+        { chunkCount, fullResponseLength: fullResponse.length }, '[Backend Complete] Streaming finished'
       );
-      console.log(
-        `[Backend Complete] First 100 chars: "${fullResponse.substring(
-          0,
-          100
-        )}..."`
+      logger.info(
+        { first100Chars: fullResponse.substring(0, 100) }, '[Backend Complete] First 100 chars'
       );
-      console.log(
-        `[Backend Complete] Last 100 chars: "...${fullResponse.substring(
-          fullResponse.length - 100
-        )}"`
+      logger.info(
+        { last100Chars: fullResponse.substring(fullResponse.length - 100) }, '[Backend Complete] Last 100 chars'
       );
 
       // Calculate completion time in seconds
       const completionTimeMs = Date.now() - startTime;
       const completionTimeSeconds = Math.floor(completionTimeMs / 1000);
-      console.log(
-        `[Backend Complete] Completion time: ${completionTimeSeconds}s (${completionTimeMs}ms)`
+      logger.info(
+        { completionTimeSeconds, completionTimeMs }, '[Backend Complete] Completion time'
       );
 
       // Get stream state to calculate thinking duration
@@ -831,8 +826,8 @@ export class WSServer extends WSEventEmitter {
       if (stream?.firstChunkTime) {
         const thinkingDurationMs = stream.firstChunkTime - startTime;
         thinkingDurationSeconds = Math.floor(thinkingDurationMs / 1000);
-        console.log(
-          `[Backend Complete] Thinking duration: ${thinkingDurationSeconds}s (${thinkingDurationMs}ms)`
+        logger.info(
+          { thinkingDurationSeconds, thinkingDurationMs }, '[Backend Complete] Thinking duration'
         );
       }
 
@@ -844,15 +839,15 @@ export class WSServer extends WSEventEmitter {
       );
       const tokenUsage = convInfo?.tokenUsage?.total;
 
-      console.log(`[Backend Complete] convInfo:`, convInfo);
-      console.log(`[Backend Complete] tokenUsage from convInfo:`, tokenUsage);
+      logger.info({ convInfo }, '[Backend Complete] convInfo');
+      logger.info({ tokenUsage }, '[Backend Complete] tokenUsage from convInfo');
 
       // Get max tokens from environment variable
       const maxTokens = process.env.OPENAI_MAX_TOKEN
         ? parseInt(process.env.OPENAI_MAX_TOKEN, 10)
         : undefined;
 
-      console.log(`[Backend Complete] maxTokens from env:`, maxTokens);
+      logger.info({ maxTokens }, '[Backend Complete] maxTokens from env');
 
       // Send completion message to all connections for this conversation
       const completionMessage = {
@@ -877,10 +872,10 @@ export class WSServer extends WSEventEmitter {
           convId: connectionInfo.convId,
         },
       };
-      console.log(
-        `[Backend Complete] Broadcasting completion message with ${fullResponse.length} chars, completionTime: ${completionTimeSeconds}s, tokens: ${tokenUsage?.totalTokens || "N/A"}, maxTokens: ${maxTokens}`
+      logger.info(
+        { fullResponseLength: fullResponse.length, completionTimeSeconds, totalTokens: tokenUsage?.totalTokens || "N/A", maxTokens }, '[Backend Complete] Broadcasting completion message'
       );
-      console.log(`[Backend Complete] Full completion message data:`, JSON.stringify(completionMessage.data, null, 2));
+      logger.info({ completionData: completionMessage.data }, '[Backend Complete] Full completion message data');
       this.broadcastToConv(connectionInfo.convId, completionMessage);
 
       // Save updated conversation history to persistent storage with message IDs
@@ -913,20 +908,19 @@ export class WSServer extends WSEventEmitter {
         return msg;
       });
 
-      console.log(
-        `[Backend Complete] Saving conversation history for ${connectionInfo.convId}`
+      logger.info(
+        { convId: connectionInfo.convId }, '[Backend Complete] Saving conversation history'
       );
-      console.log(
-        `[Backend Complete] History has ${historyWithIds.length} messages`
+      logger.info(
+        { messageCount: historyWithIds.length }, '[Backend Complete] History message count'
       );
-      console.log(
-        `[Backend Complete] History messages:`,
-        historyWithIds.map((m: any) => ({
+      logger.info(
+        { messages: historyWithIds.map((m: any) => ({
           role: m.role,
           id: m.id,
           contentLength:
             typeof m.content === "string" ? m.content.length : "N/A",
-        }))
+        })) }, '[Backend Complete] History messages'
       );
       this.messagePersistence.setClientHistory(
         connectionInfo.convId,
@@ -941,8 +935,8 @@ export class WSServer extends WSEventEmitter {
         connectionInfo.projectId,
         connectionInfo.userId
       );
-      console.log(
-        `[Backend Complete] Verification: Saved history has ${savedHistory.length} messages`
+      logger.info(
+        { savedMessageCount: savedHistory.length }, '[Backend Complete] Verification: Saved history message count'
       );
 
       // FIX: Mark stream as complete AFTER broadcasting completion and saving history
@@ -960,7 +954,7 @@ export class WSServer extends WSEventEmitter {
       // Don't wait for it to complete - let it run in the background
       this.generateTitleIfNeeded(connectionInfo.convId, connectionInfo.projectId, tenantId, historyWithIds)
         .catch((error) => {
-          console.error(`[TitleGeneration] Error generating title for ${connectionInfo.convId}:`, error);
+          logger.error({ error, convId: connectionInfo.convId }, '[TitleGeneration] Error generating title');
         });
 
       // Check if compaction is needed (automatic)
@@ -970,8 +964,8 @@ export class WSServer extends WSEventEmitter {
           connectionInfo.convId
         );
         if (compactionResult.compacted) {
-          console.log(
-            `[Auto-Compaction] Compacted chat for ${connectionInfo.convId}, saved ~${compactionResult.tokensSaved} tokens`
+          logger.info(
+            { convId: connectionInfo.convId, tokensSaved: compactionResult.tokensSaved }, '[Auto-Compaction] Compacted chat'
           );
           // Optionally notify all clients about the compaction
           this.broadcastToConv(connectionInfo.convId, {
@@ -985,14 +979,14 @@ export class WSServer extends WSEventEmitter {
           });
         }
       } catch (error: any) {
-        console.error(`[Auto-Compaction] Error:`, error);
+        logger.error({ error }, '[Auto-Compaction] Error');
         // Don't fail the main flow if compaction fails
       }
 
       // Clean up assistant message ID from connection info
       delete (connectionInfo as any).assistantMsgId;
     } catch (error: any) {
-      console.error("LLM Processing Error:", error);
+      logger.error({ error }, "LLM Processing Error");
 
       // Clean up assistant message ID from connection info even on error
       delete (connectionInfo as any).assistantMsgId;
@@ -1007,14 +1001,14 @@ export class WSServer extends WSEventEmitter {
       const isAbort = error?.name === "AbortError" || error?.message?.includes("abort");
 
       if (isAbort) {
-        console.log(`[Abort] Stream aborted for message ${assistantMsgId}`);
+        logger.info({ assistantMsgId }, '[Abort] Stream aborted for message');
 
         // Get the partial response from streaming manager
         const stream = this.streamingManager.getStream(connectionInfo.convId, assistantMsgId);
         const partialResponse = stream?.fullResponse || "";
 
         if (partialResponse.length > 0 && conversation) {
-          console.log(`[Abort] Saving partial response to history (${partialResponse.length} chars)`);
+          logger.info({ partialResponseLength: partialResponse.length }, '[Abort] Saving partial response to history');
 
           // Get current history and add the partial response
           const currentHistory = conversation.history;
@@ -1037,7 +1031,7 @@ export class WSServer extends WSEventEmitter {
 
           // Save to persistent storage
           this.messagePersistence.setClientHistory(connectionInfo.convId, historyWithIds, connectionInfo.projectId, connectionInfo.userId);
-          console.log(`[Abort] Saved aborted message to history`);
+          logger.info('[Abort] Saved aborted message to history');
         }
 
         // Don't send error messages for user-initiated aborts
@@ -1099,12 +1093,12 @@ export class WSServer extends WSEventEmitter {
       switch (control.type) {
         case "abort":
           if (conversation) {
-            console.log(`[Abort] Aborting conversation for convId: ${connectionInfo.convId}`);
+            logger.info({ convId: connectionInfo.convId }, '[Abort] Aborting conversation');
             conversation.abort();
 
             // Clean up any active streams for this conversation
             const activeStreams = this.streamingManager.getActiveStreamsForConv(connectionInfo.convId);
-            console.log(`[Abort] Cleaning up ${activeStreams.length} active streams`);
+            logger.info({ activeStreamsCount: activeStreams.length }, '[Abort] Cleaning up active streams');
             for (const stream of activeStreams) {
               this.streamingManager.completeStream(connectionInfo.convId, stream.messageId);
             }
@@ -1140,8 +1134,8 @@ export class WSServer extends WSEventEmitter {
 
         case "get_history":
           // Get history from persistent storage (which should match conversation history)
-          console.log(
-            `Backend: Getting history for convId: ${connectionInfo.convId}`
+          logger.info(
+            { convId: connectionInfo.convId }, 'Backend: Getting history for convId'
           );
           const history = await this.messagePersistence.getClientHistory(
             connectionInfo.convId,
@@ -1156,21 +1150,21 @@ export class WSServer extends WSEventEmitter {
             msg.role !== "system" && !msg._shouldHide
           );
 
-          console.log(`Backend: Retrieved history:`, {
+          logger.info({
             hasHistory: !!history,
             messageCount: history?.length || 0,
             filteredMessages: clientHistory.length,
-          });
+          }, 'Backend: Retrieved history');
 
           // Also check conversation object directly
           if (connectionInfo.conversation) {
             // Access the private _history array through any available method or property
             const convHistory =
               (connectionInfo.conversation as any)._history || [];
-            console.log(`Backend: Conversation history:`, {
+            logger.info({
               messageCount: convHistory.length,
               messages: convHistory,
-            });
+            }, 'Backend: Conversation history');
           }
 
           // Load todos for this conversation
@@ -1185,24 +1179,22 @@ export class WSServer extends WSEventEmitter {
             );
             const todosContent = await fs.readFile(todosPath, "utf-8");
             todos = JSON.parse(todosContent);
-            console.log(`Backend: Loaded todos for convId ${connectionInfo.convId}:`, {
-              todoCount: todos?.items?.length || 0,
-            });
+            logger.info({ convId: connectionInfo.convId, todoCount: todos?.items?.length || 0 }, 'Backend: Loaded todos for convId');
           } catch (error) {
             // No todos file exists yet, which is fine
-            console.log(`Backend: No todos found for convId ${connectionInfo.convId}`);
+            logger.info({ convId: connectionInfo.convId }, 'Backend: No todos found for convId');
           }
 
           // Send accumulated chunks from any active streams for this conversation
-          console.log(
-            `Backend: Checking for active streams to send accumulated chunks`
+          logger.info(
+            'Backend: Checking for active streams to send accumulated chunks'
           );
           await this.sendAccumulatedChunks(ws, connectionInfo.convId, connectionInfo.projectId, connectionInfo.userId);
 
           // Check if there are active streams for this conversation
           const activeStreams = this.streamingManager.getActiveStreamsForConv(connectionInfo.convId);
           const hasActiveStream = activeStreams.length > 0;
-          console.log(`Backend: hasActiveStream for ${connectionInfo.convId}: ${hasActiveStream} (${activeStreams.length} streams)`);
+          logger.info({ convId: connectionInfo.convId, hasActiveStream, activeStreamsCount: activeStreams.length }, 'Backend: hasActiveStream status');
 
           // Get max tokens from environment variable
           const maxTokens = process.env.OPENAI_MAX_TOKEN
@@ -1236,8 +1228,8 @@ export class WSServer extends WSEventEmitter {
             },
             metadata: { timestamp: Date.now() },
           });
-          console.log(
-            `Backend: Sent history response (filtered out system messages) with todos`
+          logger.info(
+            'Backend: Sent history response (filtered out system messages) with todos'
           );
           break;
 
@@ -1257,7 +1249,7 @@ export class WSServer extends WSEventEmitter {
           break;
 
         case "compact_chat":
-          console.log(`[Compaction] Manual compaction requested for convId: ${connectionInfo.convId}`);
+          logger.info({ convId: connectionInfo.convId }, '[Compaction] Manual compaction requested');
           try {
             const compactionResult = await this.messagePersistence.checkAndCompact(
               connectionInfo.projectId,
@@ -1277,15 +1269,15 @@ export class WSServer extends WSEventEmitter {
               metadata: { timestamp: Date.now() },
             });
 
-            console.log(`[Compaction] Result:`, compactionResult);
+            logger.info({ compactionResult }, '[Compaction] Result');
           } catch (error: any) {
-            console.error(`[Compaction] Error:`, error);
+            logger.error({ error }, '[Compaction] Error');
             this.sendError(ws, "COMPACTION_ERROR", error.message);
           }
           break;
 
         case "get_compaction_status":
-          console.log(`[Compaction] Status requested for convId: ${connectionInfo.convId}`);
+          logger.info({ convId: connectionInfo.convId }, '[Compaction] Status requested');
           try {
             const status = await this.messagePersistence.getCompactionStatus(
               connectionInfo.projectId || "A1",
@@ -1303,15 +1295,15 @@ export class WSServer extends WSEventEmitter {
               metadata: { timestamp: Date.now() },
             });
 
-            console.log(`[Compaction] Status:`, status);
+            logger.info({ status }, '[Compaction] Status');
           } catch (error: any) {
-            console.error(`[Compaction] Error getting status:`, error);
+            logger.error({ error }, '[Compaction] Error getting status');
             this.sendError(ws, "COMPACTION_STATUS_ERROR", error.message);
           }
           break;
 
         case "get_file_context":
-          console.log(`[FileContext] Get file context for project: ${connectionInfo.projectId}`);
+          logger.info({ projectId: connectionInfo.projectId }, '[FileContext] Get file context for project');
           try {
             const fileContextStorage = FileContextStorage.getInstance();
             const fileContext = await fileContextStorage.loadFileContext(
@@ -1330,15 +1322,15 @@ export class WSServer extends WSEventEmitter {
               metadata: { timestamp: Date.now() },
             });
 
-            console.log(`[FileContext] Sent file context: ${Object.keys(fileContext.files).length} files`);
+            logger.info({ fileCount: Object.keys(fileContext.files).length }, '[FileContext] Sent file context');
           } catch (error: any) {
-            console.error(`[FileContext] Error getting file context:`, error);
+            logger.error({ error }, '[FileContext] Error getting file context');
             this.sendError(ws, "FILE_CONTEXT_ERROR", error.message);
           }
           break;
 
         case "set_file_context":
-          console.log(`[FileContext] Set file context for project: ${connectionInfo.projectId}`, control.data);
+          logger.info({ projectId: connectionInfo.projectId, data: control.data }, '[FileContext] Set file context for project');
           try {
             const { fileId, included } = control.data || {};
 
@@ -1380,9 +1372,9 @@ export class WSServer extends WSEventEmitter {
               metadata: { timestamp: Date.now() },
             });
 
-            console.log(`[FileContext] Set file ${fileId} in context: ${included}`);
+            logger.info({ fileId, included }, '[FileContext] Set file in context');
           } catch (error: any) {
-            console.error(`[FileContext] Error setting file context:`, error);
+            logger.error({ error }, '[FileContext] Error setting file context');
             this.sendError(ws, "FILE_CONTEXT_ERROR", error.message);
           }
           break;
@@ -1406,7 +1398,7 @@ export class WSServer extends WSEventEmitter {
   ): void {
     // Check if this is a WhatsApp WebSocket connection
     if (ws.data?.isWhatsAppWS) {
-      console.log('[WSServer] WhatsApp WebSocket connection closed');
+      logger.info('[WSServer] WhatsApp WebSocket connection closed');
       if (this.whatsappHandlers?.close) {
         this.whatsappHandlers.close(ws);
       }
@@ -1471,7 +1463,7 @@ Always be helpful and conversational.`;
       hooks: {
         tools: {
           before: async (toolCallId: string, toolName: string, args: any) => {
-            console.log(`[Tool Hook] Before: ${toolName} (${toolCallId})`);
+            logger.info({ toolName, toolCallId }, '[Tool Hook] Before');
             // Get the assistant message ID from the connection info
             const connectionInfo = Array.from(this.connections.values()).find(
               (c) => c.convId === convId
@@ -1514,7 +1506,7 @@ Always be helpful and conversational.`;
             _args: any,
             result: any
           ) => {
-            console.log(`[Tool Hook] After: ${toolName} (${toolCallId})`);
+            logger.info({ toolName, toolCallId }, '[Tool Hook] After');
             // Broadcast tool result to all connections for this conversation
             this.broadcastToConv(convId, {
               type: "tool_result",
@@ -1536,9 +1528,7 @@ Always be helpful and conversational.`;
             _args: any,
             error: Error
           ) => {
-            console.log(
-              `[Tool Hook] Error: ${toolName} (${toolCallId}) - ${error.message}`
-            );
+            logger.info({ toolName, toolCallId, errorMessage: error.message }, '[Tool Hook] Error');
             // Broadcast tool error to all connections for this conversation
             this.broadcastToConv(convId, {
               type: "tool_result",
@@ -1575,8 +1565,8 @@ Always be helpful and conversational.`;
       });
     }
 
-    console.log(
-      `Loaded ${tools.length} built-in tools for conversation ${convId} in project ${projectId}`
+    logger.info(
+      { toolsCount: tools.length, convId, projectId }, 'Loaded built-in tools for conversation'
     );
 
     // Load extensions (this registers hooks like afterFileUpload)
@@ -1585,7 +1575,7 @@ Always be helpful and conversational.`;
       // Extensions are loaded from defaults directory by default
       await extensionLoader.loadExtensions(projectId);
     } catch (error) {
-      console.error(`[WSServer] Failed to load extensions for project ${projectId}:`, error);
+      logger.error({ error, projectId }, '[WSServer] Failed to load extensions for project');
     }
 
     return tools;
@@ -1595,7 +1585,7 @@ Always be helpful and conversational.`;
    * Broadcast todo updates to all connections for a conversation
    */
   private broadcastTodoUpdate(convId: string, todos: any): void {
-    console.log(`[TodoUpdate] Broadcasting todo update for convId: ${convId}`);
+    logger.info({ convId }, '[TodoUpdate] Broadcasting todo update for convId');
     this.broadcastToConv(convId, {
       type: "todo_update",
       id: this.generateMessageId(),
@@ -1621,7 +1611,7 @@ Always be helpful and conversational.`;
       // Check if title already exists
       const existingTitle = await getConversationTitle(convId, projectId, tenantId);
       if (existingTitle) {
-        console.log(`[TitleGeneration] Title already exists for ${convId}: "${existingTitle}"`);
+        logger.info({ convId, existingTitle }, '[TitleGeneration] Title already exists');
         return;
       }
 
@@ -1630,19 +1620,19 @@ Always be helpful and conversational.`;
 
       // Generate title after first user-assistant exchange (at least 2 non-system messages)
       if (nonSystemMessages.length >= 2) {
-        console.log(`[TitleGeneration] Generating title for ${convId} with ${nonSystemMessages.length} messages...`);
+        logger.info({ convId, messageCount: nonSystemMessages.length }, '[TitleGeneration] Generating title');
 
         // Generate title using AI
         const title = await generateConversationTitle(history, convId, projectId, tenantId);
 
-        console.log(`[TitleGeneration] Generated title for ${convId}: "${title}"`);
+        logger.info({ convId, title }, '[TitleGeneration] Generated title');
         // Title is automatically saved to info.json by generateConversationTitle
         // It will appear in conversation list when loaded from API
       } else {
-        console.log(`[TitleGeneration] Skipping title generation for ${convId} - not enough messages yet (${nonSystemMessages.length}/2)`);
+        logger.info({ convId, currentMessages: nonSystemMessages.length, requiredMessages: 2 }, '[TitleGeneration] Skipping title generation - not enough messages yet');
       }
     } catch (error) {
-      console.error(`[TitleGeneration] Failed to generate title for ${convId}:`, error);
+      logger.error({ error, convId }, '[TitleGeneration] Failed to generate title');
       // Don't throw - title generation is non-critical
     }
   }
@@ -1652,7 +1642,7 @@ Always be helpful and conversational.`;
       ws.send(JSON.stringify(message));
       return true;
     } catch (error) {
-      console.error("Failed to send message:", error);
+      logger.error({ error }, "Failed to send message");
       return false;
     }
   }

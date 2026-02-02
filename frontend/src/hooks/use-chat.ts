@@ -6,6 +6,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFileStore } from "@/stores/file-store";
+import { useLogger } from "@/hooks/use-logger";
 
 export interface UseChatOptions {
   wsUrl: string;
@@ -27,6 +28,8 @@ export interface UseChatReturn {
 }
 
 export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): UseChatReturn {
+  const log = useLogger('chat');
+  
   // Zustand stores
   const {
     messages,
@@ -56,7 +59,7 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
       return;
     }
 
-    console.log(`[useChat] Initializing WebSocket for project: ${currentProject.id}`);
+    log.info("Initializing WebSocket", { projectId: currentProject.id });
 
     const wsClient = new WSClient({
       url: wsUrl,
@@ -168,14 +171,14 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
             ) : prevFiles
           );
         } catch (e) {
-          console.error('[useChat] Failed to parse file update:', data.message);
+          log.error("Failed to parse file update", { message: data.message });
         }
       }
     };
 
     const handleAuthFailed = (data: { code: number; reason: string }) => {
       // Authentication failure - logout the user
-      console.error("[Auth Failed] WebSocket authentication failed:", data);
+      log.error("WebSocket authentication failed", { data });
       const { logout } = useAuthStore.getState();
       logout();
     };
@@ -230,7 +233,7 @@ export function useChat({ wsUrl, onError, onStatusChange }: UseChatOptions): Use
         const files = Array.from(options.experimental_attachments);
         const uploadedFiles = await uploadFiles(files, { projectId: currentProject.id });
         fileIds = uploadedFiles.map(f => f.id);
-        console.log(`Uploaded ${uploadedFiles.length} files:`, fileIds);
+        log.info(`Uploaded ${uploadedFiles.length} files`, { fileIds });
       }
 
       // Send text message via WebSocket with file references

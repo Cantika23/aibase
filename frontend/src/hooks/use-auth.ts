@@ -42,6 +42,7 @@ export function useRequireAuth() {
   useEffect(() => {
     if (!auth.isLoading && !auth.isAuthenticated) {
       // Redirect to login or show login modal
+      // Using console.warn to avoid circular dependency risk with logger
       console.warn("[Auth] User not authenticated");
     }
   }, [auth.isAuthenticated, auth.isLoading]);

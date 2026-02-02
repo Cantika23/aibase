@@ -7,6 +7,9 @@ import type {
 } from "openai/resources/chat/completions";
 import { defaultContext } from "./context";
 import { updateTokenUsage } from "./conversation-info";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("Conversation");
 
 /**
  * Type for function tool calls (excludes custom tool calls)
@@ -496,11 +499,11 @@ export class Conversation {
         // If message is empty, use a default message
         if (!messageContent || messageContent.trim() === "") {
           messageContent = `I've uploaded ${attachments.length} file${attachments.length > 1 ? 's' : ''}. ${attachmentDetails}${attachmentInfo}`;
-          console.log(`[Conversation] Empty message with attachments, using default: ${messageContent}`);
+          logger.debug({ messageContent }, "Empty message with attachments, using default message");
         } else {
           // Append attachment info to existing message
           messageContent = messageContent + `\n\n${attachmentDetails}${attachmentInfo}`;
-          console.log(`[Conversation] Appended attachment info to message: ${attachmentInfo}`);
+          logger.debug("Appended attachment info to message");
         }
       }
 
@@ -577,7 +580,7 @@ export class Conversation {
         // Capture usage information if present
         if (chunk.usage) {
           usage = chunk.usage;
-          console.log(`[Conversation] Captured usage from chunk:`, usage);
+          logger.debug({ usage }, "Captured usage from chunk");
         }
 
         if (delta?.content) {
@@ -632,11 +635,7 @@ export class Conversation {
         return;
       }
       // Log the error for debugging
-      console.error(`[Conversation] Error in streamContinuation for convId ${this.convId}:`, error);
-      if (error instanceof Error) {
-        console.error(`[Conversation] Error name: ${error.name}, message: ${error.message}`);
-        console.error(`[Conversation] Error stack: ${error.stack}`);
-      }
+      logger.error({ error, convId: this.convId }, "Error in streamContinuation");
       throw error;
     }
 
@@ -647,30 +646,28 @@ export class Conversation {
 
     // Log if stream completed with no content
     if (fullText.length === 0 && currentToolCalls.length === 0) {
-      console.warn(`[Conversation] Stream completed with no content or tool calls for convId ${this.convId}`);
-      console.warn(`[Conversation] Usage:`, usage);
+      logger.warn({ convId: this.convId, usage }, "Stream completed with no content or tool calls");
     }
 
     // Store token usage if available
     if (usage) {
-      console.log(`[Conversation] Storing token usage for convId ${this.convId}:`, {
-        promptTokens: usage.prompt_tokens,
-        completionTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens,
-      });
+      logger.debug(
+        { convId: this.convId, promptTokens: usage.prompt_tokens, completionTokens: usage.completion_tokens, totalTokens: usage.total_tokens },
+        "Storing token usage"
+      );
       try {
         await updateTokenUsage(this.convId, this.projectId, this.tenantId, {
           promptTokens: usage.prompt_tokens,
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
         });
-        console.log(`[Conversation] Successfully stored token usage for convId ${this.convId}`);
+        logger.debug({ convId: this.convId }, "Successfully stored token usage");
       } catch (error) {
         // Log error but don't fail the conversation
-        console.error("Failed to update token usage:", error);
+        logger.error({ error }, "Failed to update token usage");
       }
     } else {
-      console.log(`[Conversation] No usage information available to store for convId ${this.convId}`);
+      logger.debug({ convId: this.convId }, "No usage information available to store");
     }
 
     // Add assistant's response to history

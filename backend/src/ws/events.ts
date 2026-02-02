@@ -3,6 +3,9 @@
  */
 
 import type { EventHandler, ErrorEventHandler } from './types';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('WSEvents');
 
 export class EventEmitter {
   private listeners = new Map<string, Set<EventHandler>>();
@@ -18,7 +21,7 @@ export class EventEmitter {
 
     const eventListeners = this.listeners.get(event)!;
     if (eventListeners.size >= this.maxListeners) {
-      console.warn(`Maximum listeners (${this.maxListeners}) exceeded for event: ${event}`);
+      logger.warn({ event, maxListeners: this.maxListeners }, 'Maximum listeners exceeded for event');
     }
 
     eventListeners.add(handler);
@@ -78,7 +81,7 @@ export class EventEmitter {
       try {
         await handler(data);
       } catch (error) {
-        console.error(`Error in event handler for '${event}':`, error);
+        logger.error({ error, event }, 'Error in event handler');
       }
     });
 

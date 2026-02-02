@@ -7,6 +7,9 @@ import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { PATHS, getProjectDir as getPathProjectDir } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ProjectStorage');
 
 export interface Project {
   id: string;
@@ -121,7 +124,7 @@ export class ProjectStorage {
 
       if (!hasEmbeddableColumn || !hasEmbedTokenColumn || !hasCustomEmbedCssColumn || !hasWelcomeMessageColumn ||
         !hasShowHistoryColumn || !hasShowFilesColumn || !hasShowContextColumn || !hasShowMemoryColumn || !hasUseClientUidColumn) {
-        console.log('[ProjectStorage] Migrating database: adding embed fields');
+        logger.info('Migrating database: adding embed fields');
         this.db.run('BEGIN TRANSACTION');
 
         if (!hasEmbeddableColumn) {
@@ -164,10 +167,10 @@ export class ProjectStorage {
         this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_embed_token ON projects(embed_token)');
 
         this.db.run('COMMIT');
-        console.log('[ProjectStorage] Migration completed: embed fields added');
+        logger.info('Migration completed: embed fields added');
       }
     } catch (error) {
-      console.error('[ProjectStorage] Embed fields migration failed:', error);
+      logger.error({ error }, 'Embed fields migration failed');
       this.db.run('ROLLBACK');
       throw error;
     }
@@ -179,7 +182,7 @@ export class ProjectStorage {
       const hasIsDefaultColumn = tableInfo.some((col: any) => col.name === 'is_default');
 
       if (hasIsDefaultColumn) {
-        console.log('[ProjectStorage] Migrating database: removing is_default column');
+        logger.info('Migrating database: removing is_default column');
 
         // SQLite doesn't support DROP COLUMN directly, so we need to recreate the table
         this.db.run('BEGIN TRANSACTION');
@@ -219,15 +222,15 @@ export class ProjectStorage {
         this.db.run('CREATE INDEX IF NOT EXISTS idx_projects_is_shared ON projects(is_shared)');
 
         this.db.run('COMMIT');
-        console.log('[ProjectStorage] Migration completed: is_default column removed');
+        logger.info('Migration completed: is_default column removed');
       }
     } catch (error) {
-      console.error('[ProjectStorage] Migration failed:', error);
+      logger.error({ error }, 'Migration failed');
       this.db.run('ROLLBACK');
       throw error;
     }
 
-    console.log('[ProjectStorage] Database initialized at', this.dbPath);
+    logger.info(`Database initialized at ${this.dbPath}`);
   }
 
   /**
@@ -291,7 +294,7 @@ export class ProjectStorage {
       throw new Error('Failed to create project');
     }
 
-    console.log('[ProjectStorage] Created project:', project.name);
+    logger.info(`Created project: ${project.name}`);
     return project;
   }
 
@@ -475,9 +478,9 @@ export class ProjectStorage {
       // Delete project directory using stored tenantId
       try {
         await fs.rm(projectDir, { recursive: true, force: true });
-        console.log(`[ProjectStorage] Deleted project directory: ${projectDir}`);
+        logger.info(`Deleted project directory: ${projectDir}`);
       } catch (error) {
-        console.warn(`[ProjectStorage] Failed to delete project directory ${projectDir}:`, error);
+        logger.warn({ error }, `Failed to delete project directory ${projectDir}`);
       }
     }
 
@@ -526,7 +529,7 @@ export class ProjectStorage {
     }
 
     // Just return the project ID since we use it as the embed token
-    console.log('[ProjectStorage] Embed token is the project ID for:', projectId);
+    logger.info(`Embed token is the project ID for: ${projectId}`);
     return projectId;
   }
 
@@ -549,7 +552,7 @@ export class ProjectStorage {
     `);
 
     stmt.run(customCss, Date.now(), projectId);
-    console.log('[ProjectStorage] Updated embed CSS for project:', projectId);
+    logger.info(`Updated embed CSS for project: ${projectId}`);
   }
 
   /**
@@ -571,7 +574,7 @@ export class ProjectStorage {
     `);
 
     stmt.run(welcomeMessage, Date.now(), projectId);
-    console.log('[ProjectStorage] Updated welcome message for project:', projectId);
+    logger.info(`Updated welcome message for project: ${projectId}`);
   }
 
   /**

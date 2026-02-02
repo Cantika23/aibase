@@ -7,6 +7,9 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { getProjectDir } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('CategoryStorage');
 
 export interface Category {
   id: string;           // unique identifier (e.g., "database-tools", "web-tools")
@@ -103,7 +106,7 @@ export class CategoryStorage {
           'utf-8'
         );
 
-        console.log(`[CategoryStorage] Created default categories for project ${projectId} (tenant: ${tenantId})`);
+        logger.info({ projectId, tenantId }, 'Created default categories for project');
       } else {
         throw error;
       }
@@ -157,7 +160,7 @@ export class CategoryStorage {
     categories.push(newCategory);
     await this.saveCategories(projectId, tenantId, categories);
 
-    console.log(`[CategoryStorage] Created category '${data.id}' for project ${projectId}`);
+    logger.info({ categoryId: data.id, projectId }, 'Created category');
     return newCategory;
   }
 
@@ -190,7 +193,7 @@ export class CategoryStorage {
     categories[index] = updatedCategory;
     await this.saveCategories(projectId, tenantId, categories);
 
-    console.log(`[CategoryStorage] Updated category '${categoryId}' for project ${projectId}`);
+    logger.info({ categoryId, projectId }, 'Updated category');
     return updatedCategory;
   }
 
@@ -208,7 +211,7 @@ export class CategoryStorage {
     categories.splice(index, 1);
     await this.saveCategories(projectId, tenantId, categories);
 
-    console.log(`[CategoryStorage] Deleted category '${categoryId}' for project ${projectId}`);
+    logger.info({ categoryId, projectId }, 'Deleted category');
     return true;
   }
 
@@ -260,6 +263,6 @@ export class CategoryStorage {
     // Ensure categories file is recreated with defaults
     await this.ensureCategoriesFile(projectId, tenantId);
 
-    console.log(`[CategoryStorage] Reset categories to defaults for project ${projectId}`);
+    logger.info({ projectId }, 'Reset categories to defaults');
   }
 }

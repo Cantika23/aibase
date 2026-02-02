@@ -11,6 +11,7 @@ import type { InspectorComponentProps } from "./extension-inspector-registry";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProjectStore } from "@/stores/project-store";
+import { useLogger } from "@/hooks/use-logger";
 
 interface ExtensionInspectorProps {
   extensionId: string;
@@ -74,6 +75,7 @@ function InspectorLoadingSkeleton() {
 }
 
 export function ExtensionInspector({ extensionId, data, error }: ExtensionInspectorProps) {
+  const log = useLogger('extensions');
   const currentProject = useProjectStore((state) => state.currentProject);
   const [InspectorComponent, setInspectorComponent] = useState<ComponentType<InspectorComponentProps> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ export function ExtensionInspector({ extensionId, data, error }: ExtensionInspec
       }
     } catch (err) {
       if (!cancelled) {
-        console.error(`[ExtensionInspector] Failed to load inspector for ${extensionId}:`, err);
+        log.error(`Failed to load inspector for ${extensionId}`, { error: err });
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         setLoadError(`Failed to load inspector: ${errorMessage}`);
       }
@@ -117,7 +119,7 @@ export function ExtensionInspector({ extensionId, data, error }: ExtensionInspec
     return () => {
       cancelled = true;
     };
-  }, [extensionId, currentProject?.id, currentProject?.tenant_id]);
+  }, [extensionId, currentProject?.id, currentProject?.tenant_id, log]);
 
   useEffect(() => {
     loadInspector();
@@ -151,7 +153,7 @@ export function ExtensionInspector({ extensionId, data, error }: ExtensionInspec
   try {
     return <InspectorComponent data={data} error={error} />;
   } catch (err) {
-    console.error(`[ExtensionInspector] Error rendering inspector for ${extensionId}:`, err);
+    log.error(`Error rendering inspector for ${extensionId}`, { error: err });
     const errorMessage = err instanceof Error ? err.message : 'Unknown rendering error';
     return (
       <InspectorErrorBoundary

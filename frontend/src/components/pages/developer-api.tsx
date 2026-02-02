@@ -22,9 +22,11 @@ import {
     Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLogger } from "@/hooks/use-logger";
 
 export function DeveloperAPIPage() {
     const API_BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
+    const log = useLogger('api');
 
     const [context, setContext] = useState("");
     const [prompt, setPrompt] = useState("");
@@ -62,7 +64,7 @@ export function DeveloperAPIPage() {
                 toast.error(data.response || "Failed to get completion");
             }
         } catch (error) {
-            console.error("API Error:", error);
+            log.error("API Error", { error: String(error) });
             toast.error("Failed to connect to API");
         } finally {
             setIsLoading(false);

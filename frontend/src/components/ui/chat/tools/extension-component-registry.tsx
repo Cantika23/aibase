@@ -28,11 +28,11 @@ const ReactWithJSX = Object.assign(React, { jsx: _jsx, jsxs: _jsxs });
 declare global {
   interface Window {
     libs: {
-      React: any;
-      ReactDOM: any;
-      echarts: any;
-      ReactECharts: any;
-      mermaid: any;
+      React: unknown;
+      ReactDOM: unknown;
+      echarts: unknown;
+      ReactECharts: unknown;
+      mermaid: unknown;
     };
   }
 }
@@ -47,6 +47,12 @@ const backendComponents: Record<string, ComponentType<VisualizationComponentProp
 // Cache for dynamically loaded backend components
 const backendComponentCache: Record<string, ComponentType<VisualizationComponentProps>> = {};
 
+// Import centralized logger
+import { logger } from "@/lib/logger";
+
+// Module logger
+const log = logger.for('extensions');
+
 /**
  * Register an extension's component (loaded from backend)
  * @param type - The extension type (e.g., 'show-chart', 'custom-viz')
@@ -57,7 +63,7 @@ export function registerExtensionComponent(
   component: ComponentType<VisualizationComponentProps>
 ): void {
   backendComponents[type] = component;
-  console.log(`[ExtensionRegistry] Registered backend component for: ${type}`);
+  log.debug("Registered backend component", { type });
 }
 
 /**
@@ -73,7 +79,7 @@ async function loadComponentFromBackend(
   tenantId?: string
 ): Promise<ComponentType<VisualizationComponentProps> | null> {
   try {
-    console.log(`[ExtensionRegistry] Loading ${extensionId} from backend API${projectId ? ` (project: ${projectId})` : ''}`);
+    log.debug(`Loading ${extensionId} from backend API`, { projectId });
 
     // Build URL with optional query params for project-specific UI
     const url = new URL(`/api/extensions/${extensionId}/ui`, window.location.origin);
@@ -86,7 +92,7 @@ async function loadComponentFromBackend(
     const response = await fetch(url.toString());
 
     if (!response.ok) {
-      console.log(`[ExtensionRegistry] Backend UI not available for ${extensionId}`);
+      log.debug(`Backend UI not available for ${extensionId}`, { status: response.status });
       return null;
     }
 
@@ -133,17 +139,17 @@ async function loadComponentFromBackend(
           debug: console.debug.bind(console),
         };
 
-        const sendLog = (level, args) => {
+        const sendLog = (level: string, args: unknown[]) => {
           // Call original console
-          originalConsole[level](...args);
+          originalConsole[level as keyof typeof originalConsole](...args);
 
           // Send to backend if projectId is available
-          if (typeof window !== 'undefined' && (window as any).__currentProjectId) {
+          if (typeof window !== 'undefined' && (window as Record<string, unknown>).__currentProjectId) {
             const message = args.map(arg =>
               typeof arg === 'string' ? arg : JSON.stringify(arg)
             ).join(' ');
 
-            fetch('/api/projects/' + (window as any).__currentProjectId + '/extensions/' + extensionId + '/logs', {
+            fetch('/api/projects/' + (window as Record<string, unknown>).__currentProjectId + '/extensions/' + extensionId + '/logs', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
@@ -152,10 +158,10 @@ async function loadComponentFromBackend(
           }
         };
 
-        console.log = (...args) => sendLog('info', args);
-        console.warn = (...args) => sendLog('warn', args);
-        console.error = (...args) => sendLog('error', args);
-        console.debug = (...args) => sendLog('debug', args);
+        console.log = (...args: unknown[]) => sendLog('info', args);
+        console.warn = (...args: unknown[]) => sendLog('warn', args);
+        console.error = (...args: unknown[]) => sendLog('error', args);
+        console.debug = (...args: unknown[]) => sendLog('debug', args);
 
         // Execute the bundled code
         ${bundledCode}
@@ -173,7 +179,7 @@ async function loadComponentFromBackend(
 
       // Set current project ID for logging
       if (typeof window !== 'undefined' && projectId) {
-        (window as any).__currentProjectId = projectId;
+        (window as Record<string, unknown>).__currentProjectId = projectId;
       }
 
       // Execute with actual dependencies as arguments
@@ -184,7 +190,7 @@ async function loadComponentFromBackend(
         echarts,
         mermaid,
         extensionId
-      );
+      ) as Record<string, ComponentType<VisualizationComponentProps>>;
 
       // Get the named export we need (e.g., ShowChartMessage)
       const messageComponentName = extensionId.split('-').map((part, idx) =>
@@ -194,26 +200,26 @@ async function loadComponentFromBackend(
 
       const windowFallback =
         typeof window !== "undefined"
-          ? ((window as any)[messageComponentName] ||
-              (window as any).libs?.[messageComponentName])
+          ? ((window as Record<string, unknown>)[messageComponentName] ||
+              (window as { libs?: Record<string, unknown> }).libs?.[messageComponentName])
           : null;
 
       const component =
         moduleExports[messageComponentName] || moduleExports.default || windowFallback;
 
       if (component) {
-        console.log(`[ExtensionRegistry] Successfully loaded backend UI for ${extensionId}:`, messageComponentName);
+        log.debug(`Successfully loaded backend UI for ${extensionId}`, { componentName: messageComponentName });
         return component as ComponentType<VisualizationComponentProps>;
       }
 
-      console.warn(`[ExtensionRegistry] No component found in module for ${extensionId}. Looked for:`, messageComponentName, 'Available:', Object.keys(moduleExports));
+      log.warn(`No component found in module for ${extensionId}`, { lookedFor: messageComponentName, available: Object.keys(moduleExports) });
       return null;
     } catch (error) {
-      console.error(`[ExtensionRegistry] Error loading module with Function:`, error);
+      log.error("Error loading module with Function", { error });
       return null;
     }
   } catch (error) {
-    console.warn(`[ExtensionRegistry] Failed to load backend UI for ${extensionId}:`, error);
+    log.warn(`Failed to load backend UI for ${extensionId}`, { error });
     return null;
   }
 }
@@ -253,7 +259,7 @@ export async function getExtensionComponent(
   try {
     await loadExtensionDependencies(type, projectId, tenantId);
   } catch (error) {
-    console.warn(`[ExtensionRegistry] Failed to load dependencies for ${type}:`, error);
+    log.warn(`Failed to load dependencies for ${type}`, { error });
     // Continue anyway - dependencies might be optional
   }
 
@@ -264,7 +270,7 @@ export async function getExtensionComponent(
     return backendComponent;
   }
 
-  console.warn(`[ExtensionRegistry] No UI component found for ${type}`);
+  log.warn(`No UI component found for ${type}`);
   return null;
 }
 
@@ -308,7 +314,7 @@ export function clearBackendComponentCache(): void {
   Object.keys(backendComponentCache).forEach(key => {
     delete backendComponentCache[key];
   });
-  console.log('[ExtensionRegistry] Backend component cache cleared');
+  log.debug("Backend component cache cleared");
 }
 
 /**
@@ -323,6 +329,6 @@ export function clearExtensionComponentCache(
   const cacheKey = projectId ? `${extensionId}-${projectId}` : extensionId;
   if (backendComponentCache[cacheKey]) {
     delete backendComponentCache[cacheKey];
-    console.log(`[ExtensionRegistry] Cleared cache for ${extensionId}${projectId ? ` (project: ${projectId})` : ''}`);
+    log.debug("Cleared cache for extension", { extensionId, projectId });
   }
 }

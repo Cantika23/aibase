@@ -6,6 +6,7 @@ import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useProjectStore } from "@/stores/project-store";
+import { useLogger } from "@/hooks/use-logger";
 import { MemoryToolGroup } from "./memory-tool-group";
 import type { ToolInvocation } from "./types";
 import { getExtensionComponent } from "./extension-component-registry";
@@ -22,6 +23,7 @@ interface ToolCallProps {
 }
 
 export function ToolCall({ toolInvocations }: ToolCallProps) {
+  const log = useLogger('extensions');
   const { setSelectedScript, setSelectedGenericTool } =
     useUIStore(
       useShallow((state) => ({
@@ -99,12 +101,12 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
 
         // Debug logging to see what's in the result
         if (isScript) {
-          console.log('[ToolCall] Script invocation result:', 'result' in invocation ? invocation.result : undefined);
-          console.log('[ToolCall] Script visualizations found:', scriptVisualizations);
-          console.log('[ToolCall] Has __visualizations key?', 'result' in invocation && '__visualizations' in (invocation.result || {}));
-          console.log('[ToolCall] __visualizations count:', scriptVisualizations?.length || 0);
-          console.log('[ToolCall] __visualizations types:', scriptVisualizations?.map((v: any) => v.type) || []);
-          console.log('[ToolCall] Full invocation:', invocation);
+          log.debug("Script invocation result", { result: 'result' in invocation ? invocation.result : undefined });
+          log.debug("Script visualizations found", { scriptVisualizations });
+          log.debug("Has __visualizations key?", { hasVisualizations: 'result' in invocation && '__visualizations' in (invocation.result || {}) });
+          log.debug("__visualizations count", { count: scriptVisualizations?.length || 0 });
+          log.debug("__visualizations types", { types: scriptVisualizations?.map((v: any) => v.type) || [] });
+          log.debug("Full invocation", { invocation });
         }
 
         // Handle visualization tool calls using backend plugin system
@@ -133,9 +135,9 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
 
         const handleScriptClick = () => {
           if (isScript) {
-            console.log('[handleScriptClick] invocation:', invocation);
-            console.log('[handleScriptClick] has inspectionData?', !!(invocation as any).inspectionData);
-            console.log('[handleScriptClick] inspectionData:', (invocation as any).inspectionData);
+            log.debug("handleScriptClick invocation", { invocation });
+            log.debug("handleScriptClick has inspectionData?", { hasInspectionData: !!(invocation as any).inspectionData });
+            log.debug("handleScriptClick inspectionData", { inspectionData: (invocation as any).inspectionData });
 
             // For executing state, code might be in result field
             const code =
@@ -153,7 +155,7 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
               const actualResult = 'result' in invocation ? invocation.result : undefined;
 
               // Debug logging
-              console.log("[Dialog Open] Script invocation data:", {
+              log.debug("Dialog Open Script invocation data", {
                 toolCallId: invocation.toolCallId,
                 state: invocation.state,
                 hasResultKey: "result" in invocation,
@@ -357,7 +359,7 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
                               setError(`UI component not found for: ${viz.type}`);
                             }
                           }).catch(err => {
-                            console.error(`[VizComponentWrapper] Error loading component for ${viz.type}:`, err);
+                            log.error(`Error loading component for ${viz.type}`, { error: err });
                             setError(`Failed to load component: ${err.message}`);
                           });
                         }, [viz.type, vizIndex, projectId, tenantId]);
@@ -385,15 +387,15 @@ export function ToolCall({ toolInvocations }: ToolCallProps) {
                           }
                         };
 
-                        console.log(`[VizComponentWrapper] Rendering ${viz.type} with args:`, vizInvocation.result.args);
-                        console.log(`[VizComponentWrapper] Full viz object:`, viz);
-                        console.log(`[VizComponentWrapper] Has series?`, !!vizInvocation.result.args?.series, 'series:', vizInvocation.result.args?.series);
-                        console.log(`[VizComponentWrapper] Has datasets?`, !!vizInvocation.result.args?.datasets, 'datasets:', vizInvocation.result.args?.datasets);
+                        log.debug(`VizComponentWrapper Rendering ${viz.type} with args`, { args: vizInvocation.result.args });
+                        log.debug("VizComponentWrapper Full viz object", { viz });
+                        log.debug("VizComponentWrapper Has series?", { hasSeries: !!vizInvocation.result.args?.series, series: vizInvocation.result.args?.series });
+                        log.debug("VizComponentWrapper Has datasets?", { hasDatasets: !!vizInvocation.result.args?.datasets, datasets: vizInvocation.result.args?.datasets });
 
                         try {
                           return <Comp toolInvocation={vizInvocation} />;
                         } catch (err) {
-                          console.error(`[VizComponentWrapper] Error rendering ${viz.type}:`, err);
+                          log.error(`Error rendering ${viz.type}`, { error: err });
                           return <div className="p-4 text-sm text-red-600 dark:text-red-400">Render error: {err instanceof Error ? err.message : 'Unknown error'}</div>;
                         }
                       };

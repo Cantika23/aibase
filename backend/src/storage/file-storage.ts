@@ -6,6 +6,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getProjectFilesDir } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('FileStorage');
 
 export type FileScope = 'user' | 'public';
 
@@ -52,7 +55,7 @@ export class FileStorage {
       try {
         callback();
       } catch (error) {
-        console.error('[FileStorage] Cache invalidation callback failed:', error);
+        logger.error({ error }, 'Cache invalidation callback failed');
       }
     }
   }
@@ -106,8 +109,8 @@ export class FileStorage {
       ? `---\n${frontmatter}\n---\n${meta.description}\n`
       : `---\n${frontmatter}\n---\n`;
 
-    console.log(`[FileStorage] Saving metadata to ${metaPath}`);
-    console.log(`[FileStorage] Description length: ${meta.description?.length || 0}`);
+    logger.info(`Saving metadata to ${metaPath}`);
+    logger.debug({ descriptionLength: meta.description?.length || 0 }, 'Description length');
     await fs.writeFile(metaPath, content, 'utf-8');
   }
 
@@ -166,10 +169,10 @@ export class FileStorage {
       if (bodyMatch && bodyMatch[1]) {
         meta.description = bodyMatch[1].trim();
         if (meta.description) {
-          console.log(`[FileStorage] Loaded description for ${fileName}: ${meta.description.substring(0, 50)}...`);
+          logger.info(`Loaded description for ${fileName}: ${meta.description.substring(0, 50)}...`);
         }
       } else {
-        console.log(`[FileStorage] No body found in metadata for ${fileName}`);
+        logger.info(`No body found in metadata for ${fileName}`);
       }
 
       return meta.scope ? meta : { scope: 'user', ...meta };
@@ -581,7 +584,7 @@ ${frontmatter}
             }
           } catch (error: any) {
             if (error.code !== 'ENOENT') {
-              console.error(`Error reading tenant ${tenant.name}:`, error);
+              logger.error({ error }, `Error reading tenant ${tenant.name}`);
             }
           }
         }

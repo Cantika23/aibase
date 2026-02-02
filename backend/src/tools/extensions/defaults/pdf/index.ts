@@ -8,6 +8,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractTextFromPdf, isPdfFile } from '../../../../utils/document-extractor';
 import { getProjectFilesDir } from '../../../../config/paths';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('PDFExtension');
 
 // Type definition for injected utilities
 interface ExtensionUtils {
@@ -266,19 +269,19 @@ if (hookRegistry) {
     'afterFileUpload',
     'pdf',
     async (_context: any) => {
-      console.log('[PdfDocument] Hook called for file:', _context.fileName, 'type:', _context.fileType);
+      logger.info({ fileName: _context.fileName, fileType: _context.fileType }, 'Hook called for file');
 
       // Only process PDF files
       if (!_context.fileType.match(/(^application\/pdf)|\.pdf$/i)) {
-        console.log('[PdfDocument] Skipping non-PDF file');
+        logger.info('Skipping non-PDF file');
         return;
       }
 
-      console.log('[PdfDocument] Processing PDF file:', _context.fileName);
+      logger.info({ fileName: _context.fileName }, 'Processing PDF file');
 
       try {
         // Extract text content from PDF
-        console.log('[PdfDocument] Extracting text from:', _context.filePath);
+        logger.info({ filePath: _context.filePath }, 'Extracting text');
         const text = await extractTextFromPdf(_context.filePath);
 
         // Calculate page count
@@ -306,19 +309,18 @@ Full Text Length: ${text.length} characters`;
           label: "PdfDocument",
         });
 
-        console.log('[PdfDocument] Generated description for:', _context.fileName, 'text length:', text.length);
+        logger.info({ fileName: _context.fileName, textLength: text.length }, 'Generated description');
 
         return { description, title };
       } catch (error) {
-        console.error('[PdfDocument] Hook failed:', error);
-        console.error('[PdfDocument] Error stack:', error instanceof Error ? error.stack : String(error));
+        logger.error({ error }, 'Hook failed');
         return {};
       }
     }
   );
-  console.log('[PdfDocument] Registered afterFileUpload hook');
+  logger.info('Registered afterFileUpload hook');
 } else {
-  console.log('[PdfDocument] extensionHookRegistry not available, hook not registered');
+  logger.info('extensionHookRegistry not available, hook not registered');
 }
 
 // @ts-expect-error - Extension loader wraps this code in an async function

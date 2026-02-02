@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { buildApiUrl } from "@/lib/base-path";
+import { logger } from "@/lib/logger";
 
 const API_BASE_URL = buildApiUrl("");
 
@@ -74,7 +75,7 @@ export const useTenantStore = create<TenantStore>((set, _get) => ({
       const data = await response.json();
       set({ tenants: data.tenants, isLoading: false, error: null });
     } catch (error: any) {
-      console.error("[Tenant] Fetch tenants error:", error);
+      logger.auth.error("Fetch tenants error", { error: String(error) });
       set({
         error: error.message || "Failed to fetch tenants",
         isLoading: false,
@@ -114,10 +115,10 @@ export const useTenantStore = create<TenantStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Tenant] Tenant created successfully:", data.tenant.name);
+      logger.auth.info("Tenant created successfully", { tenantName: data.tenant.name });
       return data.tenant;
     } catch (error: any) {
-      console.error("[Tenant] Create tenant error:", error);
+      logger.auth.error("Create tenant error", { error: String(error) });
       set({
         error: error.message || "Failed to create tenant",
         isLoading: false,
@@ -164,10 +165,10 @@ export const useTenantStore = create<TenantStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Tenant] Tenant updated successfully");
+      logger.auth.info("Tenant updated successfully");
       return true;
     } catch (error: any) {
-      console.error("[Tenant] Update tenant error:", error);
+      logger.auth.error("Update tenant error", { error: String(error) });
       set({
         error: error.message || "Failed to update tenant",
         isLoading: false,
@@ -203,10 +204,10 @@ export const useTenantStore = create<TenantStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Tenant] Tenant deleted successfully");
+      logger.auth.info("Tenant deleted successfully");
       return true;
     } catch (error: any) {
-      console.error("[Tenant] Delete tenant error:", error);
+      logger.auth.error("Delete tenant error", { error: String(error) });
       set({
         error: error.message || "Failed to delete tenant",
         isLoading: false,
@@ -248,10 +249,10 @@ export const useTenantStore = create<TenantStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Tenant] Logo uploaded successfully");
+      logger.auth.info("Logo uploaded successfully");
       return true;
     } catch (error: any) {
-      console.error("[Tenant] Upload logo error:", error);
+      logger.auth.error("Upload logo error", { error: String(error) });
       set({
         error: error.message || "Failed to upload logo",
         isLoading: false,
@@ -289,10 +290,10 @@ export const useTenantStore = create<TenantStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Tenant] Logo deleted successfully");
+      logger.auth.info("Logo deleted successfully");
       return true;
     } catch (error: any) {
-      console.error("[Tenant] Delete logo error:", error);
+      logger.auth.error("Delete logo error", { error: String(error) });
       set({
         error: error.message || "Failed to delete logo",
         isLoading: false,

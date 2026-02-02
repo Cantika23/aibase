@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { User } from "./auth-store";
 import { buildApiUrl } from "@/lib/base-path";
+import { logger } from "@/lib/logger";
 
 const API_BASE_URL = buildApiUrl("");
 
@@ -79,7 +80,7 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
       const data = await response.json();
       set({ users: data.users, isLoading: false, error: null });
     } catch (error: any) {
-      console.error("[Admin] Fetch users error:", error);
+      logger.auth.error("Fetch users error", { error: String(error) });
       set({
         error: error.message || "Failed to fetch users",
         isLoading: false,
@@ -121,10 +122,10 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Admin] User created successfully:", data.user.username);
+      logger.auth.info("User created successfully", { username: data.user.username });
       return true;
     } catch (error: any) {
-      console.error("[Admin] Create user error:", error);
+      logger.auth.error("Create user error", { error: String(error) });
       set({
         error: error.message || "Failed to create user",
         isLoading: false,
@@ -160,10 +161,10 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Admin] User deleted successfully");
+      logger.auth.info("User deleted successfully");
       return true;
     } catch (error: any) {
-      console.error("[Admin] Delete user error:", error);
+      logger.auth.error("Delete user error", { error: String(error) });
       set({
         error: error.message || "Failed to delete user",
         isLoading: false,
@@ -195,10 +196,10 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
       const data = await response.json();
       set({ isLoading: false, error: null });
 
-      console.log("[Admin] Impersonation successful:", data.user.username);
+      logger.auth.info("Impersonation successful", { username: data.user.username });
       return data;
     } catch (error: any) {
-      console.error("[Admin] Impersonate user error:", error);
+      logger.auth.error("Impersonate user error", { error: String(error) });
       set({
         error: error.message || "Failed to impersonate user",
         isLoading: false,
@@ -227,7 +228,7 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
       const data = await response.json();
       set({ users: data.users, isLoading: false, error: null });
     } catch (error: any) {
-      console.error("[Admin] Fetch tenant users error:", error);
+      logger.auth.error("Fetch tenant users error", { error: String(error) });
       set({
         error: error.message || "Failed to fetch tenant users",
         isLoading: false,
@@ -270,10 +271,10 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Admin] Tenant user created successfully:", data.user.username);
+      logger.auth.info("Tenant user created successfully", { username: data.user.username });
       return true;
     } catch (error: any) {
-      console.error("[Admin] Create tenant user error:", error);
+      logger.auth.error("Create tenant user error", { error: String(error) });
       set({
         error: error.message || "Failed to create user",
         isLoading: false,
@@ -320,10 +321,10 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Admin] Tenant user updated successfully");
+      logger.auth.info("Tenant user updated successfully");
       return true;
     } catch (error: any) {
-      console.error("[Admin] Update tenant user error:", error);
+      logger.auth.error("Update tenant user error", { error: String(error) });
       set({
         error: error.message || "Failed to update user",
         isLoading: false,
@@ -359,10 +360,10 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
         error: null,
       }));
 
-      console.log("[Admin] Tenant user deleted successfully");
+      logger.auth.info("Tenant user deleted successfully");
       return true;
     } catch (error: any) {
-      console.error("[Admin] Delete tenant user error:", error);
+      logger.auth.error("Delete tenant user error", { error: String(error) });
       set({
         error: error.message || "Failed to delete user",
         isLoading: false,

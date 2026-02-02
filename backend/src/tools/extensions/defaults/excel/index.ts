@@ -6,6 +6,9 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("ExcelExtension");
 
 // Type definition for injected utilities
 interface ExtensionUtils {
@@ -165,7 +168,7 @@ async function executeDuckDB(query: string): Promise<DuckDBQueryResult> {
 
     return { columns, rows };
   } catch (error) {
-    console.error("[ExcelDocument] DuckDB query failed:", error);
+    logger.error({ error }, "DuckDB query failed");
     return { columns: [], rows: [] };
   }
 }
@@ -921,11 +924,9 @@ if (hookRegistry) {
     "afterFileUpload",
     "excel-document",
     async (_context: any) => {
-      console.log(
-        "[ExcelDocument] Hook called for file:",
-        _context.fileName,
-        "type:",
-        _context.fileType,
+      logger.info(
+        { fileName: _context.fileName, fileType: _context.fileType },
+        "Hook called for file"
       );
 
       // Only process Excel files
@@ -934,24 +935,19 @@ if (hookRegistry) {
           /(^application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))|\.xls|\.xlsx$/,
         )
       ) {
-        console.log("[ExcelDocument] Skipping non-Excel file");
+        logger.info("Skipping non-Excel file");
         return;
       }
 
-      console.log("[ExcelDocument] Processing Excel file:", _context.fileName);
+      logger.info({ fileName: _context.fileName }, "Processing Excel file");
 
       try {
         // Get comprehensive structure (sheets, columns, row counts)
-        console.log(
-          "[ExcelDocument] Getting structure for:",
-          _context.filePath,
-        );
+        logger.info({ filePath: _context.filePath }, "Getting structure");
         const structure = await getExcelStructure(_context.filePath);
-        console.log(
-          "[ExcelDocument] Found sheets:",
-          structure.sheets
-            .map((s) => `${s.name} (${s.rowCount} rows)`)
-            .join(", "),
+        logger.info(
+          { sheets: structure.sheets.map((s) => ({ name: s.name, rowCount: s.rowCount })) },
+          "Found sheets"
         );
 
         // Get preview of first sheet
@@ -968,8 +964,7 @@ if (hookRegistry) {
             .join("\n");
         }
 
-        console.log('[ExcelDocument] About to call utils.generateTitle, utils is:', typeof utils);
-        console.log('[ExcelDocument] utils.generateTitle is:', typeof utils?.generateTitle);
+        logger.debug({ utilsType: typeof utils, generateTitleType: typeof utils?.generateTitle }, "About to call utils.generateTitle");
 
         // Generate title using AI helper (injected utility) - BEFORE description
         const title = await utils.generateTitle({
@@ -978,7 +973,7 @@ if (hookRegistry) {
           label: "ExcelDocument",
         });
 
-        console.log('[ExcelDocument] generateTitle returned:', title);
+        logger.debug({ title }, "generateTitle returned");
 
         // Generate structured description for AI, now with title
         const description = generateDescription(
@@ -987,29 +982,21 @@ if (hookRegistry) {
           _context.fileName,
           title || undefined,
         );
-        console.log(
-          "[ExcelDocument] Generated structured description for:",
-          _context.fileName,
-          "length:",
-          description.length,
+        logger.info(
+          { fileName: _context.fileName, descriptionLength: description.length },
+          "Generated structured description"
         );
 
         return { description, title };
       } catch (error) {
-        console.error("[ExcelDocument] Hook failed:", error);
-        console.error(
-          "[ExcelDocument] Error stack:",
-          error instanceof Error ? error.stack : String(error),
-        );
+        logger.error({ error }, "Hook failed");
         return {};
       }
     },
   );
-  console.log("[ExcelDocument] Registered afterFileUpload hook");
+  logger.info("Registered afterFileUpload hook");
 } else {
-  console.log(
-    "[ExcelDocument] extensionHookRegistry not available, hook not registered",
-  );
+  logger.info("extensionHookRegistry not available, hook not registered");
 }
 
 // @ts-expect-error - Extension loader wraps this code in an async function

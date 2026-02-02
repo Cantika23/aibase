@@ -45,6 +45,9 @@
 import type { DatabaseConfig } from './abstraction/database';
 import type { FileStorageConfig } from './abstraction/file-storage';
 import type { CacheConfig } from './abstraction/cache';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('StorageConfig');
 
 // ============================================================================
 // Configuration Parsers
@@ -235,44 +238,42 @@ export function getStorageConfig(): StorageConfig {
 export function printStorageConfig(): void {
   const config = getStorageConfig();
   
-  console.log('\n📦 Storage Configuration');
-  console.log('========================\n');
+  logger.info('📦 Storage Configuration');
+  logger.info('========================');
   
   // Database
-  console.log(`Database: ${config.database.type}`);
+  logger.info(`Database: ${config.database.type}`);
   if (config.database.type === 'sqlite') {
-    console.log(`  Path: ${config.database.sqlite?.path}`);
+    logger.info(`  Path: ${config.database.sqlite?.path}`);
   } else {
-    console.log(`  Host: ${config.database.postgresql?.host}`);
-    console.log(`  Port: ${config.database.postgresql?.port}`);
-    console.log(`  Database: ${config.database.postgresql?.database}`);
+    logger.info(`  Host: ${config.database.postgresql?.host}`);
+    logger.info(`  Port: ${config.database.postgresql?.port}`);
+    logger.info(`  Database: ${config.database.postgresql?.database}`);
   }
   
   // File Storage
-  console.log(`\nFile Storage: ${config.fileStorage.type}`);
+  logger.info(`File Storage: ${config.fileStorage.type}`);
   if (config.fileStorage.type === 'local') {
-    console.log(`  Path: ${config.fileStorage.local?.basePath}`);
+    logger.info(`  Path: ${config.fileStorage.local?.basePath}`);
   } else if (config.fileStorage.type === 's3') {
-    console.log(`  Bucket: ${config.fileStorage.s3?.bucket}`);
-    console.log(`  Region: ${config.fileStorage.s3?.region}`);
+    logger.info(`  Bucket: ${config.fileStorage.s3?.bucket}`);
+    logger.info(`  Region: ${config.fileStorage.s3?.region}`);
     if (config.fileStorage.s3?.endpoint) {
-      console.log(`  Endpoint: ${config.fileStorage.s3.endpoint}`);
+      logger.info(`  Endpoint: ${config.fileStorage.s3.endpoint}`);
     }
   }
   
   // Cache
-  console.log(`\nCache: ${config.cache.type}`);
+  logger.info(`Cache: ${config.cache.type}`);
   if (config.cache.type === 'memory') {
-    console.log(`  Max Size: ${config.cache.memory?.maxSize} entries`);
-    console.log(`  Default TTL: ${config.cache.memory?.ttlSeconds}s`);
+    logger.info(`  Max Size: ${config.cache.memory?.maxSize} entries`);
+    logger.info(`  Default TTL: ${config.cache.memory?.ttlSeconds}s`);
   } else {
-    console.log(`  Host: ${config.cache.redis?.host || config.cache.valkey?.host}`);
-    console.log(`  Port: ${config.cache.redis?.port || config.cache.valkey?.port}`);
+    logger.info(`  Host: ${config.cache.redis?.host || config.cache.valkey?.host}`);
+    logger.info(`  Port: ${config.cache.redis?.port || config.cache.valkey?.port}`);
   }
   
   if (config.migrationMode) {
-    console.log('\n⚠️  MIGRATION MODE ENABLED - Storage is READ-ONLY');
+    logger.info('⚠️  MIGRATION MODE ENABLED - Storage is READ-ONLY');
   }
-  
-  console.log('');
 }

@@ -18,11 +18,13 @@ import {
 import { ArrowLeft, Save } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
+import { useLogger } from "@/hooks/use-logger";
 
 export function ExtensionEditor() {
   const { currentProject } = useProjectStore();
   const navigate = useNavigate();
   const { extensionId } = useParams<{ extensionId: string }>();
+  const log = useLogger('extensions');
 
   const isCreating = extensionId === "new";
 
@@ -50,7 +52,7 @@ export function ExtensionEditor() {
       setCode(extension.code);
       setEnabled(extension.metadata.enabled);
     } catch (error) {
-      console.error("Failed to load extension:", error);
+      log.error("Failed to load extension", { error: String(error) });
       toast.error(
         error instanceof Error ? error.message : "Failed to load extension"
       );
@@ -58,7 +60,7 @@ export function ExtensionEditor() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentProject, extensionId, isCreating]);
+  }, [currentProject, extensionId, isCreating, log]);
 
   useEffect(() => {
     loadExtension();

@@ -5,6 +5,9 @@
 
 import { ExtensionStorage } from "../storage/extension-storage";
 import { generateExtension } from "../services/extension-generator";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('ExtensionGenerator');
 
 export async function handleExtensionGeneratorRequest(req: Request, projectId: string): Promise<Response> {
   try {
@@ -26,8 +29,8 @@ export async function handleExtensionGeneratorRequest(req: Request, projectId: s
       }, { status: 400 });
     }
 
-    console.log(`[ExtensionGenerator] Generating extension for project ${projectId}`);
-    console.log(`[ExtensionGenerator] Prompt: ${(prompt as string).substring(0, 100)}...`);
+    logger.info({ projectId }, '[ExtensionGenerator] Generating extension for project');
+    logger.info({ prompt: (prompt as string).substring(0, 100) }, '[ExtensionGenerator] Prompt');
 
     // Generate extension using AI
     const extension = await generateExtension(prompt as string, {
@@ -61,7 +64,7 @@ export async function handleExtensionGeneratorRequest(req: Request, projectId: s
       isDefault: false,
     });
 
-    console.log(`[ExtensionGenerator] Extension created: ${created.metadata.id}`);
+    logger.info({ extensionId: created.metadata.id }, '[ExtensionGenerator] Extension created');
 
     return Response.json({
       success: true,
@@ -74,7 +77,7 @@ export async function handleExtensionGeneratorRequest(req: Request, projectId: s
     }, { status: 201 });
 
   } catch (error: any) {
-    console.error('[ExtensionGenerator] Error:', error);
+    logger.error({ error }, '[ExtensionGenerator] Error');
 
     return Response.json({
       success: false,
@@ -99,7 +102,7 @@ export async function handleExtensionPreviewRequest(req: Request): Promise<Respo
       }, { status: 400 });
     }
 
-    console.log(`[ExtensionGenerator] Generating preview for prompt: ${(prompt as string).substring(0, 100)}...`);
+    logger.info({ prompt: (prompt as string).substring(0, 100) }, '[ExtensionGenerator] Generating preview for prompt');
 
     // Generate extension preview
     const extension = await generateExtension(prompt as string, {
@@ -128,7 +131,7 @@ export async function handleExtensionPreviewRequest(req: Request): Promise<Respo
     });
 
   } catch (error: any) {
-    console.error('[ExtensionGenerator] Preview error:', error);
+    logger.error({ error }, '[ExtensionGenerator] Preview error');
 
     return Response.json({
       success: false,

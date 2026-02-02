@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 import { ConvIdManager } from '@/lib/conv-id';
 import { useProjectStore } from '@/stores/project-store';
 import { saveVisualizationAsPNG } from '@/lib/image-save';
+import { useLogger } from '@/hooks/use-logger';
 
 interface UseVisualizationSaveOptions {
   toolCallId: string;
@@ -18,6 +19,7 @@ export function useVisualizationSave({
   saveTo,
   shouldSave,
 }: UseVisualizationSaveOptions) {
+  const log = useLogger('files');
   const hasSavedRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const { currentProject } = useProjectStore();
@@ -35,14 +37,14 @@ export function useVisualizationSave({
         const container = document.querySelector(`[data-tool-call-id="${toolCallId}"]`) as HTMLElement;
 
         if (!container) {
-          console.warn(`[Visualization Save] Container not found for toolCallId: ${toolCallId}`);
+          log.warn("[Visualization Save] Container not found", { toolCallId });
           return;
         }
 
         const convId = ConvIdManager.getConvId();
         const projectId = currentProject.id;
 
-        console.log(`[Visualization Save] Saving ${saveTo} for toolCallId: ${toolCallId}`);
+        log.debug("[Visualization Save] Saving visualization", { filename: saveTo, toolCallId });
 
         const savedFile = await saveVisualizationAsPNG({
           element: container,
@@ -51,11 +53,11 @@ export function useVisualizationSave({
           projectId,
         });
 
-        console.log(`[Visualization Save] Saved successfully:`, savedFile.url);
+        log.debug("[Visualization Save] Saved successfully", { url: savedFile.url });
         hasSavedRef.current = true;
 
       } catch (error) {
-        console.error('[Visualization Save] Failed to save:', error);
+        log.error("[Visualization Save] Failed to save", { error: error instanceof Error ? error.message : String(error) });
       }
     }, 500); // 500ms delay to ensure rendering is complete
 

@@ -16,6 +16,7 @@ import type {
 
 import { WSEventEmitter } from "./ws-emitter";
 import { ConvIdManager } from "../conv-id";
+import { logger } from "../logger";
 
 export class WSClient extends WSEventEmitter {
   private ws: WebSocket | null = null;
@@ -307,24 +308,21 @@ export class WSClient extends WSEventEmitter {
         this.stats.messagesReceived++;
         this.stats.lastMessageAt = Date.now();
 
-        console.log("WSClient: Raw WebSocket message received:", event.data);
+        logger.websocket.debug("Raw WebSocket message received", { 
+          dataLength: String(event.data).length 
+        });
 
         try {
           const message: WSMessage = JSON.parse(event.data);
-          console.log(
-            "WSClient: Parsed message:",
-            message.type,
-            message.id,
-            message.data
-          );
+          logger.websocket.debug("Parsed message", {
+            type: message.type,
+            id: message.id,
+          });
           await this.handleMessage(message);
         } catch (error) {
-          console.error(
-            "WSClient: Failed to parse message:",
-            error,
-            "Raw data:",
-            event.data
-          );
+          logger.websocket.error("Failed to parse message", {
+            error: error instanceof Error ? error.message : String(error),
+          });
           this.emit("error", new Error("Invalid message format"));
         }
       };
@@ -341,7 +339,10 @@ export class WSClient extends WSEventEmitter {
 
         if (isAuthFailure) {
           // Emit auth_failed event instead of attempting reconnection
-          console.warn(`[WSClient] Authentication failure (code: ${event.code}): ${event.reason}`);
+          logger.websocket.warn("Authentication failure", { 
+            code: event.code, 
+            reason: event.reason 
+          });
           this.emit("auth_failed", { code: event.code, reason: event.reason });
         } else {
           // Normal disconnect
@@ -391,7 +392,9 @@ export class WSClient extends WSEventEmitter {
     // Emit specific message events
     switch (message.type) {
       case "llm_chunk":
-        console.log("WSClient: Emitting llm_chunk:", message.data?.chunk);
+        logger.websocket.trace("Emitting llm_chunk", { 
+          chunkLength: message.data?.chunk?.length 
+        });
         this.emit("llm_chunk", {
           chunk: message.data?.chunk || "",
           messageId: message.id,
@@ -403,7 +406,9 @@ export class WSClient extends WSEventEmitter {
 
       case "llm_complete":
         // Always emit llm_complete for the UI
-        console.log("WSClient: Emitting llm_complete:", message.data?.fullText);
+        logger.websocket.debug("Emitting llm_complete", { 
+          textLength: message.data?.fullText?.length 
+        });
         this.emit("llm_complete", {
           fullText: message.data?.fullText || "",
           messageId: message.id,
@@ -459,9 +464,11 @@ export class WSClient extends WSEventEmitter {
         // This preserves the client-side generated ID across refreshes
         if (message.data?.convId && !ConvIdManager.hasConvId()) {
           this.setConvId(message.data.convId);
-          console.log("WSClient: Accepted server conversation ID (no existing ID):", message.data.convId);
+          logger.websocket.debug("Accepted server conversation ID", { convId: message.data.convId });
         } else if (message.data?.convId) {
-          console.log("WSClient: Ignoring server conversation ID, keeping existing:", message.data.convId);
+          logger.websocket.debug("Ignoring server conversation ID, keeping existing", { 
+            serverConvId: message.data.convId 
+          });
         }
 
         this.emit("status", message.data);
@@ -489,24 +496,22 @@ export class WSClient extends WSEventEmitter {
   }
 
   public send(message: WSMessage): void {
-    console.log(
-      "WSClient: Attempting to send message:",
-      message.type,
-      message.id
-    );
-    console.log("WSClient: Connected?", this.isConnected());
-    console.log("WSClient: WebSocket state:", this.ws?.readyState);
+    logger.websocket.trace("Attempting to send message", {
+      type: message.type,
+      id: message.id,
+      connected: this.isConnected(),
+      readyState: this.ws?.readyState,
+      queueLength: this.messageQueue.length,
+    });
 
     if (this.isConnected()) {
-      console.log("WSClient: Sending via WebSocket");
       this.ws!.send(JSON.stringify(message));
       this.stats.messagesSent++;
       this.stats.lastMessageAt = Date.now();
     } else {
-      console.log(
-        "WSClient: Not connected, queuing message. Queue length:",
-        this.messageQueue.length
-      );
+      logger.websocket.debug("Not connected, queuing message", {
+        queueLength: this.messageQueue.length,
+      });
       // Queue message for when connection is restored
       this.messageQueue.push(message);
     }

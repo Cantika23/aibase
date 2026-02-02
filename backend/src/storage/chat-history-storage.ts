@@ -10,6 +10,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { getConversationChatsDir } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ChatHistoryStorage');
 
 export interface ChatHistoryMetadata {
   convId: string;
@@ -118,14 +121,14 @@ export class ChatHistoryStorage {
       const content = await fs.readFile(filePath, 'utf-8');
       const data: ChatHistoryFile = JSON.parse(content);
 
-      console.log(`[ChatHistoryStorage] Loaded ${data.messages.length} messages from ${latestFile}`);
+      logger.info({ messageCount: data.messages.length, file: latestFile }, 'Loaded messages from file');
       return data.messages;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
         // File doesn't exist yet
         return [];
       }
-      console.error('[ChatHistoryStorage] Error loading chat history:', error);
+      logger.error({ error }, 'Error loading chat history');
       throw error;
     }
   }
@@ -165,9 +168,9 @@ export class ChatHistoryStorage {
         'utf-8'
       );
 
-      console.log(`[ChatHistoryStorage] Saved ${messages.length} messages to ${path.basename(filePath)}`);
+      logger.info({ messageCount: messages.length, file: path.basename(filePath) }, 'Saved messages to file');
     } catch (error) {
-      console.error('[ChatHistoryStorage] Error saving chat history:', error);
+      logger.error({ error }, 'Error saving chat history');
       throw error;
     }
   }
@@ -309,7 +312,7 @@ export class ChatHistoryStorage {
           }
         } catch (error: any) {
           if (error.code !== 'ENOENT') {
-            console.error(`Error reading user directory ${userDir.name}:`, error);
+            logger.error({ error, userDir: userDir.name }, 'Error reading user directory');
           }
         }
       }
@@ -330,7 +333,7 @@ export class ChatHistoryStorage {
       if (error.code === 'ENOENT') {
         return [];
       }
-      console.error('[ChatHistoryStorage] Error listing conversations:', error);
+      logger.error({ error }, 'Error listing conversations');
       throw error;
     }
   }
@@ -375,7 +378,7 @@ export class ChatHistoryStorage {
       if (error.code === 'ENOENT') {
         return [];
       }
-      console.error('[ChatHistoryStorage] Error listing user conversations:', error);
+      logger.error({ error }, 'Error listing user conversations');
       throw error;
     }
   }

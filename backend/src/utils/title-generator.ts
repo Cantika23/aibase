@@ -6,7 +6,7 @@
 import OpenAI from "openai";
 import { createLogger } from "./logger";
 
-const logger = createLogger("TitleGenerator");
+const logger = createLogger("TitleGeneratorUtil");
 
 export interface TitleGenerationOptions {
   /**
@@ -61,11 +61,7 @@ export interface TitleGenerationOptions {
 export async function generateTitle(
   options: TitleGenerationOptions,
 ): Promise<string | undefined> {
-  console.log("[TitleGenerator] ====================================");
-  console.log(
-    "[TitleGenerator] generateTitle called with options:",
-    JSON.stringify(options, null, 2),
-  );
+  logger.debug("generateTitle called");
 
   const model = "GLM-4.5-Air";
   const {
@@ -75,21 +71,15 @@ export async function generateTitle(
     label = "TitleGenerator",
   } = options;
 
-  console.log("[TitleGenerator] Destructured options:", {
-    label,
-    contentLength: content?.length,
-    model,
-  });
+  logger.debug({ label, contentLength: content?.length, model }, "Destructured options");
 
   try {
     // Check if API key is configured
     const apiKey = process.env.OPENAI_API_KEY;
-    console.log("[TitleGenerator] OPENAI_API_KEY exists:", !!apiKey);
+    logger.debug({ hasApiKey: !!apiKey }, "Checking OPENAI_API_KEY");
 
     if (!apiKey) {
-      console.warn(
-        "[TitleGenerator] OPENAI_API_KEY not configured, skipping title generation",
-      );
+      logger.warn("OPENAI_API_KEY not configured, skipping title generation");
       return undefined;
     }
 
@@ -103,9 +93,9 @@ export async function generateTitle(
       process.env.TITLE_GENERATION_MODEL ||
       process.env.OPENAI_MODEL ||
       "gpt-4o-mini";
-    console.log("[TitleGenerator] Using model:", titleModel);
+    logger.debug({ titleModel }, "Using model");
 
-    console.log("[TitleGenerator] Calling OpenAI API...");
+    logger.debug("Calling OpenAI API");
 
     const response = (await Promise.race([
       openai.chat.completions.create({
@@ -126,44 +116,24 @@ export async function generateTitle(
       }),
     ])) as any;
 
-    console.log(
-      "[TitleGenerator] Full API response:",
-      JSON.stringify(response, null, 2),
-    );
-    console.log(
-      "[TitleGenerator] response.choices:",
-      JSON.stringify(response?.choices, null, 2),
-    );
-    console.log(
-      "[TitleGenerator] API Response received, choices length:",
-      response?.choices?.length,
-    );
+    logger.debug({ choicesLength: response?.choices?.length }, "API Response received");
 
     // Extract title from response
     const rawTitle = response.choices[0]?.message?.content?.trim() || "";
 
-    console.log(
-      "[TitleGenerator] Raw title from API:",
-      rawTitle ? `"${rawTitle}"` : "empty/undefined",
-      "length:",
-      rawTitle?.length,
-    );
+    logger.debug({ rawTitle, length: rawTitle?.length }, "Raw title from API");
 
     if (rawTitle && rawTitle.length > 0 && rawTitle.length < 100) {
       // Remove any surrounding quotes
       const title = rawTitle.replace(/^["']|["']$/g, "");
-      console.log("[TitleGenerator] Generated title successfully:", title);
+      logger.debug({ title }, "Generated title successfully");
       return title;
     } else {
-      console.warn(
-        "[TitleGenerator] Title validation failed, rawTitle:",
-        rawTitle,
-      );
+      logger.warn({ rawTitle }, "Title validation failed");
       return undefined;
     }
   } catch (error: any) {
-    console.error("[TitleGenerator] Failed to generate title:", error);
-    console.error("[TitleGenerator] Error stack:", error?.stack);
+    logger.error({ error }, "Failed to generate title");
     return undefined;
   }
 }

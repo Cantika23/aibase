@@ -6,6 +6,9 @@
 import { ExtensionStorage, type Extension, type ExampleEntry } from "../../storage/extension-storage";
 import { CategoryStorage } from "../../storage/category-storage";
 import { ExtensionLoader } from "../extensions/extension-loader";
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ExtensionContext');
 
 /**
  * Parse function signature from TypeScript code
@@ -151,16 +154,16 @@ export async function generateExtensionContext(extension: Extension): Promise<st
     const evaluatedContext = await loader.extractExtensionContext(extension, 3000);
 
     if (evaluatedContext && evaluatedContext.trim()) {
-      console.log(`[ExtensionContext] ✓ Successfully evaluated context function for ${metadata.id}`);
+      logger.info({ extensionId: metadata.id }, 'Successfully evaluated context function');
       return evaluatedContext.trim();
     }
   } catch (error) {
-    console.log(`[ExtensionContext] Context evaluation failed for ${metadata.id}, falling back to regex: ${error instanceof Error ? error.message : String(error)}`);
+    logger.debug({ error, extensionId: metadata.id }, 'Context evaluation failed, falling back to regex');
   }
 
   // PRIORITY 2: Fall back to regex parsing if evaluation fails
   // This handles cases where evaluation is not possible or times out
-  console.log(`[ExtensionContext] Using regex fallback for ${metadata.id}`);
+  logger.debug({ extensionId: metadata.id }, 'Using regex fallback');
 
   // Try to extract the context from the code
   // Pattern: const context = () => `...` or export const context = () => `...` (multi-line string concatenation)
@@ -214,13 +217,13 @@ export async function generateExtensionContext(extension: Extension): Promise<st
     }
 
     if (extractedContext && extractedContext.trim()) {
-      console.log(`[ExtensionContext] Using regex-parsed context for ${metadata.id}`);
+      logger.debug({ extensionId: metadata.id }, 'Using regex-parsed context');
       return extractedContext.trim();
     }
   }
 
   // PRIORITY 3: Generate context from code analysis (last resort)
-  console.log(`[ExtensionContext] No context found for ${metadata.id}, generating from code`);
+  logger.debug({ extensionId: metadata.id }, 'No context found, generating from code');
 
   // Find all function definitions in the extension object
   // Pattern: functionName: async (params) => { or functionName: (params) => {

@@ -9,6 +9,7 @@ import { useFileStore } from "@/stores/file-store";
 import { useFileContextStore } from "@/stores/file-context-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useLogger } from "@/hooks/use-logger";
 
 interface UseWebSocketHandlersProps {
   wsClient: WSClient | null;
@@ -47,6 +48,8 @@ export function useWebSocketHandlers({
   currentToolInvocationsRef,
   currentPartsRef,
 }: UseWebSocketHandlersProps) {
+  const log = useLogger('websocket');
+  
   // Get conversation store and project store for title updates
   const { refreshConversations } = useConversationStore();
   const { currentProject } = useProjectStore();
@@ -54,7 +57,7 @@ export function useWebSocketHandlers({
   useEffect(() => {
     if (!wsClient) return;
 
-    console.log("[Setup] Registering event handlers for convId:", convId);
+    log.debug("[Setup] Registering event handlers", { convId });
 
     // Register this tab as active for this conversation
     activeTabManager.registerTab(componentRef.current, convId);
@@ -94,18 +97,18 @@ export function useWebSocketHandlers({
     }) => {
       // Only active tab processes chunks
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
-      console.log("handleLLMChunk called with:", data);
+      log.trace("handleLLMChunk called", { messageId: data.messageId, chunkLength: data.chunk?.length });
 
       // Store start time from server in ref for interval calculation
       if (data.startTime && thinkingStartTimeRef.current === null) {
         thinkingStartTimeRef.current = data.startTime;
-        console.log("[ThinkingTime] Stored startTime from server:", data.startTime);
+        log.debug("[ThinkingTime] Stored startTime from server", { startTime: data.startTime });
       }
 
       // Don't process null/undefined chunks, but DO process empty string and whitespace chunks
       // Empty accumulated chunks are sent to provide startTime for thinking indicator
       if (data.chunk === null || data.chunk === undefined) {
-        console.log("Skipping null/undefined chunk");
+        log.trace("Skipping null/undefined chunk");
         return;
       }
 
@@ -118,16 +121,14 @@ export function useWebSocketHandlers({
         currentMessageIdRef.current !== messageId &&
         !data.isAccumulated
       ) {
-        console.log(
-          `[Chunk] Ignoring chunk from old message ${messageId}, current is ${currentMessageIdRef.current}`
-        );
+        log.trace("[Chunk] Ignoring chunk from old message", { messageId, current: currentMessageIdRef.current });
         return;
       }
 
       // Set the current message ID if not set (for first chunk)
       if (!currentMessageIdRef.current && !data.isAccumulated) {
         currentMessageIdRef.current = messageId;
-        console.log(`[Chunk] Set current message ID to ${messageId}`);
+        log.debug("[Chunk] Set current message ID", { messageId });
       }
 
       // Set loading state when chunks arrive (for thinking indicator)
@@ -144,7 +145,7 @@ export function useWebSocketHandlers({
           // If we don't have a thinking indicator yet, create one
           // This happens after page refresh when streaming is still active
           if (!thinkingMsg) {
-            console.log("[Chunk] Creating thinking indicator (no existing one found)");
+            log.trace("[Chunk] Creating thinking indicator (no existing one found)");
             thinkingMsg = {
               id: `thinking_${Date.now()}`,
               role: "assistant",
@@ -154,49 +155,49 @@ export function useWebSocketHandlers({
             };
           }
 
-          console.log(`[Chunk] Found/Created thinking indicator: ${!!thinkingMsg}`);
-          if (thinkingMsg) {
-            console.log(`[Chunk] Thinking message:`, thinkingMsg);
-          }
-          console.log(`[Chunk] Total prevMessages: ${prevMessages.length}, otherMessages: ${otherMessages.length}, isAccumulated: ${data.isAccumulated}`);
+          log.trace("[Chunk] Processing", { 
+            hasThinkingMsg: !!thinkingMsg, 
+            prevCount: prevMessages.length, 
+            otherCount: otherMessages.length, 
+            isAccumulated: data.isAccumulated 
+          });
 
           const prev = otherMessages;
 
           if (data.isAccumulated) {
             // Accumulated chunks on reconnect
-            console.log(
-              `[Chunk-Accumulated] Received ${data.chunk.length} chars for message ${messageId}`
-            );
+            log.debug("[Chunk-Accumulated] Received", { 
+              chunkLength: data.chunk.length, 
+              messageId 
+            });
 
             // First, try to find message by ID
             let existingIndex = prev.findIndex((m) => m.id === messageId);
 
             // If not found by ID, look for the last empty assistant message (from history)
             if (existingIndex === -1) {
-              console.log(
-                `[Chunk-Accumulated] Message ID ${messageId} not found, looking for empty assistant message`
-              );
+              log.trace("[Chunk-Accumulated] Message ID not found, looking for empty assistant message", { messageId });
               existingIndex = prev.findIndex(
                 (m) =>
                   m.role === "assistant" &&
                   (!m.content || m.content.trim() === "")
               );
               if (existingIndex !== -1) {
-                console.log(
-                  `[Chunk-Accumulated] Found empty assistant message at index ${existingIndex}, will update it and change ID to ${messageId}`
-                );
+                log.debug("[Chunk-Accumulated] Found empty assistant message", { 
+                  index: existingIndex, 
+                  newMessageId: messageId 
+                });
               }
             }
 
-            console.log(
-              `[Chunk-Accumulated] Final message index: ${existingIndex}`
-            );
+            log.trace("[Chunk-Accumulated] Final message index", { existingIndex });
 
             if (existingIndex !== -1) {
               // Update existing message with accumulated content and correct ID
-              console.log(
-                `[Chunk-Accumulated] Updating message at index ${existingIndex} with content length ${data.chunk.length}`
-              );
+              log.debug("[Chunk-Accumulated] Updating message", { 
+                index: existingIndex, 
+                contentLength: data.chunk.length 
+              });
               const toolInvocations =
                 currentToolInvocationsRef.current.size > 0
                   ? Array.from(currentToolInvocationsRef.current.values())
@@ -216,16 +217,15 @@ export function useWebSocketHandlers({
               currentMessageIdRef.current = messageId;
               currentMessageRef.current = data.chunk;
 
-              console.log(
-                `[Chunk-Accumulated] Returning ${updatedMessages.length} messages`
-              );
+              log.trace("[Chunk-Accumulated] Returning messages", { count: updatedMessages.length });
               // Don't add thinking indicator when we're actively updating the assistant message
               return updatedMessages;
             } else {
               // Create new message with accumulated content
-              console.log(
-                `[Chunk-Accumulated] Creating new message ${messageId} with accumulated content (${data.chunk.length} chars)`
-              );
+              log.debug("[Chunk-Accumulated] Creating new message", { 
+                messageId, 
+                contentLength: data.chunk.length 
+              });
               const toolInvocations =
                 currentToolInvocationsRef.current.size > 0
                   ? Array.from(currentToolInvocationsRef.current.values())
@@ -242,28 +242,21 @@ export function useWebSocketHandlers({
               currentMessageIdRef.current = messageId;
               currentMessageRef.current = data.chunk;
 
-              console.log(
-                `[Chunk-Accumulated] Returning ${prev.length + 1
-                } messages (added new)`
-              );
+              log.trace("[Chunk-Accumulated] Returning messages (added new)", { count: prev.length + 1 });
               // Don't add thinking indicator when we're actively creating the assistant message
               return [...prev, newMessage];
             }
           } else {
             // Real-time chunk - check if message already exists in array
             const existingIndex = prev.findIndex((m) => m.id === messageId);
-            console.log(
-              `[Chunk] Searching for message ${messageId}, found at index: ${existingIndex}, prev.length: ${prev.length}`
-            );
+            log.trace("[Chunk] Searching for message", { messageId, existingIndex, prevLength: prev.length });
 
             if (existingIndex === -1) {
               // Create new message
-              console.log(
-                `[Chunk] Creating new message: ${messageId} with chunk "${data.chunk.substring(
-                  0,
-                  20
-                )}..."`
-              );
+              log.debug("[Chunk] Creating new message", { 
+                messageId, 
+                chunkPreview: data.chunk.substring(0, 20) 
+              });
 
               // Add chunk to parts array in arrival order (create new array for React)
               const lastPart = currentPartsRef.current[currentPartsRef.current.length - 1];
@@ -307,19 +300,16 @@ export function useWebSocketHandlers({
               currentMessageRef.current = data.chunk;
 
               const newArray = [...prev, newMessage];
-              console.log(
-                `[Chunk] Returning new array with ${newArray.length} messages`
-              );
+              log.trace("[Chunk] Returning new array", { count: newArray.length });
               // Don't add thinking indicator when we're actively creating/updating the assistant message
-              // The thinking indicator is only shown before the first chunk arrives
-              console.log(`[Chunk] Final array has ${newArray.length} messages (thinking indicator removed)`);
               return newArray;
             } else {
               // Append to existing message
               const existingMessage = prev[existingIndex];
-              console.log(
-                `[Chunk] Found existing message at index ${existingIndex}, current content length: ${existingMessage.content.length}`
-              );
+              log.trace("[Chunk] Found existing message", { 
+                index: existingIndex, 
+                currentLength: existingMessage.content.length 
+              });
               const newContent = existingMessage.content + data.chunk;
 
               // Add chunk to parts array in arrival order (create new array for React)
@@ -345,13 +335,11 @@ export function useWebSocketHandlers({
               currentMessageIdRef.current = messageId;
               currentMessageRef.current = newContent;
 
-              console.log(
-                `[Chunk] Appending "${data.chunk.substring(
-                  0,
-                  20
-                )}..." (chunk size: ${data.chunk.length}) -> total: ${newContent.length
-                } chars`
-              );
+              log.trace("[Chunk] Appending", { 
+                chunkPreview: data.chunk.substring(0, 20),
+                chunkSize: data.chunk.length,
+                totalSize: newContent.length
+              });
 
               // Preserve existing toolInvocations or add new ones
               const toolInvocations =
@@ -359,17 +347,11 @@ export function useWebSocketHandlers({
                   ? Array.from(currentToolInvocationsRef.current.values())
                   : existingMessage.toolInvocations;
 
-              console.log(
-                `[Chunk] currentToolInvocationsRef size: ${currentToolInvocationsRef.current.size}`
-              );
-              console.log(
-                `[Chunk] existingMessage.toolInvocations:`,
-                existingMessage.toolInvocations
-              );
-              console.log(
-                `[Chunk] Final toolInvocations to use:`,
-                toolInvocations
-              );
+              log.trace("[Chunk] Tool invocations", {
+                refSize: currentToolInvocationsRef.current.size,
+                existing: existingMessage.toolInvocations,
+                final: toolInvocations
+              });
 
               // Use parts array to preserve streaming arrival order
               const parts = currentPartsRef.current.length > 0
@@ -378,7 +360,7 @@ export function useWebSocketHandlers({
 
               const updatedArray = prev.map((msg, idx) => {
                 if (idx === existingIndex) {
-                  const updatedMsg = { ...msg, content: newContent };
+                  const updatedMsg: any = { ...msg, content: newContent };
                   // Always preserve toolInvocations if they exist
                   if (toolInvocations && toolInvocations.length > 0) {
                     updatedMsg.toolInvocations = toolInvocations;
@@ -387,24 +369,16 @@ export function useWebSocketHandlers({
                   if (parts) {
                     updatedMsg.parts = parts;
                   }
-                  console.log(
-                    `[Chunk] Updated message has toolInvocations:`,
-                    updatedMsg.toolInvocations?.length || 0
-                  );
-                  console.log(
-                    `[Chunk] Updated message has parts:`,
-                    updatedMsg.parts?.length || 0
-                  );
-                  console.log(`[Chunk] Updated message object:`, updatedMsg);
+                  log.trace("[Chunk] Updated message", {
+                    toolCount: updatedMsg.toolInvocations?.length || 0,
+                    partsCount: updatedMsg.parts?.length || 0
+                  });
                   return updatedMsg;
                 }
                 return msg;
               });
-              console.log(
-                `[Chunk] Returning updated array with ${updatedArray.length} messages`
-              );
+              log.trace("[Chunk] Returning updated array", { count: updatedArray.length });
               // Don't add thinking indicator when we're actively updating the assistant message
-              // The thinking indicator is only shown before the first chunk arrives
               return updatedArray;
             }
           }
@@ -412,7 +386,7 @@ export function useWebSocketHandlers({
       });
 
       // Add logging to verify state update completed
-      console.log(`[State] setMessages completed for ${messageId}`);
+      log.trace("[State] setMessages completed", { messageId });
     };
 
     const handleLLMComplete = (data: {
@@ -431,7 +405,7 @@ export function useWebSocketHandlers({
     }) => {
       // Only active tab processes completion
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
-      console.log("handleLLMComplete called with:", {
+      log.debug("handleLLMComplete called", {
         messageId: data.messageId,
         contentLength: data.fullText.length,
         isAccumulated: data.isAccumulated,
@@ -449,19 +423,17 @@ export function useWebSocketHandlers({
       }
       if (data.tokenUsage) {
         setTokenUsage(data.tokenUsage);
-        console.log("[Complete] Updated tokenUsage from llm_complete:", data.tokenUsage);
+        log.debug("[Complete] Updated tokenUsage from llm_complete", { tokenUsage: data.tokenUsage });
       }
 
       // Use completion time from backend
       const completionTimeSeconds = data.completionTime ?? 0;
-      console.log(
-        `[Complete] Completion time from backend: ${completionTimeSeconds}s`
-      );
+      log.debug("[Complete] Completion time from backend", { seconds: completionTimeSeconds });
 
       // Don't process empty completions
       const fullText = data.fullText || "";
       if (!fullText) {
-        console.log("Skipping empty completion");
+        log.debug("Skipping empty completion");
         currentMessageRef.current = null;
         currentMessageIdRef.current = null;
         setIsLoading(false);
@@ -471,9 +443,11 @@ export function useWebSocketHandlers({
       // Use flushSync for consistency with handleLLMChunk and to prevent race conditions
       flushSync(() => {
         setMessages((prevMessages) => {
-          console.log(
-            `[Complete] Processing completion for message ${data.messageId} (${fullText.length} chars, accumulated: ${data.isAccumulated})`
-          );
+          log.debug("[Complete] Processing completion", { 
+            messageId: data.messageId, 
+            textLength: fullText.length, 
+            isAccumulated: data.isAccumulated 
+          });
 
           // Find message to update in the full array (before removing thinking indicator)
           let messageIndex = prevMessages.findIndex((m) => m.id === data.messageId && !m.isThinking);
@@ -483,28 +457,28 @@ export function useWebSocketHandlers({
           if (messageIndex === -1 && currentMessageIdRef.current) {
             messageIndex = prevMessages.findIndex((m) => m.id === currentMessageIdRef.current && !m.isThinking);
             if (messageIndex !== -1) {
-              console.log(
-                `[Complete] Found message by currentMessageIdRef ${currentMessageIdRef.current}, updating with completion ID ${data.messageId}`
-              );
+              log.debug("[Complete] Found message by currentMessageIdRef", { 
+                refId: currentMessageIdRef.current, 
+                completionId: data.messageId 
+              });
             }
           }
 
           if (messageIndex !== -1) {
             // Message already exists from streaming chunks
             const existingMessage = prevMessages[messageIndex];
-            console.log(
-              `[Complete] Message ${data.messageId} already exists with ${existingMessage.content.length} chars from streaming`
-            );
-            console.log(
-              `[Complete] Backend fullText has ${fullText.length} chars`
-            );
+            log.debug("[Complete] Message exists from streaming", { 
+              streamedLength: existingMessage.content.length,
+              backendLength: fullText.length
+            });
 
             // Use fullText from backend as authoritative source
             // If lengths don't match, there's a backend bug that needs to be fixed
             if (existingMessage.content.length !== fullText.length) {
-              console.warn(
-                `[Complete] WARNING: Streamed content (${existingMessage.content.length} chars) != backend fullText (${fullText.length} chars) - backend may have sent incomplete data`
-              );
+              log.warn("[Complete] Streamed content length mismatch", {
+                streamed: existingMessage.content.length,
+                backend: fullText.length
+              });
             }
 
             // Preserve existing toolInvocations first, then merge with any new ones
@@ -532,11 +506,11 @@ export function useWebSocketHandlers({
             if (existingMessage.parts && existingMessage.parts.length > 0) {
               // Preserve existing parts array from streaming - it already has the correct order
               finalParts = existingMessage.parts;
-              console.log(`[Complete] Preserving existing parts array with ${finalParts.length} parts from streaming`);
+              log.debug("[Complete] Preserving existing parts array", { count: finalParts.length });
             } else if (mergedToolInvocations.length > 0) {
               // Message has tool invocations but no parts - this shouldn't happen with proper streaming
               // Fallback: create parts with tool invocations for proper rendering
-              console.log(`[Complete] Creating new parts array for message with ${mergedToolInvocations.length} tool invocations (no existing parts)`);
+              log.debug("[Complete] Creating new parts array", { toolCount: mergedToolInvocations.length });
               finalParts = [];
               mergedToolInvocations.forEach((inv: any) => {
                 finalParts!.push({
@@ -547,7 +521,7 @@ export function useWebSocketHandlers({
             } else {
               // Simple message with no tools - no parts needed
               finalParts = undefined;
-              console.log(`[Complete] No parts needed for simple message (${fullText.length} chars)`);
+              log.debug("[Complete] No parts needed for simple message", { length: fullText.length });
             }
 
             // Update message AND remove thinking indicator in one atomic render
@@ -573,7 +547,12 @@ export function useWebSocketHandlers({
                   }),
                   ...(msg.experimental_attachments && { experimental_attachments: msg.experimental_attachments }),
                 };
-                console.log(`[Complete] Updated message: content=${fullText.length} chars, parts=${finalParts?.length || 0}, tools=${mergedToolInvocations.length}, attachments=${msg.attachments?.length || 0}`);
+                log.debug("[Complete] Updated message", { 
+                  contentLength: fullText.length, 
+                  partsCount: finalParts?.length || 0, 
+                  toolCount: mergedToolInvocations.length,
+                  attachmentsCount: msg.attachments?.length || 0
+                });
                 return updatedMsg;
               }
               // Remove thinking indicator in the same render
@@ -582,13 +561,10 @@ export function useWebSocketHandlers({
           }
 
           // Message not found - create one with fullText
-          console.warn(
-            `[Complete] Message ${data.messageId} not found, creating new message with fullText`
-          );
-          console.warn(
-            `[Complete] Available message IDs in prevMessages:`,
-            prevMessages.map((m) => m.id)
-          );
+          log.warn("[Complete] Message not found, creating new", { 
+            messageId: data.messageId,
+            availableIds: prevMessages.map((m) => m.id)
+          });
           const toolInvocations =
             currentToolInvocationsRef.current.size > 0
               ? Array.from(currentToolInvocationsRef.current.values())
@@ -626,12 +602,12 @@ export function useWebSocketHandlers({
       // Clear analysis state when LLM completes
       const { setAnalysisStartTime, setUploadingMessageId, uploadingMessageId } = useChatStore.getState();
       if (uploadingMessageId) {
-        console.log("[Complete] Clearing analysis state for:", uploadingMessageId);
+        log.debug("[Complete] Clearing analysis state", { uploadingMessageId });
         setAnalysisStartTime(null);
         setUploadingMessageId(null);
       }
 
-      console.log("Completion handling complete");
+      log.debug("Completion handling complete");
     };
 
     const handleCommunicationError = (data: {
@@ -657,7 +633,7 @@ export function useWebSocketHandlers({
     };
 
     const handleStatus = (data: { status?: string; message?: string }) => {
-      console.log('[handleStatus] Status message received:', data);
+      log.debug("[handleStatus] Status message received", { status: data.status, message: data.message });
 
       // Connection-related status
       if (data.status === 'connected' || data.status === 'disconnected' || data.status === 'reconnecting') {
@@ -668,7 +644,11 @@ export function useWebSocketHandlers({
       // Processing-related status (file uploads, extension processing, etc.)
       if (data.status === 'processing' || data.status === 'complete') {
         const { setUploadingMessageId, uploadingMessageId } = useChatStore.getState();
-        console.log('[handleStatus] Processing status:', data.status, 'message:', data.message, 'uploadingMessageId:', uploadingMessageId);
+        log.debug("[handleStatus] Processing status", { 
+          status: data.status, 
+          message: data.message, 
+          uploadingMessageId 
+        });
 
         // Check if this is an extension analysis status (Analyzing...)
         const isAnalyzing = data.message && (
@@ -685,7 +665,7 @@ export function useWebSocketHandlers({
             // Track analysis start time if not already tracking
             if (!analysisStartTime) {
               setAnalysisStartTime(Date.now());
-              console.log('[handleStatus] Analysis started at:', Date.now());
+              log.debug("[handleStatus] Analysis started", { startTime: Date.now() });
             }
 
             // Calculate elapsed time in seconds
@@ -698,11 +678,14 @@ export function useWebSocketHandlers({
                 timeElapsed: elapsed,
               })),
             });
-            console.log('[handleStatus] Updated file attachment processing status to:', data.message, 'timeElapsed:', elapsed);
+            log.debug("[handleStatus] Updated file attachment processing status", { 
+              status: data.message, 
+              timeElapsed: elapsed 
+            });
           }
         } else if (data.status === 'complete') {
           // Upload/analysis complete - clear processing status from file attachments
-          console.log('[handleStatus] Complete status received, clearing processing status for:', uploadingMessageId);
+          log.debug("[handleStatus] Complete status received, clearing processing status", { uploadingMessageId });
           if (uploadingMessageId) {
             const { updateMessage, setAnalysisStartTime } = useChatStore.getState();
             updateMessage(uploadingMessageId, {
@@ -712,7 +695,7 @@ export function useWebSocketHandlers({
                 timeElapsed: undefined, // Clear time elapsed
               })),
             });
-            console.log('[handleStatus] Cleared processing status for attachments');
+            log.debug("[handleStatus] Cleared processing status for attachments");
 
             // Clear analysis start time
             setAnalysisStartTime(null);
@@ -725,7 +708,7 @@ export function useWebSocketHandlers({
               }
             }, 500);
           } else {
-            console.log('[handleStatus] Complete status but no uploadingMessageId to update');
+            log.debug("[handleStatus] Complete status but no uploadingMessageId to update");
           }
         } else {
           // Regular processing status - update file attachments if we have an uploading message
@@ -737,7 +720,7 @@ export function useWebSocketHandlers({
                 processingStatus: data.message,
               })),
             });
-            console.log('[handleStatus] Updated file attachment processing status to:', data.message);
+            log.debug("[handleStatus] Updated file attachment processing status", { status: data.message });
           }
         }
       }
@@ -753,15 +736,16 @@ export function useWebSocketHandlers({
             ) : prevFiles
           );
         } catch (e) {
-          console.error('[handleStatus] Failed to parse file update:', data.message);
+          log.error("[handleStatus] Failed to parse file update", { message: data.message });
         }
       }
     };
 
     const handleHistoryResponse = (data: { messages?: any[]; hasActiveStream?: boolean; maxTokens?: number; tokenUsage?: any }) => {
-      console.log("handleHistoryResponse called with:", data);
-      console.log("[History] hasActiveStream from backend:", data.hasActiveStream);
-      console.log("[History] tokenUsage from backend:", data.tokenUsage);
+      log.debug("handleHistoryResponse called", { 
+        hasActiveStream: data.hasActiveStream,
+        tokenUsage: data.tokenUsage 
+      });
 
       // Clear history loading state when response is received
       setIsHistoryLoading(false);
@@ -769,17 +753,17 @@ export function useWebSocketHandlers({
       // Set maxTokens if provided
       if (data.maxTokens !== undefined) {
         setMaxTokens(data.maxTokens);
-        console.log("[History] Set maxTokens from history response:", data.maxTokens);
+        log.debug("[History] Set maxTokens from history response", { maxTokens: data.maxTokens });
       }
 
       // Set tokenUsage if provided (from OpenAI API via info.json)
       if (data.tokenUsage) {
         setTokenUsage(data.tokenUsage);
-        console.log("[History] Set tokenUsage from history response:", data.tokenUsage);
+        log.debug("[History] Set tokenUsage from history response", { tokenUsage: data.tokenUsage });
       }
 
       if (data.messages && Array.isArray(data.messages)) {
-        console.log("Converting messages:", data.messages);
+        log.debug("[History] Converting messages", { count: data.messages.length });
 
         // Convert and merge messages
         const serverMessages: Message[] = [];
@@ -790,7 +774,7 @@ export function useWebSocketHandlers({
 
           // Skip tool messages (they're internal)
           if (msg.role === "tool") {
-            console.log(`[History] Skipping tool message at index ${i}`);
+            log.trace("[History] Skipping tool message", { index: i });
             i++;
             continue;
           }
@@ -809,7 +793,7 @@ export function useWebSocketHandlers({
               ...(msg.attachments && { attachments: msg.attachments }),
               ...(msg.experimental_attachments && { experimental_attachments: msg.experimental_attachments }),
             });
-            console.log(`[History] Added user message at index ${i} with ${(msg as any)._attachments?.length || msg.attachments?.length || 0} attachments`);
+            log.trace("[History] Added user message", { index: i, attachments: (msg as any)._attachments?.length || msg.attachments?.length || 0 });
             i++;
             continue;
           }
@@ -829,11 +813,11 @@ export function useWebSocketHandlers({
                   const resultContent = typeof futureMsg.content === "string"
                     ? JSON.parse(futureMsg.content)
                     : futureMsg.content;
-                  console.log(`[History] Found tool result for ${futureMsg.tool_call_id}:`, resultContent);
+                  log.trace("[History] Found tool result", { toolCallId: futureMsg.tool_call_id, result: resultContent });
                   toolResultsMap.set(futureMsg.tool_call_id, resultContent);
                 } catch (e) {
                   // If not JSON, use as-is
-                  console.log(`[History] Found tool result (non-JSON) for ${futureMsg.tool_call_id}:`, futureMsg.content);
+                  log.trace("[History] Found tool result (non-JSON)", { toolCallId: futureMsg.tool_call_id, content: futureMsg.content });
                   toolResultsMap.set(futureMsg.tool_call_id, futureMsg.content);
                 }
               } else if (futureMsg.role === "assistant" && !futureMsg.tool_calls) {
@@ -842,14 +826,11 @@ export function useWebSocketHandlers({
                 break;
               }
             }
-            console.log(`[History] Tool results map size: ${toolResultsMap.size}`, Array.from(toolResultsMap.entries()));
+            log.trace("[History] Tool results map", { size: toolResultsMap.size, entries: Array.from(toolResultsMap.entries()) });
 
             // Check if this message has tool_calls
             if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
-              console.log(
-                `[History] Message ${i} has tool_calls:`,
-                msg.tool_calls
-              );
+              log.debug("[History] Message has tool_calls", { index: i, count: msg.tool_calls.length });
 
               toolInvocations = msg.tool_calls.map((tc: any) => {
                 let args = {};
@@ -860,16 +841,17 @@ export function useWebSocketHandlers({
                       ? JSON.parse(argStr)
                       : argStr || {};
                 } catch (e) {
-                  console.warn("[History] Failed to parse tool arguments:", e);
+                  log.warn("[History] Failed to parse tool arguments", { error: e instanceof Error ? e.message : String(e) });
                 }
 
                 const toolResult = toolResultsMap.get(tc.id);
                 const hasError = toolResult && toolResult.error;
 
-                console.log(`[History] Tool ${tc.id} (${tc.function?.name || tc.name}):`, {
+                log.trace("[History] Tool", { 
+                  id: tc.id, 
+                  name: tc.function?.name || tc.name,
                   hasResult: !!toolResult,
-                  result: toolResult,
-                  hasError,
+                  hasError
                 });
 
                 return {
@@ -891,9 +873,7 @@ export function useWebSocketHandlers({
                 nextMsg.tool_calls &&
                 (!nextMsg.content || nextMsg.content.trim() === "")
               ) {
-                console.log(
-                  `[History] Merging tool_calls from message ${i + 1}`
-                );
+                log.debug("[History] Merging tool_calls from next message", { nextIndex: i + 1 });
                 const nextToolInvocations = nextMsg.tool_calls.map(
                   (tc: any) => {
                     let args = {};
@@ -904,19 +884,17 @@ export function useWebSocketHandlers({
                           ? JSON.parse(argStr)
                           : argStr || {};
                     } catch (e) {
-                      console.warn(
-                        "[History] Failed to parse tool arguments:",
-                        e
-                      );
+                      log.warn("[History] Failed to parse tool arguments", { error: e instanceof Error ? e.message : String(e) });
                     }
 
                     const toolResult = toolResultsMap.get(tc.id);
                     const hasError = toolResult && toolResult.error;
 
-                    console.log(`[History] Merged tool ${tc.id} (${tc.function?.name || tc.name}):`, {
+                    log.trace("[History] Merged tool", { 
+                      id: tc.id, 
+                      name: tc.function?.name || tc.name,
                       hasResult: !!toolResult,
-                      result: toolResult,
-                      hasError,
+                      hasError
                     });
 
                     return {
@@ -972,7 +950,7 @@ export function useWebSocketHandlers({
                 nextMsg.content &&
                 !nextMsg.tool_calls
               ) {
-                console.log(`[History] Adding content from message ${i + 1} as text part`);
+                log.debug("[History] Adding content from next message as text part", { nextIndex: i + 1 });
                 parts.push({
                   type: "text",
                   text: nextMsg.content,
@@ -1004,16 +982,19 @@ export function useWebSocketHandlers({
               // Also keep toolInvocations for backwards compatibility
               if (toolInvocations.length > 0) {
                 message.toolInvocations = toolInvocations;
-                console.log(
-                  `[History] Added assistant message with ${parts.length} parts (${toolInvocations.length} tool invocations), tokenUsage:`, msg.tokenUsage
-                );
+                log.debug("[History] Added assistant message with tools", { 
+                  partsCount: parts.length, 
+                  toolCount: toolInvocations.length,
+                  tokenUsage: msg.tokenUsage
+                });
               } else {
-                console.log(
-                  `[History] Added assistant message with ${parts.length} parts (content only), tokenUsage:`, msg.tokenUsage
-                );
+                log.debug("[History] Added assistant message (content only)", { 
+                  partsCount: parts.length,
+                  tokenUsage: msg.tokenUsage
+                });
               }
 
-              console.log(`[History] Final message object:`, message);
+              log.trace("[History] Final message object", { message });
               serverMessages.push(message);
             }
 
@@ -1025,13 +1006,10 @@ export function useWebSocketHandlers({
           i++;
         }
 
-        console.log("Setting messages to:", serverMessages);
-        console.log("First message structure:", serverMessages[0]);
-        console.log(
-          "Messages state will be updated to:",
-          serverMessages.length,
-          "messages"
-        );
+        log.debug("[History] Setting messages", { 
+          count: serverMessages.length,
+          firstMessage: serverMessages[0]
+        });
 
         // Check if the last message is an incomplete assistant message (still streaming)
         const lastMessage = serverMessages[serverMessages.length - 1];
@@ -1044,26 +1022,29 @@ export function useWebSocketHandlers({
         // Backend tells us if there's an active stream (more reliable than checking last message)
         const shouldShowThinking = data.hasActiveStream || isLastMessageIncomplete;
 
-        console.log("[History] Last message incomplete?", isLastMessageIncomplete, lastMessage);
-        console.log("[History] shouldShowThinking?", shouldShowThinking, "(hasActiveStream:", data.hasActiveStream, "isLastMessageIncomplete:", isLastMessageIncomplete, ")");
+        log.debug("[History] Last message status", { 
+          isIncomplete: isLastMessageIncomplete,
+          shouldShowThinking,
+          hasActiveStream: data.hasActiveStream
+        });
 
         // IMPORTANT: Merge with current state instead of replacing it
         // This prevents history from overwriting streamed content
         setMessages((prev) => {
           // Check if there's an existing thinking indicator
           const existingThinkingIndicator = prev.find((m) => m.isThinking);
-          console.log("[History] Merging - prev.length:", prev.length, "existingThinkingIndicator:", !!existingThinkingIndicator);
-          console.log("[History] shouldShowThinking:", shouldShowThinking);
+          log.trace("[History] Merging", { 
+            prevCount: prev.length, 
+            hasExistingThinking: !!existingThinkingIndicator 
+          });
 
           // If we have no current messages, just use server messages
           if (prev.length === 0) {
-            console.log(
-              "[History] No existing messages, using server messages"
-            );
+            log.debug("[History] No existing messages, using server messages");
 
             // Add thinking indicator if streaming is active
             if (shouldShowThinking) {
-              console.log("[History] Adding thinking indicator for incomplete message");
+              log.debug("[History] Adding thinking indicator for incomplete message");
               const thinkingMessage: Message = {
                 id: `thinking_${Date.now()}`,
                 role: "assistant",
@@ -1078,9 +1059,7 @@ export function useWebSocketHandlers({
           }
 
           // If we have messages, merge smartly
-          console.log(
-            `[History] Merging with ${prev.length} existing messages`
-          );
+          log.debug("[History] Merging with existing messages", { existingCount: prev.length });
           const merged = [...serverMessages];
 
           // For each existing message, check if it has MORE content than the server version
@@ -1088,7 +1067,7 @@ export function useWebSocketHandlers({
           prev.forEach((existingMsg) => {
             // Skip thinking indicators - we'll handle them separately
             if (existingMsg.isThinking) {
-              console.log("[History] Preserving thinking indicator from existing messages");
+              log.trace("[History] Preserving thinking indicator from existing messages");
               return;
             }
 
@@ -1100,29 +1079,29 @@ export function useWebSocketHandlers({
               const serverMsg = merged[serverMsgIndex];
               // Keep the version with more content (streaming version beats history)
               if (existingMsg.content.length > serverMsg.content.length) {
-                console.log(
-                  `[History] Keeping streamed version of ${existingMsg.id} (${existingMsg.content.length} chars > ${serverMsg.content.length} chars from history)`
-                );
+                log.debug("[History] Keeping streamed version", { 
+                  id: existingMsg.id,
+                  streamedLength: existingMsg.content.length,
+                  historyLength: serverMsg.content.length
+                });
                 // Merge tokenUsage from server message into streamed message
                 merged[serverMsgIndex] = {
                   ...existingMsg,
                   ...(serverMsg.tokenUsage && { tokenUsage: serverMsg.tokenUsage }),
                   ...(serverMsg.completionTime && !existingMsg.completionTime && { completionTime: serverMsg.completionTime }),
                 };
-                console.log(
-                  `[History] Merged tokenUsage from server:`, serverMsg.tokenUsage
-                );
+                log.trace("[History] Merged tokenUsage from server", { tokenUsage: serverMsg.tokenUsage });
               } else {
-                console.log(
-                  `[History] Using history version of ${existingMsg.id} (${serverMsg.content.length} chars >= ${existingMsg.content.length} chars from stream)`
-                );
+                log.trace("[History] Using history version", { 
+                  id: existingMsg.id,
+                  historyLength: serverMsg.content.length,
+                  streamedLength: existingMsg.content.length
+                });
               }
             } else {
               // Message exists locally but not in history - this is stale data from previous session
               // Don't keep it, server history is the source of truth
-              console.log(
-                `[History] Message ${existingMsg.id} exists locally but not in history, discarding stale message`
-              );
+              log.trace("[History] Discarding stale message", { id: existingMsg.id });
             }
           });
 
@@ -1131,7 +1110,10 @@ export function useWebSocketHandlers({
           // 2. Last message is incomplete (still streaming), OR
           // 3. We had a thinking indicator before history loaded (chunks arrived before history)
           if (shouldShowThinking || existingThinkingIndicator) {
-            console.log("[History] Adding thinking indicator for incomplete message after merge (shouldShowThinking:", shouldShowThinking, "existing:", !!existingThinkingIndicator, ")");
+            log.debug("[History] Adding thinking indicator after merge", { 
+              shouldShowThinking, 
+              hasExisting: !!existingThinkingIndicator 
+            });
             const thinkingMessage: Message = {
               id: `thinking_${Date.now()}`,
               role: "assistant",
@@ -1140,41 +1122,43 @@ export function useWebSocketHandlers({
               isThinking: true,
             };
             const finalMessages = [...merged, thinkingMessage];
-            console.log("[History] Returning", finalMessages.length, "messages WITH thinking indicator");
+            log.debug("[History] Returning messages with thinking indicator", { count: finalMessages.length });
             return finalMessages;
           }
 
-          console.log("[History] Returning", merged.length, "messages WITHOUT thinking indicator");
+          log.debug("[History] Returning messages without thinking indicator", { count: merged.length });
           return merged;
         });
 
         // Set loading state if streaming is active
         if (shouldShowThinking) {
-          console.log("[History] Setting loading state to true for active stream");
+          log.debug("[History] Setting loading state for active stream");
           setIsLoading(true);
           // Don't set thinkingStartTimeRef here - wait for the next chunk with startTime from server
           thinkingStartTimeRef.current = null;
           // Set the current message ID ref so new chunks can be appended (if we have an assistant message)
           if (lastMessage && lastMessage.role === "assistant") {
             currentMessageIdRef.current = lastMessage.id;
-            console.log("[History] Set currentMessageIdRef to:", lastMessage.id);
+            log.debug("[History] Set currentMessageIdRef", { id: lastMessage.id });
           } else {
-            console.log("[History] No assistant message to set as current (will be set when first chunk arrives)");
+            log.debug("[History] No assistant message to set as current (will be set when first chunk arrives)");
           }
         }
       } else {
-        console.log("No messages to process or messages is not an array");
+        log.debug("No messages to process or messages is not an array");
       }
     };
 
     const handleControl = (data: any) => {
-      console.log("handleControl called with:", data);
+      log.debug("handleControl called", { status: data.status, type: data.type });
       if (data.status === "history" || data.type === "history_response") {
-        console.log("Processing history data:", data.history);
-        console.log("Processing todos data:", data.todos);
-        console.log("Processing hasActiveStream:", data.hasActiveStream);
-        console.log("Processing maxTokens:", data.maxTokens);
-        console.log("Processing tokenUsage:", data.tokenUsage);
+        log.debug("Processing history data", { 
+          historyCount: data.history?.length,
+          hasTodos: !!data.todos,
+          hasActiveStream: data.hasActiveStream,
+          maxTokens: data.maxTokens,
+          tokenUsage: data.tokenUsage
+        });
         handleHistoryResponse({
           messages: data.history || [],
           hasActiveStream: data.hasActiveStream,
@@ -1187,7 +1171,7 @@ export function useWebSocketHandlers({
           setTodos(data.todos);
         }
       } else if (data.status === "file_context" || data.type === "get_file_context") {
-        console.log("Processing file context data:", data.fileContext);
+        log.debug("Processing file context data", { fileContext: data.fileContext });
         // Update file context store with the mapping from server
         if (data.fileContext) {
           const { setFileContext } = useFileContextStore.getState();
@@ -1207,11 +1191,12 @@ export function useWebSocketHandlers({
     }) => {
       // Only active tab processes tool calls
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
-      console.log("[Tool Call] Received:", data);
-      console.log(
-        "[Tool Call] Assistant message ID from backend:",
-        data.assistantMessageId
-      );
+      log.debug("[Tool Call] Received", { 
+        toolCallId: data.toolCallId,
+        toolName: data.toolName,
+        status: data.status,
+        assistantMessageId: data.assistantMessageId
+      });
 
       // Map backend status to UI state
       let state: "call" | "executing" | "progress" | "result" | "error" = "call";
@@ -1268,11 +1253,10 @@ export function useWebSocketHandlers({
         thinkingStartTimeRef.current = Date.now();
       }
 
-      console.log(
-        "[Tool Call] Current tool invocations size:",
-        currentToolInvocationsRef.current.size
-      );
-      console.log("[Tool Call] Has executing tools:", hasExecutingTools);
+      log.trace("[Tool Call] Current state", {
+        invocationsSize: currentToolInvocationsRef.current.size,
+        hasExecutingTools
+      });
 
       // Add tool to parts array in arrival order (or update existing) - create new array for React
       const existingPartIndex = currentPartsRef.current.findIndex(
@@ -1297,17 +1281,17 @@ export function useWebSocketHandlers({
         ];
       }
 
-      console.log(
-        "[Tool Call] Current parts array:",
-        currentPartsRef.current.map(p => ({ type: p.type, ...(p.type === "text" ? { textLength: p.text.length } : { toolName: p.toolInvocation.toolName }) }))
-      );
+      log.trace("[Tool Call] Current parts array", {
+        parts: currentPartsRef.current.map(p => ({ 
+          type: p.type, 
+          ...(p.type === "text" ? { textLength: p.text.length } : { toolName: p.toolInvocation.toolName }) 
+        }))
+      });
 
       // Handle inspection data from extensions
       if (data.result?.__inspectionData) {
         const { extensionId, data: inspectionData } = data.result.__inspectionData;
-        console.log("[Tool Call] Received inspection data for extension:", extensionId, inspectionData);
-        console.log("[Tool Call] toolCallId:", data.toolCallId);
-        console.log("[Tool Call] toolInvocation before update:", toolInvocation);
+        log.debug("[Tool Call] Received inspection data", { extensionId, toolCallId: data.toolCallId });
 
         // Store inspection data for use in dialog
         // We'll attach this to the tool invocation
@@ -1317,8 +1301,9 @@ export function useWebSocketHandlers({
         };
         currentToolInvocationsRef.current.set(data.toolCallId, toolInvocation);
 
-        console.log("[Tool Call] toolInvocation after update:", toolInvocation);
-        console.log("[Tool Call] inspectionData keys:", Object.keys(toolInvocation.inspectionData || {}));
+        log.trace("[Tool Call] Updated inspection data", {
+          inspectionKeys: Object.keys(toolInvocation.inspectionData || {})
+        });
       }
 
       // Update or create assistant message to include tool invocations
@@ -1337,9 +1322,11 @@ export function useWebSocketHandlers({
             inv => inv.state === "executing" || inv.state === "call"
           );
 
-          console.log("[Tool Call] Tool invocations array:", toolInvocations);
-          console.log("[Tool Call] Parts array:", parts);
-          console.log("[Tool Call] Has executing tools:", hasExecutingTools);
+          log.trace("[Tool Call] Processing update", {
+            toolCount: toolInvocations.length,
+            partsCount: parts?.length,
+            hasExecutingTools
+          });
 
           // Separate thinking indicator from other messages
           const thinkingMsg = prev.find((m) => m.isThinking);
@@ -1363,7 +1350,7 @@ export function useWebSocketHandlers({
               isThinking: true,
             };
 
-            console.log("[Tool Call] Creating tool thinking indicator:", thinkingIndicator.content);
+            log.debug("[Tool Call] Creating tool thinking indicator", { content: thinkingIndicator.content });
           }
 
           // Look for message with matching ID if provided
@@ -1371,19 +1358,14 @@ export function useWebSocketHandlers({
             const existingIndex = otherMessages.findIndex(
               (m) => m.id === data.assistantMessageId
             );
-            console.log(
-              "[Tool Call] Looking for message with ID:",
-              data.assistantMessageId,
-              "found at index:",
-              existingIndex
-            );
+            log.trace("[Tool Call] Looking for message", { 
+              id: data.assistantMessageId, 
+              foundAt: existingIndex 
+            });
 
             if (existingIndex !== -1) {
               // Update existing message
-              console.log(
-                "[Tool Call] Updating existing message at index:",
-                existingIndex
-              );
+              log.debug("[Tool Call] Updating existing message", { index: existingIndex });
               const updated = otherMessages.map((msg, idx) =>
                 idx === existingIndex
                   ? { ...msg, toolInvocations, ...(parts && { parts }) }
@@ -1402,10 +1384,7 @@ export function useWebSocketHandlers({
             (m) => m.id === currentMessageIdRef.current
           );
           if (currentMsgIndex !== -1) {
-            console.log(
-              "[Tool Call] Found message by currentMessageIdRef:",
-              currentMessageIdRef.current
-            );
+            log.debug("[Tool Call] Found message by currentMessageIdRef", { id: currentMessageIdRef.current });
             const updated = otherMessages.map((msg, idx) =>
               idx === currentMsgIndex
                 ? { ...msg, toolInvocations, ...(parts && { parts }) }
@@ -1421,10 +1400,7 @@ export function useWebSocketHandlers({
           // Check if last non-thinking message is assistant
           const lastMsg = otherMessages[otherMessages.length - 1];
           if (lastMsg && lastMsg.role === "assistant") {
-            console.log(
-              "[Tool Call] Updating last assistant message:",
-              lastMsg.id
-            );
+            log.debug("[Tool Call] Updating last assistant message", { id: lastMsg.id });
             const updated = otherMessages.map((msg, idx) =>
               idx === otherMessages.length - 1
                 ? { ...msg, toolInvocations, ...(parts && { parts }) }
@@ -1443,7 +1419,7 @@ export function useWebSocketHandlers({
             currentMessageIdRef.current ||
             `msg_${Date.now()}_assistant`;
           currentMessageIdRef.current = messageId;
-          console.log("[Tool Call] Creating new message with ID:", messageId);
+          log.debug("[Tool Call] Creating new message", { id: messageId });
           const newMessage = {
             id: messageId,
             role: "assistant" as const,
@@ -1468,7 +1444,10 @@ export function useWebSocketHandlers({
     }) => {
       // Only active tab processes tool results
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
-      console.log("[Tool Result] Received:", data);
+      log.debug("[Tool Result] Received", { 
+        toolCallId: data.toolCallId,
+        toolName: data.toolName 
+      });
 
       // Update tool invocation to "result" or "error" state based on result content
       const existingInvocation = currentToolInvocationsRef.current.get(
@@ -1479,7 +1458,10 @@ export function useWebSocketHandlers({
         const hasError = data.result && data.result.error;
 
         if (hasError) {
-          console.log(`[Tool Result] Error detected in result for ${data.toolName}:`, data.result.error);
+          log.debug("[Tool Result] Error detected", { 
+            toolName: data.toolName, 
+            error: data.result.error 
+          });
         }
 
         const updatedInvocation = {
@@ -1525,8 +1507,11 @@ export function useWebSocketHandlers({
               inv => inv.state === "executing" || inv.state === "call"
             );
 
-            console.log("[Tool Result] Has executing tools after result:", hasExecutingTools);
-            console.log("[Tool Result] Last message has parts:", !!(lastMsg.parts && lastMsg.parts.length > 0), "parts length:", lastMsg.parts?.length || 0);
+            log.trace("[Tool Result] Processing", {
+              hasExecutingTools,
+              hasParts: !!(lastMsg.parts && lastMsg.parts.length > 0),
+              partsLength: lastMsg.parts?.length || 0
+            });
 
             // If no tools are executing, remove thinking indicator. If tools are still executing, update it.
             if (hasExecutingTools) {
@@ -1571,14 +1556,14 @@ export function useWebSocketHandlers({
     const handleTodoUpdate = (data: { todos: any }) => {
       // Only active tab processes todo updates
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
-      console.log("[Todo Update] Received:", data);
+      log.debug("[Todo Update] Received", { todos: data.todos });
       setTodos(data.todos);
     };
 
     const handleConversationTitleUpdate = (data: { title: string }) => {
       // Only active tab processes title updates
       if (!activeTabManager.isActiveTab(componentRef.current, convId)) return;
-      console.log("[Title Update] Received new title:", data.title);
+      log.debug("[Title Update] Received new title", { title: data.title });
 
       // Refresh conversation list to show updated title
       if (currentProject?.id) {
@@ -1588,14 +1573,14 @@ export function useWebSocketHandlers({
 
     const handleAuthFailed = (data: { code: number; reason: string }) => {
       // Authentication failure - logout the user
-      console.error("[Auth Failed] WebSocket authentication failed:", data);
+      log.error("[Auth Failed] WebSocket authentication failed", { code: data.code, reason: data.reason });
       const { logout } = useAuthStore.getState();
       logout();
     };
 
     const handleFileContextUpdate = (data: { fileId: string; included: boolean }) => {
       // Update file context store when another client changes it
-      console.log("[File Context] Received update:", data);
+      log.debug("[File Context] Received update", { fileId: data.fileId, included: data.included });
       const { setFileInContext } = useFileContextStore.getState();
       setFileInContext(data.fileId, data.included);
     };
@@ -1644,7 +1629,7 @@ export function useWebSocketHandlers({
 
     // Cleanup function - just remove event listeners, connection manager handles disconnection
     return () => {
-      console.log("[Setup] Cleaning up event handlers for convId:", convId);
+      log.debug("[Setup] Cleaning up event handlers", { convId });
 
       // Clear the time update interval
       clearInterval(timeUpdateInterval);
@@ -1668,5 +1653,5 @@ export function useWebSocketHandlers({
       wsClient.off("conversation_title_update", handleConversationTitleUpdate);
       wsClient.off("auth_failed", handleAuthFailed);
     };
-  }, [wsClient, convId, componentRef, setMessages, setIsLoading, setIsHistoryLoading, setError, setTodos, isLoading, thinkingStartTimeRef, currentMessageRef, currentMessageIdRef, currentToolInvocationsRef, currentPartsRef, refreshConversations, currentProject]);
+  }, [wsClient, convId, componentRef, setMessages, setIsLoading, setIsHistoryLoading, setError, setTodos, isLoading, thinkingStartTimeRef, currentMessageRef, currentMessageIdRef, currentToolInvocationsRef, currentPartsRef, refreshConversations, currentProject, log]);
 }

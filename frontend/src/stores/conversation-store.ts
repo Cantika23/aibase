@@ -11,6 +11,7 @@ import {
   type ConversationWithTitle,
   type ConversationMessagesResponse,
 } from "@/lib/conversation-api";
+import { logger } from "@/lib/logger";
 
 interface ConversationStore {
   // State
@@ -60,7 +61,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load conversations";
       state.setError(errorMessage);
-      console.error("Error loading conversations:", error);
+      logger.chat.error("Error loading conversations", { error: String(error) });
     } finally {
       state.setIsLoading(false);
     }
@@ -77,7 +78,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load conversation";
       state.setError(errorMessage);
-      console.error("Error loading conversation:", error);
+      logger.chat.error("Error loading conversation", { error: String(error) });
     } finally {
       state.setIsLoading(false);
     }
@@ -105,7 +106,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to delete conversation";
       state.setError(errorMessage);
-      console.error("Error deleting conversation:", error);
+      logger.chat.error("Error deleting conversation", { error: String(error) });
       return false;
     } finally {
       state.setIsLoading(false);
@@ -123,7 +124,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to refresh conversations";
       state.setError(errorMessage);
-      console.error("Error refreshing conversations:", error);
+      logger.chat.error("Error refreshing conversations", { error: String(error) });
     }
   },
 }));

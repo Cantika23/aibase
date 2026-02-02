@@ -8,6 +8,9 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { ChatHistoryStorage } from "../storage/chat-history-storage";
 import { chatCompaction } from "../storage/chat-compaction";
 import { ProjectStorage } from "../storage/project-storage";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('MessagePersistence');
 
 export interface ConvMessageHistory {
   convId: string;
@@ -78,7 +81,7 @@ export class MessagePersistence {
         return [...diskHistory];
       }
     } catch (error) {
-      console.error(`[MessagePersistence] Error loading history for ${convId}:`, error);
+      logger.error({ error, convId }, '[MessagePersistence] Error loading history');
     }
 
     return [];
@@ -123,7 +126,7 @@ export class MessagePersistence {
 
     // Asynchronously save to disk (don't wait)
     this.chatHistoryStorage.saveChatHistory(convId, messages, projectId, tenantId, userId?.toString()).catch(error => {
-      console.error(`[MessagePersistence] Error saving history for ${convId}:`, error);
+      logger.error({ error, convId }, '[MessagePersistence] Error saving history');
     });
   }
 
@@ -157,7 +160,7 @@ export class MessagePersistence {
     const project = this.projectStorage.getById(projectId);
     const tenantId = project?.tenant_id ?? 'default';
     this.chatHistoryStorage.saveChatHistory(convId, messages, projectId, tenantId, userId?.toString()).catch(error => {
-      console.error(`[MessagePersistence] Error saving history for ${convId}:`, error);
+      logger.error({ error, convId }, '[MessagePersistence] Error saving history');
     });
   }
 
@@ -291,9 +294,9 @@ export class MessagePersistence {
       const result = await chatCompaction.compactChat(projectId, convId, tenantId, messages);
 
       if (result.compacted && result.newChatFile) {
-        console.log(`[MessagePersistence] Compacted ${result.messagesCompacted} messages for ${convId}`);
-        console.log(`[MessagePersistence] Saved approximately ${result.tokensSaved} tokens`);
-        console.log(`[MessagePersistence] New chat file: ${result.newChatFile}`);
+        logger.info({ messagesCompacted: result.messagesCompacted, convId }, '[MessagePersistence] Compacted messages');
+        logger.info({ tokensSaved: result.tokensSaved }, '[MessagePersistence] Saved tokens');
+        logger.info({ newChatFile: result.newChatFile }, '[MessagePersistence] New chat file');
 
         // Note: We don't automatically update the in-memory history here
         // The compacted history will be loaded on next server restart
@@ -306,7 +309,7 @@ export class MessagePersistence {
         tokensSaved: result.tokensSaved
       };
     } catch (error) {
-      console.error(`[MessagePersistence] Error during compaction check for ${convId}:`, error);
+      logger.error({ error, convId }, '[MessagePersistence] Error during compaction check');
       return { compacted: false };
     }
   }

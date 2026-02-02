@@ -6,6 +6,9 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { getExtensionDir, getProjectExtensionsDir } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ExtensionStorage');
 
 export interface ExampleEntry {
   title: string;
@@ -239,7 +242,7 @@ export class ExtensionStorage {
       'utf-8'
     );
 
-    console.log(`[ExtensionStorage] Created extension '${data.id}' for project ${projectId}`);
+    logger.info(`Created extension '${data.id}' for project ${projectId}`);
     return { metadata, code: data.code };
   }
 
@@ -293,7 +296,7 @@ export class ExtensionStorage {
           extensions.push(ext);
         }
       } catch (error) {
-        console.warn(`[ExtensionStorage] Failed to load extension '${dir.name}':`, error);
+        logger.warn({ error }, `Failed to load extension '${dir.name}'`);
       }
     }
 
@@ -360,7 +363,7 @@ export class ExtensionStorage {
       );
     }
 
-    console.log(`[ExtensionStorage] Updated extension '${extensionId}' for project ${projectId}`);
+    logger.info(`Updated extension '${extensionId}' for project ${projectId}`);
     return { metadata: updatedMetadata, code: updatedCode };
   }
 
@@ -372,7 +375,7 @@ export class ExtensionStorage {
 
     try {
       await fs.rm(extensionDir, { recursive: true, force: true });
-      console.log(`[ExtensionStorage] Deleted extension '${extensionId}' for project ${projectId}`);
+      logger.info(`Deleted extension '${extensionId}' for project ${projectId}`);
       return true;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -461,9 +464,9 @@ export class ExtensionStorage {
         await this.update(projectId, ext.metadata.id, tenantId, {
           category: "",
         });
-        console.log(`[ExtensionStorage] Uncategorized extension '${ext.metadata.id}' from deleted category '${categoryId}'`);
+        logger.info(`Uncategorized extension '${ext.metadata.id}' from deleted category '${categoryId}'`);
       } catch (error) {
-        console.error(`[ExtensionStorage] Failed to uncategorize extension '${ext.metadata.id}':`, error);
+        logger.error({ error }, `Failed to uncategorize extension '${ext.metadata.id}'`);
       }
     }
   }

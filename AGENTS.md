@@ -100,6 +100,65 @@ All pages MUST follow consistent layout patterns to ensure proper spacing and pr
 - Event-driven architecture with typed message handling
 - Connection state management with reconnection logic
 
+### Logging Guidelines
+
+**Use the centralized logging system instead of console.log:**
+
+#### Frontend Logging
+```typescript
+// ❌ DON'T use console.log
+console.log('[Chat] Message sent', message);
+
+// ✅ DO use the centralized logger
+import { logger } from '@/lib/logger';
+logger.chat.info('Message sent', { messageId: '123' });
+
+// Or use the hook in components
+import { useLogger } from '@/hooks/use-logger';
+function MyComponent() {
+  const log = useLogger('chat');
+  log.info('Component mounted');
+}
+```
+
+#### Backend Logging
+```typescript
+// ❌ DON'T use console.log
+console.log('[Auth] User logged in');
+
+// ✅ DO use pino logger
+import { createLogger } from '../utils/logger';
+const logger = createLogger('AuthService');
+logger.info('User logged in');
+logger.error({ error }, 'Login failed');
+```
+
+#### Log Levels
+- `trace` - Very detailed debugging (disabled in production)
+- `debug` - Debug information (disabled in production)
+- `info` - General information
+- `warn` - Warnings
+- `error` - Errors
+- `fatal` - Critical errors
+
+#### Features (Frontend)
+Available features: `general`, `chat`, `files`, `whatsapp`, `auth`, `websocket`, `extensions`, `memory`, `context`, `ui`, `api`
+
+#### When to Use Each Level
+- **trace**: High-frequency events (every render, every message received)
+- **debug**: Development-only info (state changes, configuration)
+- **info**: Important business events (user actions, API calls)
+- **warn**: Recoverable issues (deprecated API usage, retry attempts)
+- **error**: Failures that affect user experience (API errors, crashes)
+- **fatal**: System-wide failures (database connection lost, cannot start)
+
+#### Best Practices
+1. Always use feature-specific loggers
+2. Include relevant context (IDs, timestamps) but never PII/passwords
+3. Use structured objects instead of string concatenation
+4. Remove debug logs before production or use appropriate levels
+5. In development, logs are sent to backend and appear in `backend.log`
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.

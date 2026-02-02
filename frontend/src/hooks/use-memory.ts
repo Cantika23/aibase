@@ -6,6 +6,7 @@ import type {
   MemoryDeleteResponse,
 } from "@/types/memory";
 import { buildApiUrl } from "@/lib/base-path";
+import { useLogger } from "@/hooks/use-logger";
 
 const API_BASE_URL = buildApiUrl("");
 
@@ -28,6 +29,7 @@ export interface UseMemoryReturn {
 
 export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
   const { projectId, autoLoad = true } = options;
+  const log = useLogger('memory');
 
   const [memory, setMemory] = useState<MemoryStore>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -55,7 +57,7 @@ export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load memory";
       setError(errorMessage);
-      console.error("Error loading memory:", err);
+      log.error("Error loading memory", { error: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +80,7 @@ export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to get category";
         setError(errorMessage);
-        console.error("Error getting category:", err);
+        log.error("Error getting category", { error: errorMessage });
         return {};
       }
     },
@@ -117,7 +119,7 @@ export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to set memory value";
         setError(errorMessage);
-        console.error("Error setting memory value:", err);
+        log.error("Error setting memory value", { error: errorMessage });
         throw err;
       } finally {
         setIsLoading(false);
@@ -164,7 +166,7 @@ export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to delete memory key";
         setError(errorMessage);
-        console.error("Error deleting memory key:", err);
+        log.error("Error deleting memory key", { error: errorMessage });
         throw err;
       } finally {
         setIsLoading(false);
@@ -202,7 +204,7 @@ export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to delete category";
         setError(errorMessage);
-        console.error("Error deleting category:", err);
+        log.error("Error deleting category", { error: errorMessage });
         throw err;
       } finally {
         setIsLoading(false);

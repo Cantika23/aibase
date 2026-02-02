@@ -8,6 +8,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractTextFromDocx, isDocxFile } from '../../../../utils/document-extractor';
 import { getProjectFilesDir } from '../../../../config/paths';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('WordExtension');
 
 // Type definition for injected utilities
 interface ExtensionUtils {
@@ -176,19 +179,19 @@ if (hookRegistry) {
     'afterFileUpload',
     'word',
     async (_context: any) => {
-      console.log('[WordDocument] Hook called for file:', _context.fileName, 'type:', _context.fileType);
+      logger.info({ fileName: _context.fileName, fileType: _context.fileType }, 'Hook called for file');
 
       // Only process Word documents
       if (!_context.fileType.match(/(^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)|\.doc|\.docx)/i)) {
-        console.log('[WordDocument] Skipping non-Word file');
+        logger.info('Skipping non-Word file');
         return;
       }
 
-      console.log('[WordDocument] Processing Word document:', _context.fileName);
+      logger.info({ fileName: _context.fileName }, 'Processing Word document');
 
       try {
         // Extract text content from Word
-        console.log('[WordDocument] Extracting text from:', _context.filePath);
+        logger.info({ filePath: _context.filePath }, 'Extracting text');
         const text = await extractTextFromDocx(_context.filePath);
 
         // Generate structured description for AI
@@ -212,19 +215,18 @@ Paragraph Count: ${paragraphCount}`;
           label: "WordDocument",
         });
 
-        console.log('[WordDocument] Generated description for:', _context.fileName, 'text length:', text.length);
+        logger.info({ fileName: _context.fileName, textLength: text.length }, 'Generated description');
 
         return { description, title };
       } catch (error) {
-        console.error('[WordDocument] Hook failed:', error);
-        console.error('[WordDocument] Error stack:', error instanceof Error ? error.stack : String(error));
+        logger.error({ error }, 'Hook failed');
         return {};
       }
     }
   );
-  console.log('[WordDocument] Registered afterFileUpload hook');
+  logger.info('Registered afterFileUpload hook');
 } else {
-  console.log('[WordDocument] extensionHookRegistry not available, hook not registered');
+  logger.info('extensionHookRegistry not available, hook not registered');
 }
 
 // @ts-expect-error - Extension loader wraps this code in an async function

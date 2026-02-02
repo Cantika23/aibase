@@ -28,6 +28,9 @@ import {
   createCache,
 } from '../abstraction';
 import type { DatabaseConfig, FileStorageConfig, CacheConfig } from '../abstraction';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('Migrator');
 
 // ============================================================================
 // Migration Options
@@ -92,10 +95,10 @@ export async function migrateDatabase(
 
   const startTime = Date.now();
   
-  console.log(`[Migration] Database: ${sourceConfig.type} → ${targetConfig.type}`);
+  logger.info(`Database: ${sourceConfig.type} → ${targetConfig.type}`);
   
   if (options.dryRun) {
-    console.log('[Migration] DRY RUN MODE - No changes will be made');
+    logger.info('DRY RUN MODE - No changes will be made');
   }
 
   const sourceDb = createDatabase(sourceConfig);
@@ -109,22 +112,22 @@ export async function migrateDatabase(
     const tables = await getTablesToMigrate(sourceDb);
     
     for (const table of tables) {
-      console.log(`\n[Migration] Table: ${table.name}`);
+      logger.info(`Table: ${table.name}`);
       
       try {
         // Check if table exists in source
         if (!await sourceDb.tableExists(table.name)) {
-          console.log(`[Migration] Table ${table.name} does not exist in source, skipping`);
+          logger.info(`Table ${table.name} does not exist in source, skipping`);
           continue;
         }
 
         // Get table schema
         const schema = await sourceDb.getTableInfo(table.name);
-        console.log(`[Migration] Columns: ${schema.map(c => c.column).join(', ')}`);
+        logger.info(`Columns: ${schema.map(c => c.column).join(', ')}`);
 
         // Read all data from source
         const sourceData = await sourceDb.query(`SELECT * FROM ${table.name}`);
-        console.log(`[Migration] Found ${sourceData.rowCount} rows`);
+        logger.info(`Found ${sourceData.rowCount} rows`);
 
         if (sourceData.rowCount === 0) {
           continue;
@@ -159,7 +162,7 @@ export async function migrateDatabase(
                   
                   // Log first few errors
                   if (result.errors.length <= 5) {
-                    console.error(`[Migration] Error inserting row:`, error);
+                    logger.error({ error }, 'Error inserting row');
                   }
                 }
               }
@@ -178,22 +181,22 @@ export async function migrateDatabase(
           }
 
           result.recordsMigrated += migrated;
-          console.log(`[Migration] Migrated ${migrated} rows to ${table.name}`);
+          logger.info(`Migrated ${migrated} rows to ${table.name}`);
         } else {
           result.recordsMigrated += sourceData.rowCount;
-          console.log(`[Migration] Would migrate ${sourceData.rowCount} rows (dry run)`);
+          logger.info(`Would migrate ${sourceData.rowCount} rows (dry run)`);
         }
       } catch (error) {
         result.success = false;
         result.errors.push(`Table ${table.name}: ${(error as Error).message}`);
-        console.error(`[Migration] Failed to migrate table ${table.name}:`, error);
+        logger.error({ error }, `Failed to migrate table ${table.name}`);
       }
     }
 
   } catch (error) {
     result.success = false;
     result.errors.push((error as Error).message);
-    console.error('[Migration] Database migration failed:', error);
+    logger.error({ error }, 'Database migration failed');
   } finally {
     await sourceDb.disconnect();
     await targetDb.disconnect();
@@ -201,9 +204,9 @@ export async function migrateDatabase(
 
   result.durationMs = Date.now() - startTime;
   
-  console.log(`\n[Migration] Database migration completed in ${result.durationMs}ms`);
-  console.log(`[Migration] Records migrated: ${result.recordsMigrated}`);
-  console.log(`[Migration] Records failed: ${result.recordsFailed}`);
+  logger.info(`Database migration completed in ${result.durationMs}ms`);
+  logger.info(`Records migrated: ${result.recordsMigrated}`);
+  logger.info(`Records failed: ${result.recordsFailed}`);
   
   return result;
 }
@@ -225,7 +228,7 @@ async function createTableInTarget(
   const sql = `CREATE TABLE ${tableName} (${columnDefs})`;
   
   await db.execute(sql);
-  console.log(`[Migration] Created table ${tableName} in target`);
+  logger.info(`Created table ${tableName} in target`);
 }
 
 // ============================================================================
@@ -248,10 +251,10 @@ export async function migrateFileStorage(
 
   const startTime = Date.now();
   
-  console.log(`[Migration] File Storage: ${sourceConfig.type} → ${targetConfig.type}`);
+  logger.info(`File Storage: ${sourceConfig.type} → ${targetConfig.type}`);
   
   if (options.dryRun) {
-    console.log('[Migration] DRY RUN MODE - No changes will be made');
+    logger.info('DRY RUN MODE - No changes will be made');
   }
 
   const sourceStorage = await createFileStorage(sourceConfig);
@@ -259,7 +262,7 @@ export async function migrateFileStorage(
 
   try {
     // List all files from source
-    console.log('[Migration] Listing files from source...');
+    logger.info('Listing files from source...');
     let continuationToken: string | undefined;
     let totalFiles = 0;
     
@@ -271,7 +274,7 @@ export async function migrateFileStorage(
       
       totalFiles += listResult.files.length;
       
-      console.log(`[Migration] Processing batch of ${listResult.files.length} files...`);
+      logger.info(`Processing batch of ${listResult.files.length} files...`);
       
       for (const file of listResult.files) {
         try {
@@ -312,7 +315,7 @@ export async function migrateFileStorage(
   } catch (error) {
     result.success = false;
     result.errors.push((error as Error).message);
-    console.error('[Migration] File storage migration failed:', error);
+    logger.error({ error }, 'File storage migration failed');
   } finally {
     await sourceStorage.close();
     await targetStorage.close();
@@ -320,10 +323,10 @@ export async function migrateFileStorage(
 
   result.durationMs = Date.now() - startTime;
   
-  console.log(`\n[Migration] File storage migration completed in ${result.durationMs}ms`);
-  console.log(`[Migration] Files migrated: ${result.recordsMigrated}`);
-  console.log(`[Migration] Files skipped: ${result.recordsSkipped}`);
-  console.log(`[Migration] Files failed: ${result.recordsFailed}`);
+  logger.info(`File storage migration completed in ${result.durationMs}ms`);
+  logger.info(`Files migrated: ${result.recordsMigrated}`);
+  logger.info(`Files skipped: ${result.recordsSkipped}`);
+  logger.info(`Files failed: ${result.recordsFailed}`);
   
   return result;
 }
@@ -348,17 +351,17 @@ export async function migrateCache(
 
   const startTime = Date.now();
   
-  console.log(`[Migration] Cache: ${sourceConfig.type} → ${targetConfig.type}`);
-  console.log('[Migration] Note: Cache migration typically only migrates session data');
+  logger.info(`Cache: ${sourceConfig.type} → ${targetConfig.type}`);
+  logger.info('Note: Cache migration typically only migrates session data');
   
   if (options.dryRun) {
-    console.log('[Migration] DRY RUN MODE - No changes will be made');
+    logger.info('DRY RUN MODE - No changes will be made');
   }
 
   // For cache, we typically only migrate sessions, not all cached data
   // This is because cached data is ephemeral and can be regenerated
   
-  console.log('[Migration] Cache migration not yet implemented');
+  logger.info('Cache migration not yet implemented');
   result.errors.push('Cache migration not yet implemented');
   
   result.durationMs = Date.now() - startTime;
@@ -389,14 +392,14 @@ export async function migrateAll(
     overallSuccess: true,
   };
 
-  console.log('╔════════════════════════════════════════════════════════════╗');
-  console.log('║              AIBase Storage Migration Tool                 ║');
-  console.log('╚════════════════════════════════════════════════════════════╝\n');
+  logger.info('╔════════════════════════════════════════════════════════════╗');
+  logger.info('║              AIBase Storage Migration Tool                 ║');
+  logger.info('╚════════════════════════════════════════════════════════════╝');
 
   // Database migration
   if (options.migrateDatabase !== false) {
-    console.log('\n📊 Database Migration');
-    console.log('═════════════════════\n');
+    logger.info('📊 Database Migration');
+    logger.info('═════════════════════');
     
     // Read configs from environment or use defaults
     const sourceConfig: DatabaseConfig = { type: 'sqlite', sqlite: { path: 'data/app/databases/app.db' } };
@@ -420,8 +423,8 @@ export async function migrateAll(
 
   // File storage migration
   if (options.migrateFiles !== false) {
-    console.log('\n📁 File Storage Migration');
-    console.log('═════════════════════════\n');
+    logger.info('📁 File Storage Migration');
+    logger.info('═════════════════════════');
     
     const sourceConfig: FileStorageConfig = { type: 'local', local: { basePath: 'data/files' } };
     const targetConfig: FileStorageConfig = {
@@ -442,8 +445,8 @@ export async function migrateAll(
 
   // Cache migration (sessions only)
   if (options.migrateCache) {
-    console.log('\n💾 Cache Migration');
-    console.log('══════════════════\n');
+    logger.info('💾 Cache Migration');
+    logger.info('══════════════════');
     
     const sourceConfig: CacheConfig = { type: 'memory' };
     const targetConfig: CacheConfig = {
@@ -460,9 +463,9 @@ export async function migrateAll(
     }
   }
 
-  console.log('\n╔════════════════════════════════════════════════════════════╗');
-  console.log(`║  Migration ${result.overallSuccess ? '✅ Completed' : '❌ Failed'}                          ║`);
-  console.log('╚════════════════════════════════════════════════════════════╝\n');
+  logger.info('╔════════════════════════════════════════════════════════════╗');
+  logger.info(`║  Migration ${result.overallSuccess ? '✅ Completed' : '❌ Failed'}                          ║`);
+  logger.info('╚════════════════════════════════════════════════════════════╝');
 
   return result;
 }

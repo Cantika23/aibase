@@ -4,6 +4,7 @@
  */
 
 import { buildApiUrl } from "@/lib/base-path";
+import { logger } from "@/lib/logger";
 
 const API_BASE_URL = `${buildApiUrl("")}/api`;
 
@@ -142,7 +143,7 @@ export async function authenticateEmbedUser(projectId: string, embedToken: strin
 
     return data.data!;
   } catch (error) {
-    console.error("Embed authentication error:", error);
+    logger.api.error(`Embed authentication error`, { error: String(error) });
     throw error; // Re-throw to handle in UI
   }
 }
@@ -169,7 +170,7 @@ export async function createNewChat(projectId: string, convId: string): Promise<
 
     return data.data!;
   } catch (error) {
-    console.error("Create new chat error:", error);
+    logger.api.error(`Create new chat error`, { error: String(error) });
     throw error;
   }
 }

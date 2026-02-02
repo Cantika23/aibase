@@ -3,6 +3,10 @@
  * Uses Bun's native WebSocket API
  */
 
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('WhatsAppWS');
+
 interface WhatsAppWSMessage {
   type: 'subscribe' | 'unsubscribe' | 'ping' | 'pong';
   projectId?: string;
@@ -32,8 +36,8 @@ const socketToProjects = new WeakMap<any, Set<string>>();
 function broadcastStatus(projectId: string, data: Omit<WhatsAppWSResponse['data'], 'projectId'>) {
   const connections = projectConnections.get(projectId);
   if (!connections) {
-    console.log('[WhatsApp WS] No connections found for project:', projectId);
-    console.log('[WhatsApp WS] Active projects:', Array.from(projectConnections.keys()));
+    logger.info({ projectId }, '[WhatsApp WS] No connections found for project');
+    logger.info({ activeProjects: Array.from(projectConnections.keys()) }, '[WhatsApp WS] Active projects');
     return;
   }
 
@@ -42,7 +46,7 @@ function broadcastStatus(projectId: string, data: Omit<WhatsAppWSResponse['data'
     data: { projectId, ...data },
   };
 
-  console.log('[WhatsApp WS] Broadcasting to', connections.size, 'connection(s) for project:', projectId);
+  logger.info({ connectionCount: connections.size, projectId }, '[WhatsApp WS] Broadcasting to connections');
   connections.forEach((ws) => {
     if (ws.readyState === 1) { // WebSocket.OPEN = 1
       ws.send(JSON.stringify(message));
@@ -98,7 +102,7 @@ export function notifyWhatsAppQRTimeout(projectId: string) {
  * Handle WebSocket connection open
  */
 function handleOpen(ws: any) {
-  console.log('[WhatsApp WS] New connection established');
+  logger.info('[WhatsApp WS] New connection established');
 }
 
 /**
@@ -111,14 +115,14 @@ async function handleMessage(ws: any, message: string | Buffer) {
     switch (data.type) {
       case 'subscribe':
         if (data.projectId) {
-          console.log('[WhatsApp WS] Client subscribed for project:', data.projectId);
+          logger.info({ projectId: data.projectId }, '[WhatsApp WS] Client subscribed for project');
 
           // Add to project connections
           if (!projectConnections.has(data.projectId)) {
             projectConnections.set(data.projectId, new Set());
           }
           projectConnections.get(data.projectId)!.add(ws);
-          console.log('[WhatsApp WS] Connection added. Total connections for project:', projectConnections.get(data.projectId)!.size);
+          logger.info({ connectionCount: projectConnections.get(data.projectId)!.size }, '[WhatsApp WS] Connection added. Total connections for project');
 
           // Track which projects this socket is subscribed to
           if (!socketToProjects.has(ws)) {
@@ -144,12 +148,12 @@ async function handleMessage(ws: any, message: string | Buffer) {
 
               if (client) {
                 const isConnected = client.isConnected || false;
-                console.log('[WhatsApp WS] Sending current status to new subscriber:', {
+                logger.info({
                   projectId: data.projectId,
                   phone: client.phone,
                   connected: isConnected,
                   deviceName: client.osName || 'WhatsApp Device',
-                });
+                }, '[WhatsApp WS] Sending current status to new subscriber');
 
                 // Send current status immediately
                 ws.send(JSON.stringify({
@@ -163,18 +167,18 @@ async function handleMessage(ws: any, message: string | Buffer) {
                   },
                 }));
               } else {
-                console.log('[WhatsApp WS] No client found for project:', data.projectId);
+                logger.info({ projectId: data.projectId }, '[WhatsApp WS] No client found for project');
               }
             }
           } catch (err) {
-            console.error('[WhatsApp WS] Error fetching client status:', err);
+            logger.error({ err }, '[WhatsApp WS] Error fetching client status');
           }
         }
         break;
 
       case 'unsubscribe':
         if (data.projectId) {
-          console.log('[WhatsApp WS] Client unsubscribed from project:', data.projectId);
+          logger.info({ projectId: data.projectId }, '[WhatsApp WS] Client unsubscribed from project');
           const connections = projectConnections.get(data.projectId);
           if (connections) {
             connections.delete(ws);
@@ -196,10 +200,10 @@ async function handleMessage(ws: any, message: string | Buffer) {
         break;
 
       default:
-        console.warn('[WhatsApp WS] Unknown message type:', data.type);
+        logger.warn({ type: data.type }, '[WhatsApp WS] Unknown message type');
     }
   } catch (err) {
-    console.error('[WhatsApp WS] Error handling message:', err);
+    logger.error({ err }, '[WhatsApp WS] Error handling message');
   }
 }
 
@@ -207,7 +211,7 @@ async function handleMessage(ws: any, message: string | Buffer) {
  * Handle WebSocket connection close
  */
 function handleClose(ws: any) {
-  console.log('[WhatsApp WS] Connection closed');
+  logger.info('[WhatsApp WS] Connection closed');
 
   // Cleanup connection from all projects
   const projects = socketToProjects.get(ws);

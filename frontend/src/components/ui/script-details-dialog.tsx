@@ -17,6 +17,7 @@ import { Button } from "./button";
 import { useUIStore } from "@/stores/ui-store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 import { ExtensionInspector } from "./chat/tools/extension-inspector";
+import { useLogger } from "@/hooks/use-logger";
 import "./script-details-dialog-tabs.css";
 
 interface ScriptDetailsDialogProps {
@@ -43,6 +44,7 @@ export function ScriptDetailsDialog({
   error,
   inspectionData,
 }: ScriptDetailsDialogProps) {
+  const log = useLogger('ui');
   const {
     highlightedCode,
     highlightedResult,
@@ -81,7 +83,7 @@ export function ScriptDetailsDialog({
         setTimeout(() => setCopiedError(false), 2000);
       }
     } catch (err) {
-      console.error("Failed to copy:", err);
+      log.error("Failed to copy", { error: err });
     }
   };
 
@@ -100,9 +102,7 @@ export function ScriptDetailsDialog({
     }
 
     // Result is too large - truncate it
-    console.warn(
-      `[ScriptDetailsDialog] Result too large (${serialized.length} chars), truncating for display`,
-    );
+    log.warn("Result too large, truncating for display", { size: serialized.length });
 
     if (typeof data === "string") {
       return {
@@ -158,15 +158,9 @@ export function ScriptDetailsDialog({
 
   // Debug: Log inspectionData whenever it changes
   useEffect(() => {
-    console.log(
-      "[ScriptDetailsDialog] inspectionData changed:",
-      inspectionData,
-    );
-    console.log(
-      "[ScriptDetailsDialog] inspectionData keys:",
-      inspectionData ? Object.keys(inspectionData) : "null",
-    );
-  }, [inspectionData]);
+    log.debug("inspectionData changed", { inspectionData });
+    log.debug("inspectionData keys", { keys: inspectionData ? Object.keys(inspectionData) : "null" });
+  }, [inspectionData, log]);
 
   useEffect(() => {
     if (open && code) {
@@ -183,7 +177,7 @@ export function ScriptDetailsDialog({
             printWidth: 80,
           });
         } catch (error) {
-          console.warn("Failed to format code:", error);
+          log.warn("Failed to format code", { error });
           // Use original code if formatting fails
         }
 
@@ -195,7 +189,7 @@ export function ScriptDetailsDialog({
         setHighlightedCode(highlighted);
       })();
     }
-  }, [open, code]);
+  }, [open, code, log, setHighlightedCode]);
 
   useEffect(() => {
     if (open && result) {
@@ -211,7 +205,7 @@ export function ScriptDetailsDialog({
         theme: "github-light",
       }).then(setHighlightedResult);
     }
-  }, [open, result]);
+  }, [open, result, setHighlightedResult]);
 
   const getStateLabel = () => {
     switch (state) {

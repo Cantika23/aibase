@@ -4,6 +4,7 @@ import { getEmbedUserConversations, deleteEmbedConversation, type ChatHistoryMet
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLogger } from "@/hooks/use-logger";
 
 interface EmbedConversationListProps {
   projectId: string;
@@ -24,6 +25,7 @@ export function EmbedConversationList({
   onConversationSelect,
   onNewChat,
 }: EmbedConversationListProps) {
+  const log = useLogger('chat');
   const [conversations, setConversations] = useState<ChatHistoryMetadata[]>([]);
   const [filteredConversations, setFilteredConversations] = useState<ChatHistoryMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,13 +42,13 @@ export function EmbedConversationList({
           setFilteredConversations(data);
         })
         .catch((error) => {
-          console.error("Failed to load conversations:", error);
+          log.error("Failed to load conversations", { error });
         })
         .finally(() => {
           setIsLoading(false);
         });
     }
-  }, [userId, projectId]);
+  }, [userId, projectId, log]);
 
   // Filter conversations based on search query
   useEffect(() => {
@@ -98,7 +100,7 @@ export function EmbedConversationList({
         onNewChat();
       }
     } catch (error) {
-      console.error("Failed to delete conversation:", error);
+      log.error("Failed to delete conversation", { error });
       alert("Failed to delete conversation. Please try again.");
     } finally {
       setDeletingId(null);

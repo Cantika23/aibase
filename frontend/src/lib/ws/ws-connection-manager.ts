@@ -7,6 +7,7 @@
 import { WSClient } from "./ws-client";
 import type { WSClientOptions } from "../types/model";
 import { authenticateEmbedUser } from "../embed-api";
+import { logger } from "@/lib/logger";
 
 // Export WSClient for use in other modules
 export type { WSClient };
@@ -42,23 +43,23 @@ export class WSConnectionManager {
     if (connectionInfo) {
       // Reuse existing connection
       connectionInfo.refCount++;
-      console.log(`WSConnectionManager: Reusing existing connection ${connectionKey} (ref count: ${connectionInfo.refCount})`);
+      logger.websocket.info(`WSConnectionManager: Reusing existing connection`, { connectionKey, refCount: connectionInfo.refCount });
       return connectionInfo.client;
     }
 
     // Create new connection
-    console.log(`WSConnectionManager: Creating new WebSocket connection for key: ${connectionKey}`);
+    logger.websocket.info(`WSConnectionManager: Creating new WebSocket connection`, { connectionKey });
 
     // Check if we need to authenticate first (for embed with uid)
     const connectionOptions = { ...options };
     if (options.uid && options.projectId && options.embedToken) {
       try {
-        console.log(`WSConnectionManager: Authenticating embed user ${options.uid}`);
+        logger.websocket.info(`WSConnectionManager: Authenticating embed user`, { uid: options.uid });
         const authData = await authenticateEmbedUser(options.projectId, options.embedToken, options.uid);
         connectionOptions.token = authData.token;
-        console.log(`WSConnectionManager: Embed authentication successful, token received`);
+        logger.websocket.info(`WSConnectionManager: Embed authentication successful, token received`);
       } catch (error) {
-        console.error(`WSConnectionManager: Embed authentication failed:`, error);
+        logger.websocket.error(`WSConnectionManager: Embed authentication failed`, { error: String(error) });
         throw error;
       }
     }
@@ -72,7 +73,7 @@ export class WSConnectionManager {
     };
 
     this.connections.set(connectionKey, connectionInfo);
-    console.log(`WSConnectionManager: Total connections now: ${this.connections.size}`);
+    logger.websocket.info(`WSConnectionManager: Total connections updated`, { totalConnections: this.connections.size });
 
     // Set up cleanup when connection is closed
     client.on("disconnected", () => {
@@ -93,25 +94,25 @@ export class WSConnectionManager {
 
     if (connectionInfo) {
       connectionInfo.refCount--;
-      console.log(`WSConnectionManager: Released connection ${connectionKey} (ref count: ${connectionInfo.refCount})`);
+      logger.websocket.info(`WSConnectionManager: Released connection`, { connectionKey, refCount: connectionInfo.refCount });
 
       // Only disconnect if no more references, but delay to handle React Strict Mode
       if (connectionInfo.refCount <= 0) {
-        console.log(`WSConnectionManager: No more references for ${connectionKey}, scheduling disconnect`);
+        logger.websocket.info(`WSConnectionManager: No more references, scheduling disconnect`, { connectionKey });
         setTimeout(() => {
           const currentConnectionInfo = this.connections.get(connectionKey);
           if (currentConnectionInfo && currentConnectionInfo.refCount <= 0) {
-            console.log(`WSConnectionManager: Confirmed disconnect for ${connectionKey}`);
+            logger.websocket.info(`WSConnectionManager: Confirmed disconnect`, { connectionKey });
             currentConnectionInfo.client.disconnect();
             this.connections.delete(connectionKey);
-            console.log(`WSConnectionManager: Total connections now: ${this.connections.size}`);
+            logger.websocket.debug(`WSConnectionManager: Total connections updated`, { totalConnections: this.connections.size });
           } else {
-            console.log(`WSConnectionManager: Disconnect cancelled for ${connectionKey}, still has references`);
+            logger.websocket.info(`WSConnectionManager: Disconnect cancelled, still has references`, { connectionKey });
           }
         }, 200); // 200ms delay to allow React Strict Mode remount
       }
     } else {
-      console.log(`WSConnectionManager: Attempted to release unknown connection: ${connectionKey}`);
+      logger.websocket.warn(`WSConnectionManager: Attempted to release unknown connection`, { connectionKey });
     }
   }
 
@@ -119,7 +120,7 @@ export class WSConnectionManager {
    * Force disconnect all connections
    */
   disconnectAll(): void {
-    console.log(`WSConnectionManager: Disconnecting all ${this.connections.size} connections`);
+    logger.websocket.info(`WSConnectionManager: Disconnecting all connections`, { count: this.connections.size });
     for (const [, connectionInfo] of this.connections) {
       connectionInfo.client.disconnect();
     }
@@ -170,7 +171,7 @@ export class WSConnectionManager {
   private onConnectionDisconnected(connectionKey: string): void {
     const connectionInfo = this.connections.get(connectionKey);
     if (connectionInfo && connectionInfo.refCount <= 0) {
-      console.log(`WSConnectionManager: Connection ${connectionKey} disconnected and cleaned up`);
+      logger.websocket.info(`WSConnectionManager: Connection disconnected and cleaned up`, { connectionKey });
       this.connections.delete(connectionKey);
     }
   }
@@ -202,7 +203,7 @@ export function useWSConnection(options: WSClientOptions) {
 
   // Initialize and manage connection in useEffect
   useEffect(() => {
-    console.log("useWSConnection: useEffect triggered for:", memoizedOptions.url);
+    logger.websocket.debug(`useWSConnection: useEffect triggered`, { url: memoizedOptions.url });
     let isMounted = true;
 
     // Get or create client (async)
@@ -221,7 +222,7 @@ export function useWSConnection(options: WSClientOptions) {
           managerRef.current.releaseClient(memoizedOptions);
         }
       } catch (error) {
-        console.error("useWSConnection: Failed to initialize connection:", error);
+        logger.websocket.error(`useWSConnection: Failed to initialize connection`, { error: String(error) });
       }
     };
 
@@ -231,7 +232,7 @@ export function useWSConnection(options: WSClientOptions) {
     return () => {
       isMounted = false;
       if (clientRef.current) {
-        console.log("useWSConnection: Cleaning up connection");
+        logger.websocket.debug(`useWSConnection: Cleaning up connection`);
         managerRef.current.releaseClient(memoizedOptions);
         clientRef.current = null;
       }

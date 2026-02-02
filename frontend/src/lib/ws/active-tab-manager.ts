@@ -4,6 +4,8 @@
  * Other tabs remain passive listeners
  */
 
+import { logger } from "@/lib/logger";
+
 type TabId = string;
 type ConvId = string;
 
@@ -38,7 +40,7 @@ class ActiveTabManager {
     const previousActiveTab = this.activeTabsPerConv.get(convId);
     this.activeTabsPerConv.set(convId, tabId);
 
-    console.log(`[ActiveTabManager] Tab ${tabId} is now active for convId ${convId} (previous: ${previousActiveTab || 'none'})`);
+    logger.ui.info(`[ActiveTabManager] Tab is now active`, { tabId, convId, previousTab: previousActiveTab || 'none' });
 
     return tabId;
   }
@@ -50,7 +52,7 @@ class ActiveTabManager {
     const tabId = this.tabIds.get(componentRef);
 
     if (tabId && this.activeTabsPerConv.get(convId) === tabId) {
-      console.log(`[ActiveTabManager] Tab ${tabId} unregistered for convId ${convId}`);
+      logger.ui.info(`[ActiveTabManager] Tab unregistered`, { tabId, convId });
       this.activeTabsPerConv.delete(convId);
     }
   }

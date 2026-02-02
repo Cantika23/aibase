@@ -2,6 +2,9 @@
  * Simple EventEmitter implementation for WebSocket events
  * Compatible with both browser and Node.js environments
  */
+
+import { logger } from "@/lib/logger";
+
 export class WSEventEmitter extends EventTarget {
   private listeners: Map<string, Set<Function>> = new Map();
 
@@ -39,13 +42,13 @@ export class WSEventEmitter extends EventTarget {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       if (event === "llm_chunk") {
-        console.log(`[Emitter] Emitting ${event} to ${eventListeners.size} listeners`);
+        logger.websocket.trace(`[Emitter] Emitting event`, { event, listenerCount: eventListeners.size });
       }
       eventListeners.forEach((listener) => {
         try {
           listener(data);
         } catch (error) {
-          console.error(`Error in event listener for ${event}:`, error);
+          logger.websocket.error(`Error in event listener`, { event, error: String(error) });
         }
       });
     }

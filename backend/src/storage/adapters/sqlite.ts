@@ -14,6 +14,9 @@ import {
   type Migration,
   type MigrationDirection,
 } from '../abstraction/database';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SQLiteAdapter');
 
 interface SQLiteTransaction extends Transaction {
   db: Database;
@@ -151,7 +154,7 @@ export class SQLiteDatabase extends AbstractDatabase {
             db.prepare('INSERT INTO _migrations (version, name, applied_at) VALUES (?, ?, ?)')
               .run(migration.version, migration.name, Date.now());
             db.exec('COMMIT');
-            console.log(`[SQLite] Applied migration ${migration.version}: ${migration.name}`);
+            logger.info(`Applied migration ${migration.version}: ${migration.name}`);
           } catch (error) {
             db.exec('ROLLBACK');
             throw error;
@@ -169,7 +172,7 @@ export class SQLiteDatabase extends AbstractDatabase {
             db.exec(migration.down);
             db.prepare('DELETE FROM _migrations WHERE version = ?').run(migration.version);
             db.exec('COMMIT');
-            console.log(`[SQLite] Rolled back migration ${migration.version}: ${migration.name}`);
+            logger.info(`Rolled back migration ${migration.version}: ${migration.name}`);
           } catch (error) {
             db.exec('ROLLBACK');
             throw error;

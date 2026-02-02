@@ -7,6 +7,9 @@ import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { PATHS } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SessionStorage');
 
 export interface Session {
   id: number;
@@ -61,7 +64,7 @@ export class SessionStorage {
     this.db.run('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)');
     this.db.run('CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)');
 
-    console.log('[SessionStorage] Database initialized');
+    logger.info('Database initialized');
   }
 
   /**
@@ -91,7 +94,7 @@ export class SessionStorage {
       throw new Error('Failed to create session');
     }
 
-    console.log('[SessionStorage] Created session for user ID:', userId);
+    logger.info(`Created session for user ID: ${userId}`);
     return session;
   }
 
@@ -192,7 +195,7 @@ export class SessionStorage {
     const deletedCount = result.changes;
 
     if (deletedCount > 0) {
-      console.log('[SessionStorage] Cleaned up', deletedCount, 'expired sessions');
+      logger.info(`Cleaned up ${deletedCount} expired sessions`);
     }
 
     return deletedCount;

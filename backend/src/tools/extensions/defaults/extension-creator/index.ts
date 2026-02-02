@@ -9,6 +9,10 @@
 // Export to make this file a module (fixes global augmentation TypeScript error)
 export {};
 
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ExtensionCreator');
+
 // Type definitions
 interface CreateOptions {
   description?: string;
@@ -447,13 +451,10 @@ function buildFailureResult(input: {
     },
   };
 
-  console.error(`[ExtensionCreator] ${input.action} failed`, {
-    stage: input.stage,
-    extensionId: input.extensionId,
-    error: normalized,
-    issues: input.issues,
-    preview,
-  });
+  logger.error(
+    { action: input.action, stage: input.stage, extensionId: input.extensionId, error: normalized, issues: input.issues, preview },
+    `${input.action} failed`
+  );
 
   return result;
 }
@@ -490,12 +491,10 @@ function buildValidationFailure(input: {
     warning: input.postWrite ? "Files were written before validation." : undefined,
   };
 
-  console.warn(`[ExtensionCreator] ${input.action} validation failed`, {
-    extensionId: input.extensionId,
-    issues: input.issues,
-    preview,
-    postWrite: input.postWrite,
-  });
+  logger.warn(
+    { action: input.action, extensionId: input.extensionId, issues: input.issues, preview, postWrite: input.postWrite },
+    `${input.action} validation failed`
+  );
 
   return result;
 }

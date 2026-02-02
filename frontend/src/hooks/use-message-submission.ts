@@ -4,6 +4,7 @@ import type { WSClient } from "@/lib/ws/ws-connection-manager";
 import { uploadFilesWithProgress } from "@/lib/file-upload";
 import { createNewChat } from "@/lib/embed-api";
 import { useChatStore } from "@/stores/chat-store";
+import { useLogger } from "@/hooks/use-logger";
 
 interface UseMessageSubmissionProps {
   wsClient: WSClient | null;
@@ -48,6 +49,8 @@ export function useMessageSubmission({
   isEmbedMode = false,
   updateMessage,
 }: UseMessageSubmissionProps) {
+  const log = useLogger('chat');
+  
   // Track if we're currently submitting to prevent double submissions
   const isSubmittingRef = useRef(false);
   // Track last submit time to prevent rapid duplicate submissions
@@ -63,47 +66,40 @@ export function useMessageSubmission({
       // Prevent rapid duplicate submissions (within 100ms)
       const now = Date.now();
       if (now - lastSubmitTimeRef.current < 100) {
-        console.log("[Submit] Ignoring rapid duplicate submission");
+        log.debug("[Submit] Ignoring rapid duplicate submission");
         return;
       }
       lastSubmitTimeRef.current = now;
 
       const isConnected = wsClient?.isConnected() === true;
 
-      console.log(
-        "[Submit] Called with input:",
-        input?.substring(0, 50),
-        "isConnected:",
-        isConnected,
-        "attachments:",
-        options?.experimental_attachments?.length || 0
-      );
+      log.debug("[Submit] Called", { 
+        input: input?.substring(0, 50), 
+        isConnected, 
+        attachments: options?.experimental_attachments?.length || 0 
+      });
 
       const hasAttachments = options?.experimental_attachments && options.experimental_attachments.length > 0;
 
       // Allow submission if there's input text OR if there are attachments
       if ((!input.trim() && !hasAttachments) || !isConnected) {
-        console.log("[Submit] Skipping - no input/attachments or not connected");
+        log.debug("[Submit] Skipping - no input/attachments or not connected");
         return;
       }
 
       // Prevent double submissions
       if (isSubmittingRef.current) {
-        console.log(
-          "[Submit] Already submitting, ignoring duplicate submission"
-        );
+        log.debug("[Submit] Already submitting, ignoring duplicate submission");
         return;
       }
 
       // Mark as submitting
       isSubmittingRef.current = true;
-      console.log("[Submit] Marked as submitting");
+      log.debug("[Submit] Marked as submitting");
 
       // If already loading, abort the previous request first
       if (isLoading) {
-        console.log(
-          "[Submit] Aborting previous request before sending new message"
-        );
+        log.debug("[Submit] Aborting previous request before sending new message");
 
         // Clear thinking start time
         thinkingStartTimeRef.current = null;
@@ -147,7 +143,7 @@ export function useMessageSubmission({
         let userMessageWithFiles: Message | null = null;
 
         if (options?.experimental_attachments && options.experimental_attachments.length > 0) {
-          console.log("[Submit] Uploading", options.experimental_attachments.length, "files");
+          log.debug("[Submit] Uploading files", { count: options.experimental_attachments.length });
 
           // Create user message with file attachments that have processing status
           // We'll update the processing status as the upload progresses
@@ -186,7 +182,7 @@ export function useMessageSubmission({
               projectId,
               convId,
               onProgress: (progress) => {
-                console.log("[Upload Progress]", progress.percentage + "%");
+                log.debug("[Upload Progress]", { percentage: progress.percentage });
                 // Stop updating if upload is complete (prevents race condition with "Analyzing..." status)
                 if (uploadComplete) return;
 
@@ -207,7 +203,7 @@ export function useMessageSubmission({
               }
             });
 
-            console.log("[Submit] Files uploaded successfully:", uploadedFiles);
+            log.debug("[Submit] Files uploaded successfully", { files: uploadedFiles });
 
             // Mark upload as complete to prevent further progress updates
             uploadComplete = true;
@@ -233,7 +229,7 @@ export function useMessageSubmission({
               });
             }
           } catch (uploadError) {
-            console.error("[Submit] File upload failed:", uploadError);
+            log.error("[Submit] File upload failed", { error: uploadError instanceof Error ? uploadError.message : String(uploadError) });
 
             // Update the attachments to show error
             if (userMessageWithFiles) {
@@ -286,18 +282,15 @@ export function useMessageSubmission({
 
         setIsLoading(true);
 
-        console.log(
-          "[Submit] Sending message to backend:",
-          messageText.substring(0, 50)
-        );
+        log.debug("[Submit] Sending message to backend", { message: messageText.substring(0, 50) });
 
         // Send message with file IDs to backend so AI can read them
         await wsClient.sendMessage(messageText, {
           fileIds: uploadedFiles?.map(f => f.id)
         });
-        console.log("[Submit] Message sent successfully");
+        log.debug("[Submit] Message sent successfully");
       } catch (error) {
-        console.log("[Submit] Error sending message:", error);
+        log.error("[Submit] Error sending message", { error: error instanceof Error ? error.message : String(error) });
         setIsLoading(false);
         setError(
           error instanceof Error ? error.message : "Failed to send message"
@@ -308,7 +301,7 @@ export function useMessageSubmission({
       } finally {
         // Reset submitting flag after a short delay to allow state updates to complete
         setTimeout(() => {
-          console.log("[Submit] Clearing submitting flag");
+          log.debug("[Submit] Clearing submitting flag");
           isSubmittingRef.current = false;
         }, 100);
       }
@@ -332,7 +325,7 @@ export function useMessageSubmission({
   );
 
   const abort = useCallback(() => {
-    console.log("[Abort] User manually aborted request");
+    log.debug("[Abort] User manually aborted request");
     setIsLoading(false);
     const abortedMessageId = currentMessageIdRef.current;
     currentMessageRef.current = null;
@@ -376,20 +369,20 @@ export function useMessageSubmission({
   }, [setMessages]);
 
   const handleNewConversation = useCallback(async () => {
-    console.log("[New Conversation] Clearing all messages and starting fresh");
+    log.debug("[New Conversation] Clearing all messages and starting fresh");
 
     // Generate new conversation ID FIRST (before clearing messages)
     const newConvId = generateNewConvId();
-    console.log("[New Conversation] Generated new conversation ID:", newConvId);
+    log.debug("[New Conversation] Generated new conversation ID", { convId: newConvId });
 
     // For embed mode, create new chat file on backend with the NEW convId
     if (isEmbedMode && projectId) {
       try {
-        console.log("[New Conversation] Creating new chat file on backend with convId:", newConvId);
+        log.debug("[New Conversation] Creating new chat file on backend", { convId: newConvId });
         await createNewChat(projectId, newConvId);
-        console.log("[New Conversation] New chat file created successfully");
+        log.debug("[New Conversation] New chat file created successfully");
       } catch (error) {
-        console.error("[New Conversation] Failed to create new chat file:", error);
+        log.error("[New Conversation] Failed to create new chat file", { error: error instanceof Error ? error.message : String(error) });
         // Continue anyway - the chat will still work
       }
     }
@@ -419,22 +412,22 @@ export function useMessageSubmission({
 
     // Disconnect websocket to force reconnection with new convId
     if (wsClient && wsClient.isConnected()) {
-      console.log("[New Conversation] Disconnecting websocket to force reconnection");
+      log.debug("[New Conversation] Disconnecting websocket to force reconnection");
       wsClient.disconnect();
     }
 
     // Reconnect with new convId after a short delay to ensure clean disconnect
     setTimeout(() => {
       if (wsClient) {
-        console.log("[New Conversation] Reconnecting with new convId:", newConvId);
+        log.debug("[New Conversation] Reconnecting with new convId", { convId: newConvId });
         wsClient.connect().catch((error) => {
-          console.error("[New Conversation] Failed to reconnect:", error);
+          log.error("[New Conversation] Failed to reconnect", { error: error instanceof Error ? error.message : String(error) });
           setError("Failed to connect to server");
         });
       }
     }, 100);
 
-    console.log("[New Conversation] Successfully cleared conversation");
+    log.debug("[New Conversation] Successfully cleared conversation");
   }, [
     wsClient,
     setMessages,

@@ -141,8 +141,8 @@ async function generateThumbnail(
  * Handle file upload via HTTP POST
  */
 export async function handleFileUpload(req: Request, wsServer?: WSServer): Promise<Response> {
-  console.log('[UPLOAD-HANDLER] ============================================');
-  console.log('[UPLOAD-HANDLER] File upload request received');
+  logger.info('========================================');
+  logger.info('[UPLOAD-HANDLER] File upload request received');
   try {
     // Get conversation ID and project ID from query params
     const url = new URL(req.url);
@@ -244,7 +244,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
 
       // Wait for extension hooks to complete (blocking)
       // This ensures the description is available when the AI responds
-      console.log('[UPLOAD-HANDLER] Starting extension analysis for file:', file.name);
+      logger.info({ fileName: file.name }, '[UPLOAD-HANDLER] Starting extension analysis for file');
 
       // Ensure extensions are loaded (hooks registered) before executing hooks
       await ensureExtensionsLoaded(projectId);
@@ -261,19 +261,19 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
         fileSize: file.size,
       });
 
-      console.log('[UPLOAD-HANDLER] Extension hook execution result:', { fileName: file.name, hookResult });
+      logger.info({ fileName: file.name, hookResult }, '[UPLOAD-HANDLER] Extension hook execution result');
 
       let fileDescription: string | undefined;
       let fileTitle: string | undefined;
 
       if (hookResult?.description && typeof hookResult.description === 'string') {
-        console.log('[UPLOAD-HANDLER] Extension hook generated description for', file.name, ':', hookResult.description.substring(0, 100));
+        logger.info({ fileName: file.name, description: hookResult.description.substring(0, 100) }, '[UPLOAD-HANDLER] Extension hook generated description');
         fileDescription = hookResult.description;
 
         // Use title from extension hook if provided
         if (hookResult.title && typeof hookResult.title === 'string') {
           fileTitle = hookResult.title;
-          console.log('[UPLOAD-HANDLER] Extension hook generated title:', fileTitle);
+          logger.info({ fileTitle }, '[UPLOAD-HANDLER] Extension hook generated title');
         }
 
         // Update file metadata with description and title (if provided by extension)
@@ -282,12 +282,12 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
             description: hookResult.description,
             title: fileTitle
           });
-          console.log('[UPLOAD-HANDLER] File metadata updated with description and title:', fileTitle);
+          logger.info({ fileTitle }, '[UPLOAD-HANDLER] File metadata updated with description and title');
         } catch (updateError) {
-          console.error('[UPLOAD-HANDLER] Failed to update file metadata:', updateError);
+          logger.error({ error: updateError }, '[UPLOAD-HANDLER] Failed to update file metadata');
         }
       } else {
-        console.log('[UPLOAD-HANDLER] Extension hook: No description generated');
+        logger.info('[UPLOAD-HANDLER] Extension hook: No description generated');
       }
 
       // Broadcast: Upload and analysis complete
@@ -314,23 +314,23 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       const fileContextStorage = FileContextStorage.getInstance();
       const allFiles = await fileStorage.listFiles(convId || '', projectId, tenantId);
 
-      console.log(`[UPLOAD-HANDLER] Total files in project ${projectId}: ${allFiles.length}`);
+      logger.info({ projectId, fileCount: allFiles.length }, '[UPLOAD-HANDLER] Total files in project');
 
       if (allFiles.length < 10) {
-        console.log(`[UPLOAD-HANDLER] Auto-checking ${uploadedFiles.length} new files in context (total files: ${allFiles.length} < 10)`);
+        logger.info({ uploadedFilesCount: uploadedFiles.length, totalFiles: allFiles.length }, '[UPLOAD-HANDLER] Auto-checking new files in context');
         await fileContextStorage.bulkSetFilesInContext(
           uploadedFiles.map(f => f.id),
           true,
           projectId,
           tenantId
         );
-        console.log(`[UPLOAD-HANDLER] Successfully auto-checked ${uploadedFiles.length} files in context`);
+        logger.info({ uploadedFilesCount: uploadedFiles.length }, '[UPLOAD-HANDLER] Successfully auto-checked files in context');
       } else {
-        console.log(`[UPLOAD-HANDLER] Not auto-checking files (total files: ${allFiles.length} >= 10)`);
+        logger.info({ totalFiles: allFiles.length }, '[UPLOAD-HANDLER] Not auto-checking files');
       }
     } catch (error) {
       // Log error but don't fail the upload
-      console.error('[UPLOAD-HANDLER] Failed to auto-check files in context:', error);
+      logger.error({ error }, '[UPLOAD-HANDLER] Failed to auto-check files in context');
     }
 
     return Response.json({

@@ -5,6 +5,8 @@
  * All dependencies are bundled and served from your own backend - no external CDN requests.
  */
 
+import { logger } from "@/lib/logger";
+
 interface ExtensionMetadata {
   id: string;
   name: string;
@@ -40,13 +42,13 @@ export async function loadExtensionDependencies(
     // Fetch extension metadata
     const response = await fetch(url.toString());
     if (!response.ok) {
-      console.warn(`[ExtensionDeps] Failed to fetch metadata for ${extensionId}:`, response.statusText);
+      logger.extensions.warn(`Failed to fetch metadata`, { extensionId, statusText: response.statusText });
       return;
     }
 
     const result = await response.json();
     if (!result.success || !result.data) {
-      console.warn(`[ExtensionDeps] Invalid metadata response for ${extensionId}`);
+      logger.extensions.warn(`Invalid metadata response`, { extensionId });
       return;
     }
 
@@ -54,7 +56,7 @@ export async function loadExtensionDependencies(
     const deps = metadata.dependencies?.frontend;
 
     if (!deps || Object.keys(deps).length === 0) {
-      console.log(`[ExtensionDeps] No frontend dependencies for ${extensionId}`);
+      logger.extensions.debug(`No frontend dependencies`, { extensionId });
       return;
     }
 
@@ -68,18 +70,18 @@ export async function loadExtensionDependencies(
     }
 
     if (Object.keys(newDeps).length === 0) {
-      console.log(`[ExtensionDeps] All dependencies already loaded for ${extensionId}`);
+      logger.extensions.debug(`All dependencies already loaded`, { extensionId });
       return;
     }
 
-    console.log(`[ExtensionDeps] Loading ${Object.keys(newDeps).length} new dependencies for ${extensionId}:`, Object.keys(newDeps));
+    logger.extensions.info(`Loading new dependencies`, { extensionId, count: Object.keys(newDeps).length, dependencies: Object.keys(newDeps) });
 
     // Create a unique loading key for this request
     const loadingKey = JSON.stringify({ extensionId, deps: newDeps });
 
     // Check if already loading
     if (loadingPromises.has(loadingKey)) {
-      console.log(`[ExtensionDeps] Dependencies already loading for ${extensionId}, waiting...`);
+      logger.extensions.debug(`Dependencies already loading, waiting...`, { extensionId });
       return loadingPromises.get(loadingKey);
     }
 
@@ -89,13 +91,13 @@ export async function loadExtensionDependencies(
 
     try {
       await loadingPromise;
-      console.log(`[ExtensionDeps] Successfully loaded dependencies for ${extensionId}`);
+      logger.extensions.info(`Successfully loaded dependencies`, { extensionId });
     } finally {
       loadingPromises.delete(loadingKey);
     }
 
   } catch (error) {
-    console.error(`[ExtensionDeps] Failed to load dependencies for ${extensionId}:`, error);
+    logger.extensions.error(`Failed to load dependencies`, { extensionId, error: String(error) });
     throw error;
   }
 }
@@ -135,13 +137,13 @@ async function loadDependenciesFromBackend(
         loadedDependencies.set(name, version);
       }
 
-      console.log(`[ExtensionDeps] Loaded and executed bundle for ${extensionId}`);
+      logger.extensions.info(`Loaded and executed bundle`, { extensionId });
     } finally {
       URL.revokeObjectURL(bundleUrl);
     }
 
   } catch (error) {
-    console.error(`[ExtensionDeps] Error loading bundle:`, error);
+    logger.extensions.error(`Error loading bundle`, { error: String(error) });
     throw error;
   }
 }
@@ -173,7 +175,7 @@ export function getLoadedDependencies(): Map<string, string> {
 export function clearLoadedDependencies(): void {
   loadedDependencies.clear();
   loadingPromises.clear();
-  console.log('[ExtensionDeps] Cleared all loaded dependencies');
+  logger.extensions.info('Cleared all loaded dependencies');
 }
 
 /**

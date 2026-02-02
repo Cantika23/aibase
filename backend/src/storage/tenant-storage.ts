@@ -7,6 +7,9 @@ import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { PATHS } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('TenantStorage');
 
 export interface Tenant {
   id: number;
@@ -81,7 +84,7 @@ export class TenantStorage {
     // Create indexes
     this.db.run('CREATE INDEX IF NOT EXISTS idx_tenants_domain ON tenants(domain)');
 
-    console.log('[TenantStorage] Database initialized at', this.dbPath);
+    logger.info(`Database initialized at ${this.dbPath}`);
   }
 
   /**
@@ -102,7 +105,7 @@ export class TenantStorage {
         throw new Error('Failed to create tenant');
       }
 
-      console.log('[TenantStorage] Created tenant:', tenant.name);
+      logger.info(`Created tenant: ${tenant.name}`);
       return tenant;
     } catch (error: any) {
       if (error.message?.includes('UNIQUE constraint failed')) {

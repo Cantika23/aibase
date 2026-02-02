@@ -155,6 +155,7 @@ import {
   handleDeleteTenant as handleDeleteTenantAdmin,
   handleCheckSetup,
 } from "./setup-handler";
+import { handleFrontendLogs, handleLogsOptions } from "./logs-handler";
 import { tenantCheckMiddleware } from "../middleware/tenant-check";
 import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware/rate-limiter";
 import { ProjectStorage } from "../storage/project-storage";
@@ -272,12 +273,12 @@ export class WebSocketServer {
     // Pre-bundle extension UIs to warm up cache (async, don't wait)
     const { preBundleExtensionUIs } = await import("./extension-ui-handler");
     preBundleExtensionUIs().catch((error) => {
-      console.error('[Server] Extension UI pre-bundling failed:', error);
+      logger.error({ error }, "Extension UI pre-bundling failed");
     });
 
     // Run migration for embed conversations (async, don't wait)
     migrateEmbedConversations().catch((error) => {
-      console.error('[Server] Migration failed:', error);
+      logger.error({ error }, "Migration failed");
     });
 
     const wsHandlers = this.wsServer.getWebSocketHandlers();
@@ -1023,6 +1024,16 @@ export class WebSocketServer {
         // Serve logo file
         if (pathname === "/api/admin/setup/logo" && req.method === "GET") {
           return handleGetLogo(req);
+        }
+
+        // Frontend logging endpoint (development only)
+        if (pathname === "/api/logs") {
+          if (req.method === "OPTIONS") {
+            return handleLogsOptions();
+          }
+          if (req.method === "POST") {
+            return handleFrontendLogs(req);
+          }
         }
 
         // Health check endpoint

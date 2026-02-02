@@ -4,6 +4,7 @@
  */
 
 import type { Message } from "@/components/ui/chat";
+import { logger } from "@/lib/logger";
 
 export class MessagePersistence {
   private static readonly MESSAGES_KEY = 'chat_messages';
@@ -27,7 +28,7 @@ export class MessagePersistence {
 
       localStorage.setItem(this.MESSAGES_KEY, JSON.stringify(serializableMessages));
     } catch (error) {
-      console.warn('Failed to save messages to localStorage:', error);
+      logger.chat.warn('Failed to save messages to localStorage', { error: String(error) });
       // If storage is full, try to save fewer messages
       try {
         const fallbackMessages = messages.slice(-100);
@@ -37,7 +38,7 @@ export class MessagePersistence {
         }));
         localStorage.setItem(this.MESSAGES_KEY, JSON.stringify(serializableMessages));
       } catch (fallbackError) {
-        console.error('Failed to save even reduced messages:', fallbackError);
+        logger.chat.error('Failed to save even reduced messages', { error: String(fallbackError) });
         // Clear storage if we can't save anything
         localStorage.removeItem(this.MESSAGES_KEY);
       }
@@ -62,7 +63,7 @@ export class MessagePersistence {
         createdAt: msg.createdAt ? new Date(msg.createdAt) : new Date()
       }));
     } catch (error) {
-      console.warn('Failed to load messages from localStorage:', error);
+      logger.chat.warn('Failed to load messages from localStorage', { error: String(error) });
       // Clear corrupted data
       localStorage.removeItem(this.MESSAGES_KEY);
       return [];
@@ -117,7 +118,7 @@ export function useMessagePersistence(messages: Message[], setMessages: (message
   useEffect(() => {
     const savedMessages = MessagePersistence.loadMessages();
     if (savedMessages.length > 0) {
-      console.log(`Loaded ${savedMessages.length} messages from localStorage`);
+      logger.chat.info(`Loaded messages from localStorage`, { count: savedMessages.length });
       setMessages(savedMessages);
     }
   }, [setMessages]);

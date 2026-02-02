@@ -12,12 +12,14 @@ import { buildWsUrl } from "@/lib/base-path";
 import { useEmbedConvId } from "@/lib/embed-conv-id";
 import { useChatStore } from "@/stores/chat-store";
 import { EmbedConversationList } from "@/components/ui/embed-conversation-list";
+import { useLogger } from "@/hooks/use-logger";
 
 export function EmbedChatPage() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("projectId");
   const embedToken = searchParams.get("embedToken");
   const uid = searchParams.get("uid") || undefined;
+  const log = useLogger('chat');
 
   const [embedInfo, setEmbedInfo] = useState<{
     customCss: string | null;
@@ -90,7 +92,7 @@ export function EmbedChatPage() {
 
       // Limit CSS size to 10KB
       if (sanitizedCss.length > 10240) {
-        console.warn("[Embed] Custom CSS exceeds 10KB limit, truncating");
+        log.warn("Custom CSS exceeds 10KB limit, truncating");
         return;
       }
 
@@ -107,9 +109,9 @@ export function EmbedChatPage() {
         styles.forEach((s) => s.remove());
       };
     } catch (error) {
-      console.error("[Embed] Failed to inject custom CSS:", error);
+      log.error("Failed to inject custom CSS", { error: String(error) });
     }
-  }, [embedInfo.customCss]);
+  }, [embedInfo.customCss, log]);
 
   // Build public WebSocket URL
   // Include uid parameter if present so backend can use it as CURRENT_UID

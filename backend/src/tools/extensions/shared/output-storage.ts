@@ -2,6 +2,9 @@ import { writeFile, readFile, unlink, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 import { PATHS } from "../../../config/paths";
+import { createLogger } from '../../../utils/logger';
+
+const logger = createLogger('OutputStorage');
 
 // In-memory storage for smaller outputs (< 10MB)
 const memoryStorage = new Map<string, any>();
@@ -104,7 +107,7 @@ export async function storeOutput(
 
   // Schedule cleanup
   setTimeout(() => {
-    cleanupOutput(outputId).catch(console.error);
+    cleanupOutput(outputId).catch((error) => logger.error({ error, outputId }, 'Cleanup failed'));
   }, OUTPUT_TTL);
 
   return metadata;
@@ -191,5 +194,5 @@ export async function clearExpiredOutputs(): Promise<void> {
 
 // Run cleanup periodically (every 10 minutes)
 setInterval(() => {
-  clearExpiredOutputs().catch(console.error);
+  clearExpiredOutputs().catch((error) => logger.error({ error }, 'Periodic cleanup failed'));
 }, 10 * 60 * 1000);

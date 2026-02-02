@@ -51,6 +51,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useLogger } from "@/hooks/use-logger";
 
 interface CategoryGroup {
   category: Category;
@@ -61,6 +62,7 @@ interface CategoryGroup {
 export function ExtensionsSettings() {
   const { currentProject } = useProjectStore();
   const navigate = useNavigate();
+  const log = useLogger('extensions');
 
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
@@ -154,14 +156,14 @@ export function ExtensionsSettings() {
 
       setCategoryGroups(groups);
     } catch (error) {
-      console.error("Failed to load data:", error);
+      log.error("Failed to load data", { error: String(error) });
       toast.error(
         error instanceof Error ? error.message : "Failed to load extensions",
       );
     } finally {
       setIsLoading(false);
     }
-  }, [currentProject]);
+  }, [currentProject, log]);
 
   useEffect(() => {
     if (currentProject) {
@@ -318,7 +320,7 @@ export function ExtensionsSettings() {
         setFrontendLogs(prev => ({ ...prev, [extensionId]: frontendLogs }));
         setBackendLogs(prev => ({ ...prev, [extensionId]: backendLogs }));
       } catch (error) {
-        console.error('Failed to load debug logs:', error);
+        log.error("Failed to load debug logs", { error: String(error) });
       }
     }
   };
@@ -383,7 +385,7 @@ export function ExtensionsSettings() {
           })),
         );
       } catch (error) {
-        console.error(`Failed to toggle ${ext.metadata.name}:`, error);
+        log.error(`Failed to toggle ${ext.metadata.name}`, { error: String(error) });
       }
     }
 

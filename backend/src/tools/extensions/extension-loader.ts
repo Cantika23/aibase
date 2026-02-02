@@ -13,6 +13,9 @@ import { extensionHookRegistry } from './extension-hooks';
 import { dependencyBundler } from './dependency-bundler';
 import type { DependencyRequest } from './dependency-bundler';
 import * as os from 'os';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ExtensionLoader');
 
 export class ExtensionLoader {
   private extensionStorage: ExtensionStorage;
@@ -104,11 +107,11 @@ export class ExtensionLoader {
             isDefault: true,
           });
         } catch (error) {
-          console.warn(`[ExtensionLoader] Failed to copy extension ${dir.name}:`, error);
+          logger.warn({ error, extensionId: dir.name }, 'Failed to copy extension');
         }
       }
     } catch (error) {
-      console.error('[ExtensionLoader] Failed to copy default extensions:', error);
+      logger.error({ error }, 'Failed to copy default extensions');
       throw error;
     }
   }
@@ -213,7 +216,7 @@ export class ExtensionLoader {
         // This ensures consistent calling patterns: excel.summarize(), postgresql(), etc.
         scope[namespace] = exports;
       } catch (error: any) {
-        console.error(`[ExtensionLoader] Failed to load extension '${extension.metadata.name}':`, error);
+        logger.error({ error, extensionName: extension.metadata.name }, 'Failed to load extension');
 
         // Record error in metadata
         const tenantId = this.getTenantId(projectId);
@@ -235,7 +238,7 @@ export class ExtensionLoader {
       }
     }
 
-    console.log(`[ExtensionLoader] Loaded ${Object.keys(scope).length} tools from ${extensions.length} extensions`);
+    logger.info({ toolCount: Object.keys(scope).length, extensionCount: extensions.length }, 'Loaded tools from extensions');
     return scope;
   }
 
@@ -273,13 +276,13 @@ export class ExtensionLoader {
             code,
           });
         } catch (error) {
-          console.warn(`[ExtensionLoader] Failed to load default extension ${dir.name}:`, error);
+          logger.warn({ error, extensionId: dir.name }, 'Failed to load default extension');
         }
       }
 
       return extensions;
     } catch (error) {
-      console.error('[ExtensionLoader] Failed to load defaults:', error);
+      logger.error({ error }, 'Failed to load defaults');
       return [];
     }
   }
@@ -354,13 +357,12 @@ export class ExtensionLoader {
 
       // Check if transpilation actually changed anything
       if (result.code === transformedCode) {
-        console.error(`[ExtensionLoader] WARNING: Transpiled code is IDENTICAL to input! esbuild didn't transpile.`);
+        logger.error('Transpiled code is IDENTICAL to input! esbuild did not transpile');
       }
 
       return result.code;
     } catch (error) {
-      console.error(`[ExtensionLoader] Transpilation FAILED for '${extensionId}':`, error);
-      console.error(`[ExtensionLoader] Error details:`, error);
+      logger.error({ error, extensionId }, 'Transpilation failed');
       // Throw error instead of returning original code - we can't evaluate raw TypeScript
       throw new Error(`Failed to transpile extension '${extensionId}': ${error}`);
     }
@@ -386,7 +388,7 @@ export class ExtensionLoader {
         try {
           loadedDeps[name] = await import(name);
         } catch (error) {
-          console.error(`[ExtensionLoader] Failed to load dependency ${name}:`, error);
+          logger.error({ error, dependencyName: name }, 'Failed to load dependency');
           throw new Error(`Failed to load dependency ${name}: ${error}`);
         }
       }
@@ -461,7 +463,7 @@ export class ExtensionLoader {
 
       return result || {};
     } catch (error: any) {
-      console.error(`[ExtensionLoader] Failed to evaluate extension '${extension.metadata.name}':`, error);
+      logger.error({ error, extensionName: extension.metadata.name }, 'Failed to evaluate extension');
       throw new Error(`Extension evaluation failed: ${error.message}`);
     }
   }
@@ -481,7 +483,7 @@ export class ExtensionLoader {
    */
   async extractExtensionContext(extension: Extension, timeoutMs: number = 5000): Promise<string> {
     try {
-      console.log(`[ExtensionLoader] Evaluating context for extension '${extension.metadata.id}'`);
+      logger.debug({ extensionId: extension.metadata.id }, 'Evaluating context for extension');
 
       // Wrap evaluation in timeout
       const contextPromise = this.evaluateExtension(extension);
@@ -505,19 +507,19 @@ export class ExtensionLoader {
         const contextString = await Promise.race([contextResultPromise, contextTimeoutPromise]);
 
         if (typeof contextString === 'string') {
-          console.log(`[ExtensionLoader] Successfully evaluated context for '${extension.metadata.id}' (${contextString.length} chars)`);
+          logger.debug({ extensionId: extension.metadata.id, contextLength: contextString.length }, 'Successfully evaluated context');
           return contextString;
         } else {
-          console.warn(`[ExtensionLoader] Context function for '${extension.metadata.id}' did not return a string, got ${typeof contextString}`);
+          logger.warn({ extensionId: extension.metadata.id, returnType: typeof contextString }, 'Context function did not return a string');
           return '';
         }
       } else {
-        console.log(`[ExtensionLoader] Extension '${extension.metadata.id}' has no context function, will use regex fallback`);
+        logger.debug({ extensionId: extension.metadata.id }, 'Extension has no context function, will use regex fallback');
         return '';
       }
     } catch (error: any) {
       // Log error but don't fail - caller will fall back to regex parsing
-      console.warn(`[ExtensionLoader] Failed to evaluate context for '${extension.metadata.id}': ${error.message}`);
+      logger.warn({ error, extensionId: extension.metadata.id }, 'Failed to evaluate context');
       return '';
     }
   }

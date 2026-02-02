@@ -1,6 +1,9 @@
 import type { Tool } from "../../llm/conversation";
 import { peek, peekInfo } from "./shared/peek-output";
 import { ProjectStorage } from "../../storage/project-storage";
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ScriptRuntime');
 
 /**
  * Context documentation for core script runtime functionality
@@ -183,21 +186,20 @@ export class ScriptRuntime {
       // Create and execute the function
       // Code runs directly as async function body - Bun handles TypeScript syntax
       const fn = new AsyncFunction(...argNames, code);
-      console.log('[ScriptRuntime] Executing code...');
+      logger.debug('Executing code...');
       const result = await fn(...argValues);
-      console.log('[ScriptRuntime] Execution completed successfully');
+      logger.debug('Execution completed successfully');
 
       // Extract visualizations from the result if present (for direct returns)
       const extractedVisualizations = this.extractVisualizations(result);
-      console.log('[ScriptRuntime] Extracted visualizations from result:', extractedVisualizations);
+      logger.debug({ extractedVisualizations }, 'Extracted visualizations from result');
 
       // Combine collected visualizations (from showChart/showTable/showMermaid calls) with extracted ones
       const allVisualizations = [
         ...this.collectedVisualizations,
         ...extractedVisualizations
       ];
-      console.log('[ScriptRuntime] Total collected visualizations:', this.collectedVisualizations.length);
-      console.log('[ScriptRuntime] All visualizations to include:', allVisualizations.length);
+      logger.debug({ collectedCount: this.collectedVisualizations.length, totalCount: allVisualizations.length }, 'Visualizations summary');
 
       // If visualizations were found, include them in the result
       if (allVisualizations.length > 0) {
@@ -205,16 +207,14 @@ export class ScriptRuntime {
           ...result,
           __visualizations: allVisualizations
         };
-        console.log('[ScriptRuntime] Final result with visualizations:', JSON.stringify(finalResult, null, 2));
-        console.log('[ScriptRuntime] __visualizations count:', allVisualizations.length);
-        console.log('[ScriptRuntime] __visualizations types:', allVisualizations.map((v: any) => v.type));
+        logger.debug({ finalResult: JSON.stringify(finalResult), visualizationCount: allVisualizations.length, visualizationTypes: allVisualizations.map((v: any) => v.type) }, 'Final result with visualizations');
         return finalResult;
       }
 
-      console.log('[ScriptRuntime] No visualizations to include, returning original result');
+      logger.debug('No visualizations to include, returning original result');
       return result;
     } catch (error: any) {
-      console.error('[ScriptRuntime] Execution error:', error);
+      logger.error({ error }, 'Execution error');
       throw error;
     }
   }
@@ -297,7 +297,7 @@ export class ScriptRuntime {
     // Inject extension exports into scope
     if (this.context.extensions) {
       Object.assign(scope, this.context.extensions);
-      console.log(`[ScriptRuntime] Loaded ${Object.keys(this.context.extensions).length} extension functions`);
+      logger.debug({ extensionCount: Object.keys(this.context.extensions).length }, 'Loaded extension functions');
     }
 
     return scope;
@@ -318,13 +318,13 @@ export class ScriptRuntime {
         payloadSize = Buffer.byteLength(JSON.stringify(payload), 'utf-8');
       } catch (error) {
         // If serialization fails, send message only
-        console.warn('[ScriptRuntime] Could not serialize progress data, sending message only:', error);
+        logger.warn({ error }, 'Could not serialize progress data, sending message only');
         truncatedData = undefined;
       }
 
       // Check if payload exceeds limit
       if (truncatedData !== undefined && payloadSize > MAX_PROGRESS_SIZE) {
-        console.warn(`[ScriptRuntime] Progress data too large (${payloadSize} bytes > ${MAX_PROGRESS_SIZE} bytes), truncating data`);
+        logger.warn({ payloadSize, maxSize: MAX_PROGRESS_SIZE }, 'Progress data too large, truncating');
 
         // Try to send a summary instead
         try {
@@ -336,7 +336,7 @@ export class ScriptRuntime {
           };
         } catch (error) {
           // If summarization fails, send message only
-          console.warn('[ScriptRuntime] Could not summarize progress data:', error);
+          logger.warn({ error }, 'Could not summarize progress data');
           truncatedData = undefined;
         }
       }
@@ -413,7 +413,7 @@ export class ScriptRuntime {
       };
       this.collectedVisualizations.push(visualization);
 
-      console.log(`[ScriptRuntime] Registered visualization: type=${type}, total=${this.collectedVisualizations.length}`);
+      logger.debug({ type, totalCount: this.collectedVisualizations.length }, 'Registered visualization');
       // Return the visualization object for backward compatibility
       return { __visualization: visualization };
     };

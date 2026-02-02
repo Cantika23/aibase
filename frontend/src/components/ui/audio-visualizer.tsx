@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { useLogger } from "@/hooks/use-logger"
 
 // Configuration constants for the audio analyzer
 const AUDIO_CONFIG = {
@@ -27,6 +28,7 @@ export function AudioVisualizer({
   isRecording,
   onClick,
 }: AudioVisualizerProps) {
+  const log = useLogger('ui')
   // Refs for managing audio context and animation
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -102,7 +104,7 @@ export function AudioVisualizer({
 
       draw()
     } catch (error) {
-      console.error("Error starting visualization:", error)
+      log.error("Error starting visualization", { error })
     }
   }
 

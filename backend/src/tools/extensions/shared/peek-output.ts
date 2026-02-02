@@ -1,4 +1,7 @@
 import { retrieveOutput, getOutputMetadata } from "./output-storage";
+import { createLogger } from '../../../utils/logger';
+
+const logger = createLogger('PeekOutput');
 
 export interface PeekResult {
   outputId: string;

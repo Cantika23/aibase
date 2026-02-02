@@ -4,6 +4,9 @@
  */
 
 import OpenAI from "openai";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("ExtensionGeneratorService");
 
 export interface GenerateExtensionOptions {
   projectId: string;
@@ -177,9 +180,8 @@ Requirements:
 
 Generate the complete extension code following the structure specified above.`;
 
-  console.log('[ExtensionGenerator] Calling OpenAI API...');
-  console.log('[ExtensionGenerator] Using model:', process.env.OPENAI_MODEL);
-  console.log('[ExtensionGenerator] Base URL:', process.env.OPENAI_BASE_URL);
+  logger.info('Calling OpenAI API for extension generation');
+  logger.debug({ model: process.env.OPENAI_MODEL, baseURL: process.env.OPENAI_BASE_URL }, 'OpenAI configuration');
 
   // Initialize OpenAI client
   const openai = new OpenAI({
@@ -191,7 +193,7 @@ Generate the complete extension code following the structure specified above.`;
   // Z.AI and other providers may have limits on max_tokens
   const configuredMaxTokens = parseInt(process.env.OPENAI_MAX_TOKEN || '4000', 10);
   const maxTokens = Math.min(configuredMaxTokens, 8000); // Cap at 8000 for compatibility
-  console.log('[ExtensionGenerator] Using max_tokens:', maxTokens, '(configured:', configuredMaxTokens, ')');
+  logger.debug({ maxTokens, configuredMaxTokens }, 'Using max_tokens');
 
   // Call OpenAI API
   const response = await openai.chat.completions.create({
@@ -205,26 +207,21 @@ Generate the complete extension code following the structure specified above.`;
   });
 
   // Parse response
-  console.log('[ExtensionGenerator] OpenAI response structure:', JSON.stringify({
-    choices: response.choices?.length,
-    firstChoice: response.choices?.[0] ? {
-      hasMessage: !!response.choices[0].message,
-      messageKeys: response.choices[0].message ? Object.keys(response.choices[0].message) : [],
-      hasContent: !!response.choices[0].message?.content,
-      contentLength: response.choices[0].message?.content?.length || 0,
-    } : null,
-  }, null, 2));
+  logger.debug({
+    choicesCount: response.choices?.length,
+    hasContent: !!response.choices?.[0]?.message?.content,
+    contentLength: response.choices?.[0]?.message?.content?.length || 0,
+  }, 'OpenAI response received');
 
   const content = response.choices[0]?.message?.content;
 
   if (!content) {
-    console.error('[ExtensionGenerator] Empty response from OpenAI');
-    console.error('[ExtensionGenerator] Full response:', JSON.stringify(response, null, 2));
+    logger.error({ response }, 'Empty response from OpenAI');
     throw new Error('No content generated from OpenAI. The AI returned an empty response. This could be due to API quota limits, model restrictions, or invalid configuration.');
   }
 
-  console.log('[ExtensionGenerator] Received response from OpenAI');
-  console.log('[ExtensionGenerator] Response preview:', content.substring(0, 500));
+  logger.info('Received response from OpenAI');
+  logger.debug({ preview: content.substring(0, 500) }, 'Response preview');
 
   // Try to extract JSON from response - multiple strategies
   let jsonStr: string | null = null;
@@ -235,7 +232,7 @@ Generate the complete extension code following the structure specified above.`;
   try {
     parsed = JSON.parse(content);
     jsonStr = content;
-    console.log('[ExtensionGenerator] Parsed entire content as JSON');
+    logger.debug('Parsed entire content as JSON');
   } catch {
     // Not valid JSON as-is, continue to extraction strategies
   }
@@ -246,9 +243,9 @@ Generate the complete extension code following the structure specified above.`;
     let jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch && jsonMatch[1]) {
       jsonStr = jsonMatch[1].trim();
-      console.log('[ExtensionGenerator] Found JSON in ```json block with closing ```, length:', jsonStr.length);
+      logger.debug({ length: jsonStr.length }, 'Found JSON in ```json block with closing ```');
     } else {
-      console.log('[ExtensionGenerator] Strategy 2a (```json block with closing ```): No match');
+      logger.debug('Strategy 2a (```json block with closing ```): No match');
     }
   }
 
@@ -261,9 +258,9 @@ Generate the complete extension code following the structure specified above.`;
       if (jsonStr.endsWith('```')) {
         jsonStr = jsonStr.substring(0, jsonStr.length - 3).trim();
       }
-      console.log('[ExtensionGenerator] Found JSON in ```json block (no closing ```), length:', jsonStr.length);
+      logger.debug({ length: jsonStr.length }, 'Found JSON in ```json block (no closing ```)');
     } else {
-      console.log('[ExtensionGenerator] Strategy 2b (```json block without closing ```): No match');
+      logger.debug('Strategy 2b (```json block without closing ```): No match');
     }
   }
 
@@ -272,9 +269,9 @@ Generate the complete extension code following the structure specified above.`;
     let jsonMatch = content.match(/```\s*([\s\S]*?)\s*```/);
     if (jsonMatch && jsonMatch[1]) {
       jsonStr = jsonMatch[1].trim();
-      console.log('[ExtensionGenerator] Found JSON in ``` block with closing ```, length:', jsonStr.length);
+      logger.debug({ length: jsonStr.length }, 'Found JSON in ``` block with closing ```');
     } else {
-      console.log('[ExtensionGenerator] Strategy 3a (``` block with closing ```): No match');
+      logger.debug('Strategy 3a (``` block with closing ```): No match');
     }
   }
 
@@ -287,9 +284,9 @@ Generate the complete extension code following the structure specified above.`;
       if (jsonStr.endsWith('```')) {
         jsonStr = jsonStr.substring(0, jsonStr.length - 3).trim();
       }
-      console.log('[ExtensionGenerator] Found JSON in ``` block (no closing ```), length:', jsonStr.length);
+      logger.debug({ length: jsonStr.length }, 'Found JSON in ``` block (no closing ```)');
     } else {
-      console.log('[ExtensionGenerator] Strategy 3b (``` block without closing ```): No match');
+      logger.debug('Strategy 3b (``` block without closing ```): No match');
     }
   }
 
@@ -299,16 +296,16 @@ Generate the complete extension code following the structure specified above.`;
     let jsonMatch = content.match(/\\{[\\s\\S]*\\}/);
     if (jsonMatch && jsonMatch[0]) {
       jsonStr = jsonMatch[0].trim(); // Trim whitespace
-      console.log('[ExtensionGenerator] Found JSON object directly, length:', jsonStr.length);
+      logger.debug({ length: jsonStr.length }, 'Found JSON object directly');
     } else {
-      console.log('[ExtensionGenerator] Strategy 4 (direct JSON): No match');
+      logger.debug('Strategy 4 (direct JSON): No match');
     }
   }
 
-  console.log('[ExtensionGenerator] Final jsonStr after all strategies:', jsonStr ? jsonStr.substring(0, 100) + '...' : 'NULL');
+  logger.debug({ jsonPreview: jsonStr ? jsonStr.substring(0, 100) + '...' : null }, 'Final JSON after all strategies');
 
   if (!jsonStr) {
-    console.error('[ExtensionGenerator] Failed to extract JSON. Full response:', content);
+    logger.error({ content }, 'Failed to extract JSON from response');
     throw new Error('Failed to extract JSON from AI response. AI did not return valid JSON format.');
   }
 
@@ -318,14 +315,13 @@ Generate the complete extension code following the structure specified above.`;
       parsed = JSON.parse(jsonStr);
     }
   } catch (error: any) {
-    console.error('[ExtensionGenerator] JSON parse error:', error.message);
-    console.error('[ExtensionGenerator] JSON string that failed:', jsonStr.substring(0, 500));
+    logger.error({ error: error.message, jsonPreview: jsonStr.substring(0, 500) }, 'JSON parse error');
     throw new Error(`Failed to parse AI response as JSON: ${error.message}`);
   }
 
   // Validate response structure
   if (!parsed.id || !parsed.name || !parsed.description || !parsed.code) {
-    console.error('[ExtensionGenerator] Invalid AI response structure:', parsed);
+    logger.error({ parsed }, 'Invalid AI response structure');
     throw new Error('Invalid AI response: missing required fields (id, name, description, or code)');
   }
 
@@ -333,7 +329,7 @@ Generate the complete extension code following the structure specified above.`;
   let normalizedCategory = parsed.category || category || '';
   if (normalizedCategory === 'Uncategorized') {
     normalizedCategory = '';
-    console.log('[ExtensionGenerator] Normalized category from "Uncategorized" to empty string');
+    logger.debug('Normalized category from "Uncategorized" to empty string');
   }
 
   // Construct extension
@@ -349,7 +345,7 @@ Generate the complete extension code following the structure specified above.`;
     code: parsed.code,
   };
 
-  console.log(`[ExtensionGenerator] Generated extension: ${extension.metadata.id}`);
+  logger.info({ extensionId: extension.metadata.id }, 'Generated extension');
 
   return extension;
 }

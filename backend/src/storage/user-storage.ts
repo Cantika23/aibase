@@ -7,6 +7,9 @@ import { Database } from "bun:sqlite";
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { PATHS } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('UserStorage');
 
 export type UserRole = 'admin' | 'user';
 
@@ -80,7 +83,7 @@ export class UserStorage {
     const needsMigration = await this.checkNeedsMigration();
 
     if (needsMigration) {
-      console.log('[UserStorage] Migrating database schema for multi-tenant username uniqueness...');
+      logger.info('Migrating database schema for multi-tenant username uniqueness...');
       await this.migrateSchema();
     }
 
@@ -131,7 +134,7 @@ export class UserStorage {
       // Index doesn't exist or other error, ignore
     }
 
-    console.log('[UserStorage] Database initialized at', this.dbPath);
+    logger.info(`Database initialized at ${this.dbPath}`);
   }
 
   /**
@@ -158,7 +161,7 @@ export class UserStorage {
       const hasOldSingleColumnUnique = tableSchema.sql.includes('username TEXT UNIQUE');
 
       if (hasOldSingleColumnUnique) {
-        console.log('[UserStorage] Detected old schema with single-column username UNIQUE constraint');
+        logger.info('Detected old schema with single-column username UNIQUE constraint');
         return true;
       }
 
@@ -166,21 +169,21 @@ export class UserStorage {
       const hasNewCompositeUnique = tableSchema.sql.includes('UNIQUE(username, tenant_id)');
 
       if (!hasNewCompositeUnique) {
-        console.log('[UserStorage] No composite unique constraint found, migration needed');
+        logger.info('No composite unique constraint found, migration needed');
         return true;
       }
 
       // Check if tenant_id is NOT NULL
       const hasNotNullTenantId = tableSchema.sql.includes('tenant_id INTEGER NOT NULL');
       if (!hasNotNullTenantId) {
-        console.log('[UserStorage] tenant_id is not NOT NULL, migration needed');
+        logger.info('tenant_id is not NOT NULL, migration needed');
         return true;
       }
 
       return false;
     } catch (error) {
       // If there's any error checking, assume no migration needed
-      console.error('[UserStorage] Error checking migration status:', error);
+      logger.error({ error }, 'Error checking migration status');
       return false;
     }
   }
@@ -240,7 +243,7 @@ export class UserStorage {
       // Commit transaction
       db.run('COMMIT');
 
-      console.log('[UserStorage] Schema migration completed successfully');
+      logger.info('Schema migration completed successfully');
     } catch (error: any) {
       // Rollback on error
       try {
@@ -249,7 +252,7 @@ export class UserStorage {
       } catch (rollbackError) {
         // Ignore rollback errors
       }
-      console.error('[UserStorage] Schema migration failed:', error);
+      logger.error({ error }, 'Schema migration failed');
       throw new Error(`Failed to migrate database schema: ${error.message}`);
     }
   }
@@ -281,7 +284,7 @@ export class UserStorage {
         throw new Error('Failed to create user');
       }
 
-      console.log('[UserStorage] Created user:', user.username);
+      logger.info(`Created user: ${user.username}`);
       return user;
     } catch (error: any) {
       if (error.message?.includes('UNIQUE constraint failed')) {

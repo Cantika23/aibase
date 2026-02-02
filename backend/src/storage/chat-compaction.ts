@@ -3,6 +3,9 @@ import path from 'path';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import OpenAI from 'openai';
 import { getConversationDir, getConversationChatsDir } from '../config/paths';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ChatCompaction');
 
 interface CompactionConfig {
   // Token threshold to trigger compaction (default: 150K tokens)
@@ -60,7 +63,7 @@ export class ChatCompaction {
     } catch (error) {
       // Only log if it's not a file not found error
       if ((error as any).code !== 'ENOENT') {
-        console.error('Error checking compaction threshold:', error);
+        logger.error({ error }, 'Error checking compaction threshold');
       }
       return false;
     }
@@ -118,7 +121,7 @@ export class ChatCompaction {
         tokensSaved: await this.estimateTokensSaved(messagesToCompact, compactedMessage)
       };
     } catch (error) {
-      console.error('Error during chat compaction:', error);
+      logger.error({ error }, 'Error during chat compaction');
       return { compacted: false };
     }
   }
@@ -194,7 +197,7 @@ ${summary}
 The conversation continues below with recent messages:`
       };
     } catch (error) {
-      console.error('Error creating compacted summary:', error);
+      logger.error({ error }, 'Error creating compacted summary');
 
       // Fallback: create a simple summary without LLM
       return {
@@ -314,7 +317,7 @@ Key topics: ${this.extractKeyTopics(messages)}
     } catch (error) {
       // Only log if it's not a file not found error
       if ((error as any).code !== 'ENOENT') {
-        console.error('Error getting compaction status:', error);
+        logger.error({ error }, 'Error getting compaction status');
       }
       return {
         shouldCompact: false,

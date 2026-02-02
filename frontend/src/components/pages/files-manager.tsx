@@ -74,6 +74,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
+import { useLogger } from "@/hooks/use-logger";
 
 // Error Boundary component to catch rendering errors
 class FilesErrorBoundary extends React.Component<
@@ -83,12 +84,11 @@ class FilesErrorBoundary extends React.Component<
   state = { hasError: false };
 
   static getDerivedStateFromError(error: Error) {
-    console.error("[FilesPage] Rendering error:", error);
     return { hasError: true };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("[FilesPage] Error caught:", error, errorInfo);
+    // Error is handled by the boundary, no need for console.error
   }
 
   render() {
@@ -120,6 +120,7 @@ type ViewMode = "list" | "grid";
 export function FilesManagerPage() {
   const navigate = useNavigate();
   const { projectId } = useParams();
+  const log = useLogger('files');
 
   const { loadConversations } = useConversationStore();
   const { clearMessages } = useChatStore();
@@ -175,7 +176,7 @@ export function FilesManagerPage() {
 
       setFiles(validFiles);
     } catch (error) {
-      console.error("[FilesPage] Error loading files:", error);
+      log.error("Error loading files", { error: String(error) });
       toast.error("Failed to load files", {
         description: error instanceof Error ? error.message : "Unknown error",
       });
@@ -191,7 +192,7 @@ export function FilesManagerPage() {
       const data = await getFileContext(projectId);
       setFileContext(data.fileContext);
     } catch (error) {
-      console.error("[FilesPage] Error loading file context:", error);
+      log.error("Error loading file context", { error: String(error) });
       // Don't show toast for this error, just log it
       setFileContext({});
     } finally {
@@ -211,7 +212,7 @@ export function FilesManagerPage() {
       toast.success("File deleted successfully");
       loadFiles(projectId);
     } catch (error) {
-      console.error("Error deleting file:", error);
+      log.error("Error deleting file", { error: String(error) });
       toast.error("Failed to delete file");
     } finally {
       setDeletingFile(null);
@@ -235,7 +236,7 @@ export function FilesManagerPage() {
       toast.success("File renamed successfully");
       loadFiles(projectId);
     } catch (error) {
-      console.error("Error renaming file:", error);
+      log.error("Error renaming file", { error: String(error) });
       toast.error(
         error instanceof Error ? error.message : "Failed to rename file",
       );
@@ -282,7 +283,7 @@ export function FilesManagerPage() {
       setSelectedFiles(new Set());
       loadFiles(projectId);
     } catch (error) {
-      console.error("Error deleting files:", error);
+      log.error("Error deleting files", { error: String(error) });
       toast.error("Failed to delete some files");
     }
   };
@@ -296,7 +297,7 @@ export function FilesManagerPage() {
       await setFileInContext(projectId, fileId, included);
       // No toast needed, the visual checkbox update is sufficient feedback
     } catch (error) {
-      console.error("Error toggling file context:", error);
+      log.error("Error toggling file context", { error: String(error) });
       // Revert the change on error
       setFileContext((prev) => ({ ...prev, [fileId]: !included }));
       toast.error("Failed to update file context");
@@ -356,7 +357,7 @@ export function FilesManagerPage() {
         });
         setFiles(validFiles);
       } catch (error) {
-        console.error("Error uploading files:", error);
+        log.error("Error uploading files", { error: String(error) });
         toast.error(
           error instanceof Error ? error.message : "Failed to upload files"
         );
@@ -414,7 +415,7 @@ export function FilesManagerPage() {
         });
         setFiles(validFiles);
       } catch (error) {
-        console.error("Error uploading files:", error);
+        log.error("Error uploading files", { error: String(error) });
         toast.error(
           error instanceof Error ? error.message : "Failed to upload files"
         );

@@ -35,6 +35,9 @@ import {
   printStorageConfig,
   type StorageConfig,
 } from './storage-config';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('StorageFactory');
 
 // ============================================================================
 // Storage State
@@ -71,7 +74,7 @@ export interface InitializeOptions {
 export async function initializeStorage(options: InitializeOptions = {}): Promise<void> {
   if (state.initialized) {
     if (!options.silent) {
-      console.log('[Storage] Already initialized');
+      logger.info('Already initialized');
     }
     return;
   }
@@ -86,7 +89,7 @@ export async function initializeStorage(options: InitializeOptions = {}): Promis
   try {
     // Initialize database
     if (!options.silent) {
-      console.log(`[Storage] Initializing ${config.database.type} database...`);
+      logger.info(`Initializing ${config.database.type} database...`);
     }
     state.database = createDatabase(config.database);
     await state.database.connect();
@@ -100,21 +103,21 @@ export async function initializeStorage(options: InitializeOptions = {}): Promis
 
     // Initialize file storage
     if (!options.silent) {
-      console.log(`[Storage] Initializing ${config.fileStorage.type} file storage...`);
+      logger.info(`Initializing ${config.fileStorage.type} file storage...`);
     }
     state.fileStorage = await createFileStorage(config.fileStorage);
     setGlobalFileStorage(state.fileStorage);
 
     // Initialize cache
     if (!options.silent) {
-      console.log(`[Storage] Initializing ${config.cache.type} cache...`);
+      logger.info(`Initializing ${config.cache.type} cache...`);
     }
     state.cache = await createCache(config.cache);
     setGlobalCache(state.cache);
 
     // Initialize legacy storage classes (for backward compatibility)
     if (!options.silent) {
-      console.log('[Storage] Initializing legacy storage classes...');
+      logger.info('Initializing legacy storage classes...');
     }
     
     const { UserStorage } = await import('./user-storage');
@@ -130,10 +133,10 @@ export async function initializeStorage(options: InitializeOptions = {}): Promis
     state.initialized = true;
     
     if (!options.silent) {
-      console.log('[Storage] ✅ All storage backends initialized successfully\n');
+      logger.info('✅ All storage backends initialized successfully');
     }
   } catch (error) {
-    console.error('[Storage] ❌ Failed to initialize storage:', error);
+    logger.error({ error }, '❌ Failed to initialize storage');
     await cleanupStorage();
     throw error;
   }
@@ -208,7 +211,7 @@ export async function cleanupStorage(): Promise<void> {
   state.config = null;
 
   if (errors.length > 0) {
-    console.error('[Storage] Errors during cleanup:', errors);
+    logger.error({ errors }, 'Errors during cleanup');
   }
 }
 

@@ -2,6 +2,7 @@
  * Setup configuration utilities
  */
 
+import { logger } from "@/lib/logger";
 
 interface SetupConfig {
   appName: string | null;
@@ -40,7 +41,7 @@ export async function fetchSetupConfig(): Promise<SetupConfig | null> {
 
       return null;
     } catch (error) {
-      console.error("Error fetching setup config:", error);
+      logger.general.error("Error fetching setup config", { error: String(error) });
       return null;
     }
   })();

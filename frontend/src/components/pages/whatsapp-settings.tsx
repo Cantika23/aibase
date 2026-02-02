@@ -32,6 +32,7 @@ import { MessageCircle, RefreshCw, Smartphone, Trash2, Users, MessageSquare } fr
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
+import { useLogger } from "@/hooks/use-logger";
 
 const API_BASE_URL = buildApiUrl("");
 
@@ -84,6 +85,7 @@ export function WhatsAppSettings() {
   const [conversationToDelete, setConversationToDelete] = useState<WhatsAppConversation | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef<boolean>(false as boolean); // Track latest connection status from WebSocket
+  const log = useLogger('whatsapp');
 
   // Format phone number for display
   const formatPhoneNumber = (phone: string | null | undefined): string => {
@@ -197,10 +199,10 @@ export function WhatsAppSettings() {
         setQrCodeImage(qrDataUrl);
       }
     } catch (err) {
-      console.error("Failed to fetch QR code:", err);
+      log.error("Failed to fetch QR code", { error: String(err) });
       setQrCodeImage(null);
     }
-  }, []);
+  }, [log]);
 
   // Create new WhatsApp client
   const createClient = useCallback(async () => {
@@ -246,7 +248,7 @@ export function WhatsAppSettings() {
   const deleteClient = useCallback(async () => {
     if (!currentProject || !client) return;
 
-    console.log('[WhatsApp Settings] Deleting client:', client.id);
+    log.debug("Deleting WhatsApp client", { clientId: client.id });
 
     try {
       const response = await fetch(
@@ -260,7 +262,7 @@ export function WhatsAppSettings() {
         throw new Error("Failed to delete WhatsApp client");
       }
 
-      console.log('[WhatsApp Settings] Delete successful, clearing state');
+      log.debug("WhatsApp client deleted successfully");
 
       // Reset all state
       setClient(null);
@@ -272,16 +274,15 @@ export function WhatsAppSettings() {
 
       // Reload client after a short delay to verify deletion
       setTimeout(() => {
-        console.log('[WhatsApp Settings] Reloading client to verify deletion');
         loadClient();
       }, 500);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to delete WhatsApp client";
-      console.error('[WhatsApp Settings] Delete failed:', errorMessage);
+      log.error("Failed to delete WhatsApp client", { error: errorMessage });
       toast.error(errorMessage);
     }
-  }, [currentProject, client, loadClient]);
+  }, [currentProject, client, loadClient, log]);
 
   // Load WhatsApp conversations
   const loadConversations = useCallback(async () => {
@@ -368,7 +369,7 @@ export function WhatsAppSettings() {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('[WhatsApp WS] Connected');
+      log.debug("WhatsApp WebSocket connected");
       // Subscribe to this project's updates
       ws.send(JSON.stringify({
         type: 'subscribe',
@@ -379,11 +380,11 @@ export function WhatsAppSettings() {
     ws.onmessage = async (event) => {
       try {
         const message: WhatsAppWSMessage = JSON.parse(event.data);
-        console.log('[WhatsApp WS] Message:', message);
+        log.debug("WhatsApp WebSocket message received", { type: message.type });
 
         switch (message.type) {
           case 'subscribed':
-            console.log('[WhatsApp WS] Subscribed to project:', message.projectId);
+            log.debug("Subscribed to WhatsApp project updates", { projectId: message.projectId });
             break;
 
           case 'status':
@@ -447,16 +448,16 @@ export function WhatsAppSettings() {
             break;
         }
       } catch (err) {
-        console.error('[WhatsApp WS] Error parsing message:', err);
+        log.error("Error parsing WhatsApp WebSocket message", { error: String(err) });
       }
     };
 
     ws.onerror = (error) => {
-      console.error('[WhatsApp WS] Error:', error);
+      log.error("WhatsApp WebSocket error", { error: String(error) });
     };
 
     ws.onclose = () => {
-      console.log('[WhatsApp WS] Disconnected');
+      log.debug("WhatsApp WebSocket disconnected");
     };
 
     return () => {
@@ -470,7 +471,7 @@ export function WhatsAppSettings() {
       ws.close();
       wsRef.current = null;
     };
-  }, [currentProject]);
+  }, [currentProject, log]);
 
   // Load client when project changes
   useEffect(() => {

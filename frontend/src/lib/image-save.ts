@@ -5,6 +5,7 @@
  */
 
 import html2canvas from 'html2canvas';
+import { logger } from "@/lib/logger";
 
 export interface SaveVisualizationOptions {
   element: HTMLElement;
@@ -51,7 +52,7 @@ async function convertSvgToPng(svg: SVGElement, scale: number = 3): Promise<stri
   width = Math.max(width, 400);
   height = Math.max(height, 300);
 
-  console.log('[image-save] SVG dimensions:', { width, height, scale });
+  logger.files.debug('[image-save] SVG dimensions', { width, height, scale });
 
   // Set explicit dimensions on the clone
   clone.setAttribute('width', width.toString());
@@ -104,7 +105,7 @@ async function convertSvgToPng(svg: SVGElement, scale: number = 3): Promise<stri
     ctx.scale(scale, scale);
     ctx.drawImage(img, 0, 0, width, height);
 
-    console.log('[image-save] Canvas size:', {
+    logger.files.debug('[image-save] Canvas size', {
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
     });
@@ -142,7 +143,7 @@ export async function saveVisualizationAsPNG(
   const { element, filename, convId, projectId } = options;
 
   try {
-    console.log('[image-save] Capturing element:', {
+    logger.files.debug('[image-save] Capturing element', {
       filename,
       elementClass: element.className,
       hasSvg: !!element.querySelector('svg'),
@@ -154,15 +155,15 @@ export async function saveVisualizationAsPNG(
     const svgElement = element.querySelector('svg');
 
     if (svgElement) {
-      console.log('[image-save] Using direct SVG-to-PNG conversion');
+      logger.files.debug('[image-save] Using direct SVG-to-PNG conversion');
       base64 = await convertSvgToPng(svgElement, 2);
     } else {
-      console.log('[image-save] Using html2canvas');
+      logger.files.debug('[image-save] Using html2canvas');
       base64 = await captureWithHtml2Canvas(element);
     }
 
-    console.log('[image-save] Canvas created, base64 length:', base64.length);
-    console.log('[image-save] Sending to backend:', {
+    logger.files.debug('[image-save] Canvas created', { base64Length: base64.length });
+    logger.files.debug('[image-save] Sending to backend', {
       filename,
       convId,
       projectId,
@@ -195,11 +196,11 @@ export async function saveVisualizationAsPNG(
       throw new Error(result.error || 'Failed to save image');
     }
 
-    console.log('[image-save] Save successful:', result.file);
+    logger.files.info('[image-save] Save successful', { file: result.file });
     return result.file;
 
   } catch (error) {
-    console.error('Failed to save visualization:', error);
+    logger.files.error('Failed to save visualization', { error: String(error) });
     throw error;
   }
 }

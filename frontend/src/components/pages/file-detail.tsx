@@ -40,10 +40,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useLogger } from "@/hooks/use-logger";
 
 export function FileDetailPage() {
   const navigate = useNavigate();
   const { projectId, fileName } = useParams<{ projectId: string; fileName: string }>();
+  const log = useLogger('files');
 
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [currentFile, setCurrentFile] = useState<FileInfo | null>(null);
@@ -101,7 +103,7 @@ export function FileDetailPage() {
 
       setFiles(validFiles);
     } catch (error) {
-      console.error("[FileDetailPage] Error loading files:", error);
+      log.error("Error loading files", { error: String(error) });
       toast.error("Failed to load files", {
         description: error instanceof Error ? error.message : "Unknown error",
       });
@@ -150,7 +152,7 @@ export function FileDetailPage() {
           setFileContent(content);
         }
       } catch (err) {
-        console.error('Error loading file:', err);
+        log.error("Error loading file content", { error: String(err) });
         setContentError('Failed to load file content');
       } finally {
         setIsContentLoading(false);
@@ -201,7 +203,7 @@ export function FileDetailPage() {
       toast.success("File deleted successfully");
       navigate(`/projects/${projectId}/files`);
     } catch (error) {
-      console.error("Error deleting file:", error);
+      log.error("Error deleting file", { error: String(error) });
       toast.error("Failed to delete file");
     } finally {
       setDeletingFile(null);
@@ -222,7 +224,7 @@ export function FileDetailPage() {
       await loadFiles(projectId);
       navigate(`/projects/${projectId}/files/${encodeURIComponent(newFileName.trim())}`);
     } catch (error) {
-      console.error("Error renaming file:", error);
+      log.error("Error renaming file", { error: String(error) });
       toast.error(
         error instanceof Error ? error.message : "Failed to rename file",
       );

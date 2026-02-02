@@ -7,6 +7,10 @@
  * The extensionHookRegistry is passed as a parameter during evaluation
  */
 
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ImageExtension');
+
 // Type definitions
 interface ExtensionHookRegistry {
   registerHook(hookType: string, name: string, handler: (context: HookContext) => Promise<HookResult | undefined>): void;
@@ -131,12 +135,12 @@ function isImageFile(mimeType: string) {
  * Analyze an image file and extract description
  */
 async function analyzeImageFile(filePath: string, mimeType: string) {
-  console.log('[Image] analyzeImageFile called:', { filePath, mimeType });
+  logger.debug({ filePath, mimeType }, 'analyzeImageFile called');
 
   // Get API key from environment
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    console.error('[Image] OPENAI_API_KEY not configured, skipping image analysis');
+    logger.error('OPENAI_API_KEY not configured, skipping image analysis');
     return null;
   }
 
@@ -151,7 +155,7 @@ async function analyzeImageFile(filePath: string, mimeType: string) {
   const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.z.ai/v1';
   const endpoint = `${baseUrl}/chat/completions`;
 
-  console.log('[Image] Calling vision API:', { endpoint, model: 'GLM-4.6V' });
+  logger.debug({ endpoint, model: 'GLM-4.6V' }, 'Calling vision API');
 
   // Add timeout to prevent hanging
   const controller = new AbortController();
@@ -192,36 +196,36 @@ async function analyzeImageFile(filePath: string, mimeType: string) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Image] Vision API error:', response.status, errorText);
+      logger.error({ status: response.status, errorText }, 'Vision API error');
       return null;
     }
 
-    console.log('[Image] Vision API response status:', response.status);
+    logger.debug({ status: response.status }, 'Vision API response');
 
     const data = await response.json() as VisionAPIResponse;
-    console.log('[Image] Vision API response keys:', Object.keys(data));
-    console.log('[Image] Full response structure:', JSON.stringify(data, null, 2).substring(0, 500));
+    logger.debug({ responseKeys: Object.keys(data) }, 'Vision API response keys');
+    logger.debug({ responseStructure: JSON.stringify(data, null, 2).substring(0, 500) }, 'Full response structure');
 
     // GLM-4.6V returns reasoning in reasoning_content field
     const description = data.choices?.[0]?.message?.content ||
                        data.choices?.[0]?.message?.reasoning_content;
 
-    console.log('[Image] Extracted description:', description ? description.substring(0, 100) : 'UNDEFINED');
+    logger.debug({ descriptionPreview: description ? description.substring(0, 100) : null }, 'Extracted description');
 
     if (description) {
-      console.log('[Image] Image analyzed successfully:', description.substring(0, 100));
+      logger.info({ descriptionPreview: description.substring(0, 100) }, 'Image analyzed successfully');
       return description;
     }
 
-    console.log('[Image] No description found in response, returning null');
+    logger.debug('No description found in response');
     return null;
   } catch (error: unknown) {
     clearTimeout(timeoutId); // Ensure timeout is cleared on error
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('[Image] Vision API request timed out after 30 seconds');
+      logger.error('Vision API request timed out after 30 seconds');
       return null;
     }
-    console.error('[Image] Image analysis failed:', error instanceof Error ? error.message : String(error));
+    logger.error({ error }, 'Image analysis failed');
     return null;
   }
 }
@@ -379,15 +383,15 @@ if (hookRegistry) {
         return;
       }
 
-      console.log('[Image] Hook triggered for image:', _context.fileName);
+      logger.debug({ fileName: _context.fileName }, 'Hook triggered for image');
 
       // Analyze the image
       const description = await analyzeImageFile(_context.filePath, _context.fileType);
 
-      console.log('[Image] analyzeImageFile returned:', description ? `success (${description.substring(0, 50)}...)` : 'null/undefined');
+      logger.debug({ hasDescription: !!description, descriptionPreview: description ? description.substring(0, 50) : null }, 'analyzeImageFile returned');
 
       if (description) {
-        console.log('[Image] Generated description for:', _context.fileName, description.substring(0, 100));
+        logger.info({ fileName: _context.fileName, descriptionPreview: description.substring(0, 100) }, 'Generated description');
 
         // Generate title using AI helper (injected utility)
         const title = await utils.generateTitle({
@@ -399,13 +403,13 @@ if (hookRegistry) {
         return { description, title };
       }
 
-      console.log('[Image] No description generated for:', _context.fileName);
+      logger.debug({ fileName: _context.fileName }, 'No description generated');
       return {};
     }
   );
-  console.log('[Image] Registered afterFileUpload hook');
+  logger.info('Registered afterFileUpload hook');
 } else {
-  console.log('[Image] extensionHookRegistry not available, hook not registered');
+  logger.info('extensionHookRegistry not available, hook not registered');
 }
 
 // Return the extension object (extension loader wraps this in an async function)

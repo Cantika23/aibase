@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
+import { useLogger } from "@/hooks/use-logger";
 
 interface GeneratedExtension {
   metadata: {
@@ -41,6 +42,7 @@ interface GeneratedExtension {
 export function ExtensionAICreator() {
   const { currentProject } = useProjectStore();
   const navigate = useNavigate();
+  const log = useLogger('extensions');
 
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -79,7 +81,7 @@ export function ExtensionAICreator() {
       setGeneratedExtension(data.data.preview);
       toast.success("Extension generated successfully!");
     } catch (error) {
-      console.error("Failed to generate extension:", error);
+      log.error("Failed to generate extension", { error: String(error) });
       toast.error(
         error instanceof Error ? error.message : "Failed to generate extension"
       );
@@ -107,7 +109,7 @@ export function ExtensionAICreator() {
       toast.success("Extension created successfully!");
       navigate(`/projects/${currentProject.id}/extensions`);
     } catch (error: any) {
-      console.error("Failed to save extension:", error);
+      log.error("Failed to save extension", { error: String(error) });
       toast.error(
         error instanceof Error ? error.message : "Failed to save extension"
       );

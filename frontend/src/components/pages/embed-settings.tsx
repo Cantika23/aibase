@@ -14,11 +14,13 @@ import { useProjectStore } from "@/stores/project-store";
 import { Check, Copy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useLogger } from "@/hooks/use-logger";
 
 const API_BASE_URL = buildApiUrl("");
 
 export function EmbedSettings() {
   const { currentProject, updateProject } = useProjectStore();
+  const log = useLogger('ui');
 
   const [embedToken, setEmbedToken] = useState<string | null>(null);
   const [customCss, setCustomCss] = useState("");
@@ -49,9 +51,9 @@ export function EmbedSettings() {
         setCustomCss(data.data.customCss);
       }
     } catch (err) {
-      console.error("Failed to load custom CSS:", err);
+      log.error("Failed to load custom CSS", { error: String(err) });
     }
-  }, [currentProject]);
+  }, [currentProject, log]);
 
 
 
@@ -208,6 +210,7 @@ export function EmbedSettings() {
       toast.success("Embed code copied to clipboard!");
       setTimeout(() => setIsCopying(false), 2000);
     } catch (err) {
+      log.error("Failed to copy to clipboard", { error: String(err) });
       toast.error("Failed to copy to clipboard");
       setIsCopying(false);
     }

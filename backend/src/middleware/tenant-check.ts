@@ -9,6 +9,9 @@
  */
 
 import { TenantStorage } from "../storage/tenant-storage";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("TenantCheck");
 
 const tenantStorage = TenantStorage.getInstance();
 
@@ -58,7 +61,7 @@ async function getTenantCount(): Promise<number> {
     const tenants = tenantStorage.getAll();
     return tenants.length;
   } catch (error) {
-    console.error("[TenantCheck] Error getting tenant count:", error);
+    logger.error({ error }, "Error getting tenant count");
     return 0; // Assume no tenants on error to be safe
   }
 }

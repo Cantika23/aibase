@@ -14,6 +14,9 @@ import {
   AbstractCache,
   type CacheConfig,
 } from '../abstraction/cache';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('MemoryCache');
 
 interface CacheItem<T = unknown> {
   value: T;
@@ -223,7 +226,7 @@ export class MemoryCache extends AbstractCache {
     }
     
     if (cleaned > 0) {
-      console.log(`[MemoryCache] Cleaned up ${cleaned} expired entries`);
+      logger.info(`Cleaned up ${cleaned} expired entries`);
     }
   }
 
@@ -240,7 +243,7 @@ export class MemoryCache extends AbstractCache {
     
     if (oldestKey) {
       this.cache.delete(oldestKey);
-      console.log(`[MemoryCache] Evicted LRU entry: ${oldestKey}`);
+      logger.info(`Evicted LRU entry: ${oldestKey}`);
     }
   }
 

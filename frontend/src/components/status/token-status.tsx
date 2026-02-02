@@ -8,12 +8,14 @@ import { useChatStore } from "@/stores/chat-store";
 import { useFileContextStore } from "@/stores/file-context-store";
 import { useState } from "react";
 import type { Message } from "@/components/ui/chat/messages/types";
+import { useLogger } from "@/hooks/use-logger";
 
 interface TokenStatusProps {
   convId: string;
 }
 
 export function TokenStatus({ convId }: TokenStatusProps) {
+  const log = useLogger('auth');
   // Get token usage and maxTokens from store (comes directly from OpenAI API via backend)
   const tokenUsage = useChatStore((state) => state.tokenUsage);
   const maxTokens = useChatStore((state) => state.maxTokens) || 200000;
@@ -116,7 +118,7 @@ export function TokenStatus({ convId }: TokenStatusProps) {
       setCopiedFormat(format);
       setTimeout(() => setCopiedFormat(null), 2000);
     } catch (err) {
-      console.error("Failed to copy transcript:", err);
+      log.error("Failed to copy transcript", { error: err });
     }
   };
 

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react"
 
 import { recordAudio } from "@/lib/audio-utils"
 import { useAudioStore } from "@/stores/audio-store"
+import { useLogger } from "@/hooks/use-logger"
 
 interface UseAudioRecordingOptions {
   transcribeAudio?: (blob: Blob) => Promise<string>
@@ -12,6 +13,8 @@ export function useAudioRecording({
   transcribeAudio,
   onTranscriptionComplete,
 }: UseAudioRecordingOptions) {
+  const log = useLogger('ui');
+  
   // Zustand store
   const {
     isListening,
@@ -52,7 +55,7 @@ export function useAudioRecording({
         onTranscriptionComplete?.(text)
       }
     } catch (error) {
-      console.error("Error transcribing audio:", error)
+      log.error("Error transcribing audio", { error: error instanceof Error ? error.message : String(error) });
     } finally {
       setIsTranscribing(false)
       setIsListening(false)
@@ -78,7 +81,7 @@ export function useAudioRecording({
         // Start recording with the stream
         activeRecordingRef.current = recordAudio(stream)
       } catch (error) {
-        console.error("Error recording audio:", error)
+        log.error("Error recording audio", { error: error instanceof Error ? error.message : String(error) });
         setIsListening(false)
         setIsRecording(false)
         if (audioStream) {

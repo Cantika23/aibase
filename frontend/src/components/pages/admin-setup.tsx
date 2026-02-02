@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/auth-store";
+import { useLogger } from "@/hooks/use-logger";
 
 interface SetupData {
   appName: string;
@@ -71,6 +72,7 @@ const getLicenseCookie = (): string | null => {
 export function AdminSetupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const log = useLogger('auth');
 
   const [licenseKey, setLicenseKey] = useState("");
   const [isVerified, setIsVerified] = useState(false);
@@ -167,7 +169,7 @@ export function AdminSetupPage() {
         toast.error(data.error || "Failed to load users");
       }
     } catch (err) {
-      console.error("Error loading users:", err);
+      log.error("Error loading users", { error: String(err) });
       toast.error("Failed to load users");
     } finally {
       setLoadingUsers(false);
@@ -268,7 +270,7 @@ export function AdminSetupPage() {
         }
       }
     } catch (err) {
-      console.error("Error loading setup:", err);
+      log.error("Error loading setup", { error: String(err) });
     }
   };
 
@@ -493,7 +495,7 @@ export function AdminSetupPage() {
         toast.error(data.error || "Failed to load tenants");
       }
     } catch (err) {
-      console.error("Error loading tenants:", err);
+      log.error("Error loading tenants", { error: String(err) });
       toast.error("Failed to load tenants");
     } finally {
       setLoadingTenants(false);

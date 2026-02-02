@@ -2,6 +2,9 @@ import { Tool } from "../../llm/conversation";
 import { ScriptRuntime, context as scriptRuntimeContext } from "../extensions/script-runtime";
 import { storeOutput } from "../extensions/shared/output-storage";
 import { ExtensionLoader } from "../extensions/extension-loader";
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ScriptTool');
 
 /**
  * Script Tool context
@@ -208,7 +211,7 @@ Example (multi-line):
       serialized = JSON.stringify(result);
     } catch (error: any) {
       // If serialization fails (circular refs, etc), return as-is
-      console.warn(`[ScriptTool] Could not serialize result for size check: ${error.message}`);
+      logger.warn({ error }, 'Could not serialize result for size check');
       return result;
     }
 
@@ -220,7 +223,7 @@ Example (multi-line):
     }
 
     // Result is too large - store it and return truncated version
-    console.log(`[ScriptTool] Result too large (${size} bytes > ${maxSize} bytes), storing and truncating...`);
+    logger.info({ size, maxSize }, 'Result too large, storing and truncating');
 
     const metadata = await storeOutput(result, this.convId, this.currentToolCallId!);
 
@@ -302,7 +305,7 @@ Example (multi-line):
         await extensionLoader.initializeProject(this.projectId);
       } catch (error) {
         // Log but don't fail script execution if initialization fails
-        console.warn(`[ScriptTool] Extension initialization failed (non-critical):`, error);
+        logger.warn({ error }, 'Extension initialization failed (non-critical)');
       }
 
       const extensions = await extensionLoader.loadExtensions(this.projectId);
@@ -327,12 +330,11 @@ Example (multi-line):
       } catch (firstError: any) {
         // If we get "Invalid escape" error and code has \n, try fixing it
         if (firstError.message?.includes("Invalid escape") && args.code.includes("\\n")) {
-          console.warn("[ScriptTool] Execution failed with 'Invalid escape' error");
-          console.warn("[ScriptTool] Code contains literal \\n - retrying with escape sequence fix");
-          console.warn("[ScriptTool] Original code (first 200 chars):", args.code.substring(0, 200));
+          logger.warn('Execution failed with Invalid escape error');
+          logger.warn({ originalCodePreview: args.code.substring(0, 200) }, 'Code contains literal \\n - retrying with escape sequence fix');
 
           const fixedCode = fixEscapeSequences(args.code);
-          console.log("[ScriptTool] Fixed code (first 200 chars):", fixedCode.substring(0, 200));
+          logger.debug({ fixedCodePreview: fixedCode.substring(0, 200) }, 'Fixed code with proper escape sequences');
 
           // Create new runtime with fixed code
           const retryRuntime = new ScriptRuntime({

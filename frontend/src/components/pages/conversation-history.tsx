@@ -36,12 +36,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RefreshCw } from "lucide-react";
+import { useLogger } from "@/hooks/use-logger";
 
 export function ConversationHistoryPage() {
   const navigate = useNavigate();
   const { projectId } = useParams();
   const { conversations, isLoading, loadConversations, removeConversation } =
     useConversationStore();
+  const log = useLogger('chat');
 
   const { clearMessages } = useChatStore();
   const { setConvId, clearConvId } = useConvId();
@@ -99,7 +101,7 @@ export function ConversationHistoryPage() {
       const files = await fetchConversationFiles(convId, projectId);
       setDeletingConversation({ convId, title, files });
     } catch (error) {
-      console.error("Error loading files:", error);
+      log.error("Error loading files", { error: String(error) });
       // Still allow deletion even if files can't be loaded
       setDeletingConversation({ convId, title, files: [] });
     }
@@ -133,7 +135,7 @@ export function ConversationHistoryPage() {
       // Reload conversations to get the updated title
       await loadConversations(projectId);
     } catch (error) {
-      console.error("Error regenerating title:", error);
+      log.error("Error regenerating title", { error: String(error) });
       toast.error(error instanceof Error ? error.message : "Failed to regenerate title");
     } finally {
       setRegeneratingTitleId(null);

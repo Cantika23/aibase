@@ -12,6 +12,9 @@
  */
 
 import type { DependencyRequest } from './dependency-bundler';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ExtensionWorker');
 
 // Type declarations for worker context
 declare const self: Worker & {
@@ -112,22 +115,21 @@ function evaluateExtension(code: string, dependencies: Record<string, any>, meta
       errorMsg = e instanceof Error ? e.message : String(e);
     }
 
-    // Send debug info via console
+    // Send debug info via logger
     if (errorMsg) {
-      console.log('[ExtensionWorker] ERROR:', errorMsg);
+      logger.error({ errorMsg }, 'Extension evaluation error');
     }
-    console.log('[ExtensionWorker] extensionResult:', JSON.stringify(extensionResult));
-    console.log('[ExtensionWorker] extensionResult keys:', Object.keys(extensionResult || {}));
+    logger.debug({ extensionResult: JSON.stringify(extensionResult), extensionResultKeys: Object.keys(extensionResult || {}) }, 'Extension evaluation result');
 
     // Check for module.exports pattern
     const moduleExportsKeys = Object.keys(module.exports);
-    console.log('[ExtensionWorker] module.exports keys:', moduleExportsKeys);
+    logger.debug({ moduleExportsKeys }, 'module.exports keys');
     if (moduleExportsKeys.length > 0) {
-      console.log('[ExtensionWorker] Returning module.exports');
+      logger.debug('Returning module.exports');
       return module.exports;
     }
 
-    console.log('[ExtensionWorker] Returning extensionResult');
+    logger.debug('Returning extensionResult');
     return extensionResult || {};
   `;
 
@@ -163,7 +165,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         throw new Error('No code provided for evaluation');
       }
 
-      console.log('[ExtensionWorker] Starting evaluation for:', metadata?.id);
+      logger.info({ extensionId: metadata?.id }, 'Starting evaluation');
 
       // Load dependencies if provided
       const loadedDeps = dependencies && Object.keys(dependencies).length > 0
@@ -177,14 +179,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         ...(metadata || {})
       };
 
-      console.log('[ExtensionWorker] Calling evaluateExtension, code length:', code.length);
+      logger.debug({ codeLength: code.length }, 'Calling evaluateExtension');
       const result = await withTimeout(
         () => evaluateExtension(code, loadedDeps, enhancedMetadata),
         30000 // 30 second timeout
       );
 
-      console.log('[ExtensionWorker] Evaluation result:', JSON.stringify(result));
-      console.log('[ExtensionWorker] Evaluation result keys:', Object.keys(result || {}));
+      logger.debug({ result: JSON.stringify(result), resultKeys: Object.keys(result || {}) }, 'Evaluation completed');
 
       response.result = result;
 
@@ -193,13 +194,12 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
 
   } catch (error) {
-    console.log('[ExtensionWorker] ERROR:', error instanceof Error ? error.message : String(error));
-    console.log('[ExtensionWorker] ERROR stack:', error instanceof Error ? error.stack : 'N/A');
+    logger.error({ error, stack: error instanceof Error ? error.stack : 'N/A' }, 'Extension evaluation failed');
     response.type = 'error';
     response.error = error instanceof Error ? error.message : String(error);
   }
 
-  console.log('[ExtensionWorker] Posting response:', response.type);
+  logger.debug({ responseType: response.type }, 'Posting response');
   self.postMessage(response);
 };
 

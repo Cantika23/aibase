@@ -9,6 +9,9 @@ import { loadConversationInfo } from "./conversation-info";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { getConversationDir } from "../config/paths";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("TitleGenerator");
 
 /**
  * Generate a title for a conversation using AI
@@ -107,7 +110,7 @@ export async function generateConversationTitle(
 
     return "New Conversation";
   } catch (error) {
-    console.error("[TitleGenerator] Error generating title:", error);
+    logger.error({ error }, "Error generating title");
 
     // Fallback to first user message
     const firstUserMsg = messages.find(
@@ -144,7 +147,7 @@ async function saveConversationTitle(
       await fs.writeFile(infoPath, JSON.stringify(info, null, 2), "utf-8");
     }
   } catch (error) {
-    console.error("[TitleGenerator] Error saving title:", error);
+    logger.error({ error }, "Error saving title");
   }
 }
 
@@ -160,7 +163,7 @@ export async function getConversationTitle(
     const info = await loadConversationInfo(convId, projectId, tenantId);
     return info?.title || null;
   } catch (error) {
-    console.error("[TitleGenerator] Error getting title:", error);
+    logger.error({ error }, "Error getting title");
     return null;
   }
 }
@@ -259,7 +262,7 @@ export async function regenerateConversationTitle(
 
     return "New Conversation";
   } catch (error) {
-    console.error("[TitleGenerator] Error regenerating title:", error);
+    logger.error({ error }, "Error regenerating title");
 
     // Fallback to first user message
     const firstUserMsg = messages.find(
