@@ -160,7 +160,10 @@ import { tenantCheckMiddleware } from "../middleware/tenant-check";
 import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware/rate-limiter";
 import { ProjectStorage } from "../storage/project-storage";
 import { TenantStorage } from "../storage/tenant-storage";
-import { logger } from "../utils/logger";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('Server');
+
 import { initializeStorage, cleanupStorage, checkStorageHealth } from "../storage/storage-factory";
 
 /**

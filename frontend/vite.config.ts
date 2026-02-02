@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => {
       pure: mode === "production" ? ["console.log", "console.info", "console.debug", "console.trace"] : [],
       drop: mode === "production" ? ["debugger"] : [],
     },
+    clearScreen: false,
     server: {
       port: 5050,
       proxy: {

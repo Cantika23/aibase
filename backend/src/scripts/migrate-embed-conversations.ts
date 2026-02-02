@@ -6,6 +6,9 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('Migration');
 
 /**
  * Migrate existing embed_user_{uid} conversations to new structure
@@ -14,12 +17,12 @@ export async function migrateEmbedConversations(): Promise<void> {
   const dataDir = path.join(process.cwd(), 'data');
 
   try {
-    console.log('[Migration] Starting embed conversation migration...');
+    logger.info('Starting embed conversation migration...');
 
     // Check if data directory exists
     const dataDirExists = await fs.access(dataDir).then(() => true).catch(() => false);
     if (!dataDirExists) {
-      console.log('[Migration] Data directory does not exist, skipping migration');
+      logger.info('Data directory does not exist, skipping migration');
       return;
     }
 
@@ -33,11 +36,11 @@ export async function migrateEmbedConversations(): Promise<void> {
     );
 
     if (projects.length === 0) {
-      console.log('[Migration] No projects found, skipping migration');
+      logger.info('No projects found, skipping migration');
       return;
     }
 
-    console.log(`[Migration] Found ${projects.length} projects`);
+    logger.info(`Found ${projects.length} projects`);
 
     let totalMigrated = 0;
 
@@ -52,11 +55,11 @@ export async function migrateEmbedConversations(): Promise<void> {
       );
 
       if (embedConvDirs.length === 0) {
-        console.log(`[Migration] No embed conversations found in project ${projectId}`);
+        logger.info(`No embed conversations found in project ${projectId}`);
         continue;
       }
 
-      console.log(`[Migration] Found ${embedConvDirs.length} embed conversations in project ${projectId}`);
+      logger.info(`Found ${embedConvDirs.length} embed conversations in project ${projectId}`);
 
       for (const convDir of embedConvDirs) {
         const convId = convDir.name;
@@ -69,14 +72,14 @@ export async function migrateEmbedConversations(): Promise<void> {
           // Check if old path exists
           const oldPathExists = await fs.access(oldPath).then(() => true).catch(() => false);
           if (!oldPathExists) {
-            console.log(`[Migration] Old path does not exist: ${oldPath}, skipping`);
+            logger.info(`Old path does not exist: ${oldPath}, skipping`);
             continue;
           }
 
           // Check if new path already exists
           const newPathExists = await fs.access(newPath).then(() => true).catch(() => false);
           if (newPathExists) {
-            console.log(`[Migration] New path already exists: ${newPath}, skipping`);
+            logger.info(`New path already exists: ${newPath}, skipping`);
             // Remove old path to clean up
             await fs.rm(oldPath, { recursive: true, force: true });
             totalMigrated++;
@@ -89,18 +92,18 @@ export async function migrateEmbedConversations(): Promise<void> {
           // Move conversation directory
           await fs.rename(oldPath, newPath);
 
-          console.log(`[Migration] Migrated: ${projectId}/${convId} → ${projectId}/${uid}/${convId}`);
+          logger.info(`Migrated: ${projectId}/${convId} → ${projectId}/${uid}/${convId}`);
           totalMigrated++;
         } catch (error: any) {
-          console.error(`[Migration] Error migrating ${projectId}/${convId}:`, error.message);
+          logger.error(`Error migrating ${projectId}/${convId}: ${error.message}`);
         }
       }
     }
 
-    console.log(`[Migration] Completed successfully. Migrated ${totalMigrated} conversations`);
+    logger.info(`Completed successfully. Migrated ${totalMigrated} conversations`);
   } catch (error: any) {
     if (error.code !== 'ENOENT') {
-      console.error('[Migration] Migration error:', error);
+      logger.error({ error }, 'Migration error');
       throw error;
     }
   }
@@ -110,11 +113,11 @@ export async function migrateEmbedConversations(): Promise<void> {
 if (import.meta.main) {
   migrateEmbedConversations()
     .then(() => {
-      console.log('[Migration] Script completed');
+      logger.info('Script completed');
       process.exit(0);
     })
     .catch((error) => {
-      console.error('[Migration] Script failed:', error);
+      logger.error({ error }, 'Script failed');
       process.exit(1);
     });
 }

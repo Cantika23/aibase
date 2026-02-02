@@ -124,20 +124,20 @@ func NewClientManager(container *sqlstore.Container, configPath string) *ClientM
 	}
 	// Load configuration from file
 	if err := cm.loadConfig(); err != nil {
-		fmt.Printf("Failed to load config (will use defaults): %v\n", err)
+		LogConfig.Warn("Failed to load config (will use defaults): %v", err)
 	}
 	// Override with environment variable if set
 	if envCallbackURL := os.Getenv("CALLBACK_URL"); envCallbackURL != "" {
 		cm.callbackURL = envCallbackURL
-		fmt.Printf("Callback URL set from environment: %s\n", envCallbackURL)
+		LogConfig.Info("Callback URL set from environment: %s", envCallbackURL)
 	}
 	// Load client ID mappings
 	if err := cm.loadClientMappings(); err != nil {
-		fmt.Printf("Failed to load client mappings (will use defaults): %v\n", err)
+		LogConfig.Warn("Failed to load client mappings (will use defaults): %v", err)
 	}
 	// Load pending clients
 	if err := cm.loadPendingClients(); err != nil {
-		fmt.Printf("Failed to load pending clients (will use defaults): %v\n", err)
+		LogConfig.Warn("Failed to load pending clients (will use defaults): %v", err)
 	}
 	return cm
 }
@@ -162,7 +162,7 @@ func (cm *ClientManager) loadConfig() error {
 	cm.callbackURL = config.CallbackURL
 	cm.mutex.Unlock()
 
-	fmt.Printf("Configuration loaded: callbackURL=%s\n", config.CallbackURL)
+	LogConfig.Info("Configuration loaded: callbackURL=%s", config.CallbackURL)
 	return nil
 }
 
@@ -189,7 +189,7 @@ func (cm *ClientManager) saveConfig() error {
 		return fmt.Errorf("failed to rename temp config file: %w", err)
 	}
 
-	fmt.Printf("Configuration saved to %s\n", cm.configPath)
+	LogConfig.Info("Configuration saved to %s", cm.configPath)
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (cm *ClientManager) loadClientMappings() error {
 	}
 	cm.mutex.Unlock()
 
-	fmt.Printf("Client mappings loaded: %d mappings\n", len(mapping.Mappings))
+	LogConfig.Info("Client mappings loaded: %d mappings", len(mapping.Mappings))
 	return nil
 }
 
@@ -243,7 +243,7 @@ func (cm *ClientManager) saveClientMappings() error {
 		return fmt.Errorf("failed to rename temp client mappings file: %w", err)
 	}
 
-	fmt.Printf("Client mappings saved to %s\n", cm.clientMapPath)
+	LogConfig.Info("Client mappings saved to %s", cm.clientMapPath)
 	return nil
 }
 
@@ -270,7 +270,7 @@ func (cm *ClientManager) loadPendingClients() error {
 	}
 	cm.mutex.Unlock()
 
-	fmt.Printf("Pending clients loaded: %d pending clients\n", len(pendingClients.Clients))
+	LogClient.Info("Pending clients loaded: %d pending clients", len(pendingClients.Clients))
 	return nil
 }
 
@@ -297,7 +297,7 @@ func (cm *ClientManager) savePendingClients() error {
 		return fmt.Errorf("failed to rename temp pending clients file: %w", err)
 	}
 
-	fmt.Printf("Pending clients saved to %s\n", cm.pendingClientsPath)
+	LogClient.Info("Pending clients saved to %s", cm.pendingClientsPath)
 	return nil
 }
 
@@ -319,7 +319,7 @@ func (cm *ClientManager) createClient(osName string, customID string) (*WhatsApp
 
 	clientLog := waLog.Stdout("Client", "DEBUG", true)
 	client := whatsmeow.NewClient(deviceStore, clientLog)
-	fmt.Printf("Created new client: %s\n", clientID)
+	LogClient.Info("Created new client: %s", clientID)
 
 	waClient := &WhatsAppClient{
 		client:       client,
@@ -350,7 +350,7 @@ func (cm *ClientManager) createClient(osName string, customID string) (*WhatsApp
 
 		// Save pending clients to disk
 		if err := cm.savePendingClients(); err != nil {
-			fmt.Printf("Warning: Failed to save pending clients: %v\n", err)
+			LogClient.Warn("Failed to save pending clients: %v", err)
 		}
 	} else {
 		cm.mutex.Unlock()
@@ -412,7 +412,7 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 				if lidJID.User != "" && phoneJID.User != "" {
 					// Use whatsmeow's built-in LID to phone number mapping
 					client.client.StoreLIDPNMapping(context.Background(), lidJID, phoneJID)
-					fmt.Printf("[LID Mapping] Stored mapping using whatsmeow: %s -> %s\n", lidJID.String(), phoneJID.String())
+					LogMessage.Info("Stored mapping using whatsmeow: %s -> %s", lidJID.String(), phoneJID.String())
 				}
 			}
 
@@ -423,9 +423,9 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 					// Mark as read
 					err := client.client.MarkRead(context.Background(), []types.MessageID{v.Info.ID}, v.Info.Timestamp, chatJID, v.Info.Sender)
 					if err != nil {
-						fmt.Printf("Failed to mark message as read: %v\n", err)
+						LogMessage.Error("Failed to mark message as read: %v", err)
 					} else {
-						fmt.Printf("Marked message as read from %s\n", chatJID.String())
+						LogMessage.Info("Marked message as read from %s", chatJID.String())
 					}
 
 					// Start typing indicator
@@ -436,7 +436,7 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 			// Download media first if message contains media (synchronous to ensure fileUrl is available)
 			// Note: Location messages (static and live) don't have downloadable files
 			if v.Message.GetImageMessage() != nil || v.Message.GetVideoMessage() != nil || v.Message.GetAudioMessage() != nil || v.Message.GetDocumentMessage() != nil {
-				fmt.Printf("Media message detected for client %s, downloading before webhook...\n", client.deviceStore.ID.String())
+				LogMedia.Info("Media message detected for client %s, downloading before webhook...", client.deviceStore.ID.String())
 				// Release mutex during download to avoid blocking other operations
 				client.mutex.Unlock()
 				cm.downloadImage(client, v)
@@ -479,9 +479,9 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 						cm.mutex.Unlock()
 						// Save updated pending clients to disk
 						if err := cm.savePendingClients(); err != nil {
-							fmt.Printf("Warning: Failed to save pending clients: %v\n", err)
+							LogClient.Warn("Failed to save pending clients: %v", err)
 						} else {
-							fmt.Printf("Removed client from pending list: %s\n", ourUUID)
+							LogClient.Info("Removed client from pending list: %s", ourUUID)
 						}
 					} else {
 						cm.mutex.Unlock()
@@ -489,9 +489,9 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 
 					// Save mappings to disk
 					if err := cm.saveClientMappings(); err != nil {
-						fmt.Printf("Warning: Failed to save client mappings: %v\n", err)
+						LogClient.Warn("Failed to save client mappings: %v", err)
 					} else {
-						fmt.Printf("Saved client mapping: %s -> %s\n", whatsappID, ourUUID)
+						LogConfig.Info("Saved client mapping: %s -> %s", whatsappID, ourUUID)
 					}
 				} else {
 					cm.mutex.Unlock()
@@ -574,12 +574,12 @@ func (cm *ClientManager) startTyping(client *WhatsAppClient, chatJID types.JID) 
 	// Send typing indicator
 	err := client.client.SendChatPresence(context.Background(), chatJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 	if err != nil {
-		fmt.Printf("Failed to send typing indicator: %v\n", err)
+		LogMessage.Error("Failed to send typing indicator: %v", err)
 		return
 	}
 
 	client.typingActive[chatID] = true
-	fmt.Printf("Started typing indicator for %s\n", chatID)
+	LogMessage.Info("Started typing indicator for %s", chatID)
 
 	// Set up timer to stop typing after 1 minute
 	client.typingTimers[chatID] = time.AfterFunc(60*time.Second, func() {
@@ -608,9 +608,9 @@ func (cm *ClientManager) stopTyping(client *WhatsAppClient, chatJID types.JID) {
 	// Send stop typing indicator (paused)
 	err := client.client.SendChatPresence(context.Background(), chatJID, types.ChatPresencePaused, types.ChatPresenceMediaText)
 	if err != nil {
-		fmt.Printf("Failed to stop typing indicator: %v\n", err)
+		LogMessage.Error("Failed to stop typing indicator: %v", err)
 	} else {
-		fmt.Printf("Stopped typing indicator for %s\n", chatID)
+		LogMessage.Info("Stopped typing indicator for %s", chatID)
 	}
 
 	delete(client.typingActive, chatID)
@@ -739,13 +739,13 @@ func createClient(c *gin.Context) {
 	go func() {
 		qrChan, err := waClient.client.GetQRChannel(context.Background())
 		if err != nil {
-			fmt.Printf("Failed to get QR channel: %v\n", err)
+		LogQR.Error("Failed to get QR channel: %v", err)
 			return
 		}
 
 		err = waClient.client.Connect()
 		if err != nil {
-			fmt.Printf("Failed to connect client: %v\n", err)
+		LogClient.Error("Failed to connect client: %v", err)
 			return
 		}
 
@@ -756,7 +756,7 @@ func createClient(c *gin.Context) {
 				waClient.mutex.Unlock()
 			} else if evt.Event == "timeout" {
 				// QR code expired
-				fmt.Printf("QR code expired for client %s\n", clientID)
+		LogQR.Info("QR code expired for client %s", clientID)
 
 				// Send webhook for timeout
 				// We need to use the clientID (UUID) here
@@ -830,7 +830,7 @@ func setConfig(c *gin.Context) {
 
 	// Save configuration to persistent storage
 	if err := manager.saveConfig(); err != nil {
-		fmt.Printf("Warning: Failed to save config: %v\n", err)
+		LogConfig.Warn("Failed to save config: %v", err)
 		// Don't fail the request, just log the warning
 	}
 
@@ -1673,7 +1673,7 @@ func sendDocumentBase64(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("[Aimeow Base64] Decoded %d bytes from base64 input\n", len(documentData))
+	LogBase64.Debug("Decoded %d bytes from base64 input", len(documentData))
 
 	// Format phone number
 	targetJID := strings.TrimSuffix(req.Phone, "@s.whatsapp.net")
@@ -1732,7 +1732,7 @@ func sendDocumentBase64(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("[Aimeow Base64] ✅ Successfully sent document %s (%d bytes) to %s\n", req.Filename, len(documentData), req.Phone)
+	LogBase64.Info("Successfully sent document %s (%d bytes) to %s", req.Filename, len(documentData), req.Phone)
 
 	c.JSON(http.StatusOK, SendMessageResponse{
 		Success:   true,
@@ -1796,7 +1796,7 @@ func deleteMessage(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("[Aimeow Delete] Message %s deleted from chat %s (revoke ID: %s)\n", req.MessageID, targetJID, resp.ID)
+	LogMessage.Info("Message %s deleted from chat %s (revoke ID: %s)", req.MessageID, targetJID, resp.ID)
 
 	c.JSON(http.StatusOK, SendMessageResponse{
 		Success:   true,
@@ -1964,24 +1964,24 @@ func (cm *ClientManager) sendWebhook(client *WhatsAppClient, message interface{}
 
 	jsonData, err := json.Marshal(webhookData)
 	if err != nil {
-		fmt.Printf("Failed to marshal webhook data: %v\n", err)
+		LogWebhook.Error("Failed to marshal webhook data: %v", err)
 		return
 	}
 
 	// Log the webhook payload for debugging
-	fmt.Printf("[Aimeow Webhook] Payload: %s\n", string(jsonData))
+	LogWebhook.Debug("Payload: %s", string(jsonData))
 
 	resp, err := http.Post(cm.callbackURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Printf("Failed to send webhook: %v\n", err)
+		LogWebhook.Error("Failed to send webhook: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		fmt.Printf("Webhook returned error status: %d\n", resp.StatusCode)
+		LogWebhook.Warn("Webhook returned error status: %d", resp.StatusCode)
 	} else {
-		fmt.Printf("[Aimeow Webhook] Successfully sent to %s (status: %d)\n", cm.callbackURL, resp.StatusCode)
+		LogWebhook.Info("Successfully sent to %s (status: %d)", cm.callbackURL, resp.StatusCode)
 	}
 }
 
@@ -2007,23 +2007,23 @@ func (cm *ClientManager) sendConnectionStatusWebhook(clientID string, event stri
 
 	jsonData, err := json.Marshal(webhookData)
 	if err != nil {
-		fmt.Printf("Failed to marshal status webhook data: %v\n", err)
+		LogWebhook.Error("Failed to marshal status webhook data: %v", err)
 		return
 	}
 
-	fmt.Printf("[Aimeow Status Webhook] Event: %s, Client: %s, Payload: %s\n", event, clientID, string(jsonData))
+	LogWebhook.Debug("Event: %s, Client: %s, Payload: %s", event, clientID, string(jsonData))
 
 	resp, err := http.Post(statusURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Printf("Failed to send status webhook: %v\n", err)
+		LogWebhook.Error("Failed to send status webhook: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		fmt.Printf("Status webhook returned error status: %d\n", resp.StatusCode)
+		LogWebhook.Warn("Status webhook returned error status: %d", resp.StatusCode)
 	} else {
-		fmt.Printf("[Aimeow Status Webhook] Successfully sent to %s (status: %d)\n", statusURL, resp.StatusCode)
+		LogWebhook.Info("Successfully sent to %s (status: %d)", statusURL, resp.StatusCode)
 	}
 }
 
@@ -2036,11 +2036,11 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 
 	// Check if message contains media
 	if msg.Message.GetImageMessage() == nil && msg.Message.GetVideoMessage() == nil && msg.Message.GetAudioMessage() == nil && msg.Message.GetDocumentMessage() == nil {
-		fmt.Printf("No media in message, skipping download\n")
+		LogMedia.Debug("No media in message, skipping download")
 		return
 	}
 
-	fmt.Printf("Media detected in message, proceeding with download\n")
+	LogMedia.Debug("Media detected in message, proceeding with download")
 
 	// Get the UUID for this client
 	whatsappID := client.deviceStore.ID.String()
@@ -2055,14 +2055,14 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 	// Fallback to WhatsApp ID if mapping doesn't exist
 	if !exists {
 		clientID = whatsappID
-		fmt.Printf("Warning: No UUID mapping found for client %s\n", whatsappID)
+		LogClient.Warn("No UUID mapping found for client %s", whatsappID)
 	}
 
 	// Create client directory using UUID (no need to sanitize since UUIDs don't have special chars)
 	clientDir := filepath.Join(dataDir, "files", clientID)
 	err := os.MkdirAll(clientDir, 0755)
 	if err != nil {
-		fmt.Printf("Failed to create client directory: %v\n", err)
+		LogClient.Error("Failed to create client directory: %v", err)
 		return
 	}
 
@@ -2086,7 +2086,7 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 		// Use whatsmeow Download to properly decrypt media
 		mediaData, err = client.client.Download(context.Background(), imageMsg)
 		if err != nil {
-			fmt.Printf("Failed to download image for client %s: %v\n", clientID, err)
+			LogMedia.Error("Failed to download image for client %s: %v", clientID, err)
 			return
 		}
 
@@ -2101,7 +2101,7 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 		}
 		mediaData, err = client.client.Download(context.Background(), videoMsg)
 		if err != nil {
-			fmt.Printf("Failed to download video for client %s: %v\n", clientID, err)
+			LogMedia.Error("Failed to download video for client %s: %v", clientID, err)
 			return
 		}
 
@@ -2116,7 +2116,7 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 		}
 		mediaData, err = client.client.Download(context.Background(), audioMsg)
 		if err != nil {
-			fmt.Printf("Failed to download audio for client %s: %v\n", clientID, err)
+			LogMedia.Error("Failed to download audio for client %s: %v", clientID, err)
 			return
 		}
 
@@ -2131,7 +2131,7 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 		}
 		mediaData, err = client.client.Download(context.Background(), docMsg)
 		if err != nil {
-			fmt.Printf("Failed to download document for client %s: %v\n", clientID, err)
+			LogMedia.Error("Failed to download document for client %s: %v", clientID, err)
 			return
 		}
 
@@ -2145,7 +2145,7 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 	// Save decrypted media to file
 	err = os.WriteFile(mediaPath, mediaData, 0644)
 	if err != nil {
-		fmt.Printf("Failed to save %s file for client %s: %v\n", mediaType, clientID, err)
+		LogMedia.Error("Failed to save %s file for client %s: %v", mediaType, clientID, err)
 		return
 	}
 
@@ -2154,7 +2154,7 @@ func (cm *ClientManager) downloadImage(client *WhatsAppClient, message interface
 	client.images[mediaID] = mediaPath
 	client.mutex.Unlock()
 
-	fmt.Printf("%s downloaded for client %s: %s -> %s (%d bytes)\n", strings.Title(mediaType), clientID, mediaID, mediaPath, len(mediaData))
+	LogMedia.Info("%s downloaded for client %s: %s -> %s (%d bytes)", strings.Title(mediaType), clientID, mediaID, mediaPath, len(mediaData))
 }
 
 func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message interface{}) map[string]interface{} {
@@ -2167,7 +2167,7 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 	// Fallback to WhatsApp ID if mapping doesn't exist (shouldn't happen)
 	if !exists {
 		clientID = whatsappID
-		fmt.Printf("Warning: No UUID mapping found for client %s\n", whatsappID)
+		LogClient.Warn("No UUID mapping found for client %s", whatsappID)
 	}
 
 	// Type assert to get actual message struct
@@ -2224,13 +2224,13 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 		} else if isLIDNumber(msg.Info.Chat.User) {
 			// Number looks like LID even without @lid suffix
 			potentialLIDs = append(potentialLIDs, msg.Info.Chat)
-			fmt.Printf("[LID Detection] Chat %s looks like LID based on number pattern\n", msg.Info.Chat.String())
+		LogLID.Debug("Chat %s looks like LID based on number pattern", msg.Info.Chat.String())
 		}
 		if strings.Contains(msg.Info.Sender.String(), "@lid") && msg.Info.Sender.String() != msg.Info.Chat.String() {
 			potentialLIDs = append(potentialLIDs, msg.Info.Sender)
 		} else if isLIDNumber(msg.Info.Sender.User) && msg.Info.Sender.String() != msg.Info.Chat.String() {
 			potentialLIDs = append(potentialLIDs, msg.Info.Sender)
-			fmt.Printf("[LID Detection] Sender %s looks like LID based on number pattern\n", msg.Info.Sender.String())
+		LogLID.Debug("Sender %s looks like LID based on number pattern", msg.Info.Sender.String())
 		}
 
 		// Try to resolve LID to phone number using device store
@@ -2240,7 +2240,7 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 				// Method 1: Check if device store has this LID mapped using GetAltJID
 				if altJID, err := client.deviceStore.GetAltJID(context.Background(), lidJID); err == nil && altJID.User != "" {
 					fromUser = altJID.User
-					fmt.Printf("[LID Lookup] Found phone via DeviceStore.GetAltJID: %s -> %s\n", lidJID.String(), altJID.String())
+		LogLID.Debug("Found phone via DeviceStore.GetAltJID: %s -> %s", lidJID.String(), altJID.String())
 					break
 				}
 
@@ -2249,7 +2249,7 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 					// Check if resolved JID is a phone number (not LID)
 					if !strings.Contains(contactInfo.JID.String(), "@lid") {
 						fromUser = contactInfo.JID.User
-						fmt.Printf("[LID Lookup] Found phone via ResolveContactQRLink: %s -> %s\n", lidJID.String(), fromUser)
+		LogLID.Debug("Found phone via ResolveContactQRLink: %s -> %s", lidJID.String(), fromUser)
 						// Store the mapping for future use
 						client.client.StoreLIDPNMapping(context.Background(), lidJID, contactInfo.JID)
 						break
@@ -2261,11 +2261,11 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 				if err == nil {
 					if userInfo, exists := userInfoMap[lidJID]; exists {
 						// Check if VerifiedName has phone info or try to get from other fields
-						fmt.Printf("[LID Lookup] GetUserInfo result for %s: LID=%s, VerifiedName=%+v\n",
+							LogLID.Debug("GetUserInfo result for %s: LID=%s, VerifiedName=%+v",
 							lidJID.String(), userInfo.LID.String(), userInfo.VerifiedName)
 						if userInfo.LID.User != "" && userInfo.LID.User != lidJID.User && !strings.Contains(userInfo.LID.String(), "@lid") {
 							fromUser = userInfo.LID.User
-							fmt.Printf("[LID Lookup] Found phone via GetUserInfo.LID: %s -> %s\n", lidJID.String(), fromUser)
+						LogLID.Debug("Found phone via GetUserInfo.LID: %s -> %s", lidJID.String(), fromUser)
 							break
 						}
 					}
@@ -2307,7 +2307,7 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 	}
 
 	// Debug logging to help diagnose issues
-	fmt.Printf("[Webhook Debug] Message from Chat=%s Sender=%s SenderAlt=%s Using=%s IsLID=%v\n",
+	LogWebhook.Debug("Message from Chat=%s Sender=%s SenderAlt=%s Using=%s IsLID=%v",
 		msg.Info.Chat.String(), msg.Info.Sender.String(), msg.Info.SenderAlt.String(), fromUser, isUnresolvedLID)
 
 	messageData := map[string]interface{}{
@@ -2329,7 +2329,7 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 	// Flag unresolved LID for additional handling
 	if isUnresolvedLID {
 		messageData["isLID"] = true
-		fmt.Printf("[Webhook Warning] ⚠️ Unresolved LID detected: %s - SenderAlt was: %s\n", fromUser, msg.Info.SenderAlt.String())
+	LogWebhook.Warn("Unresolved LID detected: %s - SenderAlt was: %s", fromUser, msg.Info.SenderAlt.String())
 	}
 
 	// Determine message type and extract content
@@ -2408,7 +2408,7 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 			}
 		}
 
-		fmt.Printf("[Location] Live location received: lat=%.6f, lng=%.6f, accuracy=%dm\n",
+		LogLocation.Info("Live location received: lat=%.6f, lng=%.6f, accuracy=%dm",
 			locMsg.GetDegreesLatitude(), locMsg.GetDegreesLongitude(), locMsg.GetAccuracyInMeters())
 
 	case msg.Message.GetLocationMessage() != nil:
@@ -2430,7 +2430,7 @@ func (cm *ClientManager) extractMessageData(client *WhatsAppClient, message inte
 			}
 		}
 
-		fmt.Printf("[Location] Static location received: lat=%.6f, lng=%.6f, name=%s\n",
+		LogLocation.Info("Static location received: lat=%.6f, lng=%.6f, name=%s",
 			locMsg.GetDegreesLatitude(), locMsg.GetDegreesLongitude(), locMsg.GetName())
 
 	default:
@@ -2473,10 +2473,10 @@ func loadExistingClients(container *sqlstore.Container) error {
 		return fmt.Errorf("failed to get existing devices: %w", err)
 	}
 
-	fmt.Printf("Found %d existing device(s) in database\n", len(devices))
+	LogDatabase.Info("Found %d existing device(s) in database", len(devices))
 
 	for i, deviceStore := range devices {
-		fmt.Printf("Loading device %d/%d: ID=%v\n", i+1, len(devices), deviceStore.ID)
+			LogDatabase.Debug("Loading device %d/%d: ID=%v", i+1, len(devices), deviceStore.ID)
 		clientLog := waLog.Stdout("Client", "DEBUG", true)
 		client := whatsmeow.NewClient(deviceStore, clientLog)
 
@@ -2502,37 +2502,37 @@ func loadExistingClients(container *sqlstore.Container) error {
 			clientUUID := uuid.New()
 			clientID = clientUUID.String()
 			manager.clientIDMap[whatsappID] = clientID
-			fmt.Printf("Generated new UUID for existing client %s: %s\n", whatsappID, clientID)
+		LogClient.Info("Generated new UUID for existing client %s: %s", whatsappID, clientID)
 			// Save the new mapping
 			manager.mutex.Unlock()
 			if err := manager.saveClientMappings(); err != nil {
-				fmt.Printf("Warning: Failed to save client mappings: %v\n", err)
+				LogClient.Warn("Failed to save client mappings: %v", err)
 			}
 			manager.mutex.Lock()
 		} else {
-			fmt.Printf("Using existing UUID for client %s: %s\n", whatsappID, clientID)
+			LogClient.Info("Using existing UUID for client %s: %s", whatsappID, clientID)
 		}
 		manager.clients[clientID] = waClient
 		manager.mutex.Unlock()
 
 		// Auto-connect if device has existing session
 		if client.Store.ID != nil {
-			fmt.Printf("Attempting to auto-reconnect client %s (Device ID: %s)\n", clientID, client.Store.ID.String())
+			LogClient.Info("Attempting to auto-reconnect client %s (Device ID: %s)", clientID, client.Store.ID.String())
 			localClientID := clientID // Capture for closure
 			go func() {
 				err := client.Connect()
 				if err != nil {
-					fmt.Printf("Failed to reconnect client %s: %v\n", localClientID, err)
+					LogClient.Error("Failed to reconnect client %s: %v", localClientID, err)
 				} else {
-					fmt.Printf("Successfully reconnected client %s\n", localClientID)
+					LogClient.Info("Successfully reconnected client %s", localClientID)
 				}
 			}()
 		} else {
-			fmt.Printf("Skipping auto-connect for client %s (no device ID)\n", clientID)
+			LogClient.Debug("Skipping auto-connect for client %s (no device ID)", clientID)
 		}
 	}
 
-	fmt.Printf("Finished loading %d existing client(s)\n", len(devices))
+	LogClient.Info("Finished loading %d existing client(s)", len(devices))
 	return nil
 }
 
@@ -2542,25 +2542,25 @@ func recreatePendingClients(container *sqlstore.Container) error {
 	defer manager.mutex.Unlock()
 
 	if len(manager.pendingClients) == 0 {
-		fmt.Println("No pending clients to recreate")
+		LogClient.Info("No pending clients to recreate")
 		return nil
 	}
 
-	fmt.Printf("Recreating %d pending client(s)...\n", len(manager.pendingClients))
+	LogClient.Info("Recreating %d pending client(s)...", len(manager.pendingClients))
 
 	for clientID, pendingClient := range manager.pendingClients {
 		// Check if client already exists in memory
 		if _, exists := manager.clients[clientID]; exists {
-			fmt.Printf("Pending client %s already exists in memory, skipping\n", clientID)
+		LogClient.Debug("Pending client %s already exists in memory, skipping", clientID)
 			continue
 		}
 
-		fmt.Printf("Recreating pending client: %s (OS: %s)\n", clientID, pendingClient.OSName)
+		LogClient.Info("Recreating pending client: %s (OS: %s)", clientID, pendingClient.OSName)
 
 		// Create a new device store
 		deviceStore := container.NewDevice()
 		if deviceStore == nil {
-			fmt.Printf("Failed to create device store for pending client %s\n", clientID)
+			LogClient.Error("Failed to create device store for pending client %s", clientID)
 			continue
 		}
 
@@ -2581,7 +2581,7 @@ func recreatePendingClients(container *sqlstore.Container) error {
 		client.AddEventHandler(manager.eventHandler(waClient))
 		manager.clients[clientID] = waClient
 
-		fmt.Printf("Successfully recreated pending client: %s\n", clientID)
+		LogClient.Info("Successfully recreated pending client: %s", clientID)
 
 		// Start connection process in background
 		localClientID := clientID
@@ -2589,13 +2589,13 @@ func recreatePendingClients(container *sqlstore.Container) error {
 		go func() {
 			qrChan, err := localWaClient.client.GetQRChannel(context.Background())
 			if err != nil {
-				fmt.Printf("Failed to get QR channel for pending client %s: %v\n", localClientID, err)
+				LogQR.Error("Failed to get QR channel for pending client %s: %v", localClientID, err)
 				return
 			}
 
 			err = localWaClient.client.Connect()
 			if err != nil {
-				fmt.Printf("Failed to connect pending client %s: %v\n", localClientID, err)
+				LogClient.Error("Failed to connect pending client %s: %v", localClientID, err)
 				return
 			}
 
@@ -2604,13 +2604,13 @@ func recreatePendingClients(container *sqlstore.Container) error {
 					localWaClient.mutex.Lock()
 					localWaClient.qrCode = evt.Code
 					localWaClient.mutex.Unlock()
-					fmt.Printf("QR code received for pending client %s\n", localClientID)
+					LogQR.Debug("QR code received for pending client %s", localClientID)
 				}
 			}
 		}()
 	}
 
-	fmt.Printf("Finished recreating %d pending client(s)\n", len(manager.pendingClients))
+	LogClient.Info("Finished recreating %d pending client(s)", len(manager.pendingClients))
 	return nil
 }
 
@@ -2715,14 +2715,14 @@ func stopTypingHandler(c *gin.Context) {
 }
 
 func main() {
-	fmt.Println("Starting Aimeow WhatsApp API Server...")
+	LogServer.Info("Starting Aimeow WhatsApp API Server...")
 
 	// Initialize base URL from environment variable
 	baseURL = os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:7030"
 	}
-	fmt.Printf("Base URL: %s\n", baseURL)
+	LogServer.Info("Base URL: %s", baseURL)
 
 	// Initialize database
 	dbLog := waLog.Stdout("Database", "DEBUG", true)
@@ -2737,67 +2737,67 @@ func main() {
 
 	// Create data directory if it does not exist
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		fmt.Printf("Warning: Failed to create data directory: %v\n", err)
+		LogServer.Warn("Failed to create data directory: %v", err)
 		// Try alternative directory
 		dataDir = "/tmp/aimeow"
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
 			panic(fmt.Errorf("failed to create alternative data directory: %w", err))
 		}
-		fmt.Printf("Using alternative data directory: %s\n", dataDir)
+		LogServer.Warn("Using alternative data directory: %s", dataDir)
 	}
-	fmt.Printf("Using data directory: %s\n", dataDir)
+	LogServer.Info("Using data directory: %s", dataDir)
 
 	// Create database path
 	dbPath := filepath.Join(dataDir, "aimeow.db")
-	fmt.Printf("Database path: %s\n", dbPath)
+	LogDatabase.Info("Database path: %s", dbPath)
 
 	// Check if database file exists
 	if _, err := os.Stat(dbPath); err == nil {
-		fmt.Printf("Database file already exists: %s\n", dbPath)
+		LogDatabase.Info("Database file already exists: %s", dbPath)
 	} else {
 		// Database doesn't exist, test if we can create it
 		dbFile, err := os.Create(dbPath)
 		if err != nil {
-			fmt.Printf("Warning: Cannot create database file: %v\n", err)
+			LogDatabase.Warn("Cannot create database file: %v", err)
 			// Try alternative location in /tmp
 			dbPath = "/tmp/aimeow.db"
-			fmt.Printf("Using fallback database path: %s\n", dbPath)
+			LogDatabase.Warn("Using fallback database path: %s", dbPath)
 		} else {
 			dbFile.Close()
 			os.Remove(dbPath) // Remove empty test file, let sqlstore create it properly
-			fmt.Printf("Database file creation test successful\n")
+			LogDatabase.Info("Database file creation test successful")
 		}
 	}
 
-	fmt.Printf("Initializing database container at: %s\n", dbPath)
+	LogDatabase.Info("Initializing database container at: %s", dbPath)
 	container, err := sqlstore.New(ctx, "sqlite3", fmt.Sprintf("file:%s?_foreign_keys=on", dbPath), dbLog)
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database container: %w", err))
 	}
-	fmt.Printf("Database container initialized successfully\n")
+	LogDatabase.Info("Database container initialized successfully")
 
 	// Initialize client manager with config path
 	configPath := filepath.Join(dataDir, "config.json")
-	fmt.Printf("Configuration file path: %s\n", configPath)
+	LogConfig.Info("Configuration file path: %s", configPath)
 	manager = NewClientManager(container, configPath)
 
 	// Load existing clients
-	fmt.Printf("Loading existing clients...\n")
+	LogClient.Info("Loading existing clients...")
 	err = loadExistingClients(container)
 	if err != nil {
-		fmt.Printf("Failed to load existing clients: %v\n", err)
+		LogClient.Error("Failed to load existing clients: %v", err)
 	} else {
-		fmt.Printf("Existing clients loaded successfully\n")
+		LogClient.Info("Existing clients loaded successfully")
 	}
 
 	// Recreate pending clients (created but not yet connected)
 	err = recreatePendingClients(container)
 	if err != nil {
-		fmt.Printf("Failed to recreate pending clients: %v\n", err)
+		LogClient.Error("Failed to recreate pending clients: %v", err)
 	}
 
 	// Setup Gin router
-	fmt.Printf("Setting up Gin router...\n")
+	LogRouter.Info("Setting up Gin router...")
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
@@ -2807,7 +2807,7 @@ func main() {
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
 	r.Use(cors.New(config))
-	fmt.Printf("CORS configured\n")
+	LogRouter.Info("CORS configured")
 
 	// API routes
 	v1 := r.Group("/api/v1")
@@ -2853,27 +2853,27 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	fmt.Printf("Health check endpoint configured\n")
+	LogRouter.Info("Health check endpoint configured")
 
 	// Fallback health check at root
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Aimeow WhatsApp API is running"})
 	})
-	fmt.Printf("Root health check endpoint configured\n")
+	LogRouter.Info("Root health check endpoint configured")
 
 	// Swagger documentation
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	fmt.Printf("Swagger documentation configured\n")
+	LogRouter.Info("Swagger documentation configured")
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "7030"
 	}
-	fmt.Printf("Aimeow WhatsApp API Server starting on :%s\n", port)
-	fmt.Printf("Swagger UI: %s/swagger/index.html\n", baseURL)
-	fmt.Printf("API Health: %s/health\n", baseURL)
-	fmt.Printf("Files: %s/files\n", baseURL)
+	LogServer.Info("Aimeow WhatsApp API Server starting on :%s", port)
+	LogRouter.Info("Swagger UI: %s/swagger/index.html", baseURL)
+	LogRouter.Info("API Health: %s/health", baseURL)
+	LogRouter.Info("Files: %s/files", baseURL)
 
-	fmt.Printf("Starting HTTP server on port %s...\n", port)
+	LogServer.Info("Starting HTTP server on port %s...", port)
 	r.Run(":" + port)
 }
