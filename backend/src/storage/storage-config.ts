@@ -45,7 +45,7 @@
 import type { DatabaseConfig } from './abstraction/database';
 import type { FileStorageConfig } from './abstraction/file-storage';
 import type { CacheConfig } from './abstraction/cache';
-import { createLogger } from './utils/logger';
+import { createLogger } from '../utils/logger';
 
 const logger = createLogger('StorageConfig');
 

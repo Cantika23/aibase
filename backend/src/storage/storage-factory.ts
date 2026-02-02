@@ -35,7 +35,7 @@ import {
   printStorageConfig,
   type StorageConfig,
 } from './storage-config';
-import { createLogger } from './utils/logger';
+import { createLogger } from '../utils/logger';
 
 const logger = createLogger('StorageFactory');
 

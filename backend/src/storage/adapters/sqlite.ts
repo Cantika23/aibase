@@ -14,7 +14,7 @@ import {
   type Migration,
   type MigrationDirection,
 } from '../abstraction/database';
-import { createLogger } from '../utils/logger';
+import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('SQLiteAdapter');
 

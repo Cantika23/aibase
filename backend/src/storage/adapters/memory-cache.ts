@@ -14,7 +14,7 @@ import {
   AbstractCache,
   type CacheConfig,
 } from '../abstraction/cache';
-import { createLogger } from '../utils/logger';
+import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('MemoryCache');
 

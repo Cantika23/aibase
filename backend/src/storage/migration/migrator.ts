@@ -28,7 +28,7 @@ import {
   createCache,
 } from '../abstraction';
 import type { DatabaseConfig, FileStorageConfig, CacheConfig } from '../abstraction';
-import { createLogger } from '../utils/logger';
+import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('Migrator');
 
