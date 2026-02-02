@@ -44,3 +44,7 @@ bins/aimeow/*.macos
 bins/duckdb/duckdb-manager
 bins/duckdb/duckdb-manager.exe
 bins/duckdb/bin/
+
+
+.beads
+.crush

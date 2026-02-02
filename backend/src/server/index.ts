@@ -160,6 +160,7 @@ import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware
 import { ProjectStorage } from "../storage/project-storage";
 import { TenantStorage } from "../storage/tenant-storage";
 import { logger } from "../utils/logger";
+import { initializeStorage, cleanupStorage, checkStorageHealth } from "../storage/storage-factory";
 
 /**
  * Normalize base path to ensure it starts with / and doesn't end with /
@@ -259,6 +260,14 @@ export class WebSocketServer {
     // Ensure all required directories exist
     const { ensureDirectories } = await import("../config/paths");
     await ensureDirectories();
+
+    // Initialize storage abstraction layer
+    try {
+      await initializeStorage();
+    } catch (error) {
+      logger.error({ error }, "Failed to initialize storage layer");
+      throw error;
+    }
 
     // Pre-bundle extension UIs to warm up cache (async, don't wait)
     const { preBundleExtensionUIs } = await import("./extension-ui-handler");
@@ -1018,11 +1027,13 @@ export class WebSocketServer {
 
         // Health check endpoint
         if (pathname === "/health") {
+          const storageHealth = await checkStorageHealth();
           return Response.json({
-            status: "healthy",
+            status: storageHealth.healthy ? "healthy" : "degraded",
             timestamp: Date.now(),
             connections: this.wsServer.getConnectionCount(),
             sessions: this.wsServer.getActiveSessions().length,
+            storage: storageHealth,
           });
         }
 
@@ -1095,6 +1106,9 @@ export class WebSocketServer {
    * Stop the server
    */
   async stop(): Promise<void> {
+    // Cleanup storage connections
+    await cleanupStorage();
+
     if (this.bunServer) {
       this.bunServer.stop();
       this.bunServer = null;
