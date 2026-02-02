@@ -221,7 +221,7 @@ export function MessageInput({
             enterKeyHint="send"
             inputMode="text"
             className={cn(
-              "z-10 w-full grow resize-none rounded-xl border border-input bg-background p-3 pr-24 text-sm ring-offset-background transition-[border] placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+              "z-10 w-full grow resize-none rounded-xl border border-input bg-background p-3 pr-24 text-base md:text-sm ring-offset-background transition-[border] placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
               showFileList && "pb-16",
               className
             )}
@@ -266,7 +266,7 @@ export function MessageInput({
             type="button"
             size="icon"
             variant="outline"
-            className="h-8 w-8"
+            className="h-10 w-10 touch-target"
             aria-label="Attach a file"
             onClick={async () => {
               const files = await showFileUploadDialog()
@@ -280,7 +280,7 @@ export function MessageInput({
           <Button
             type="button"
             variant="outline"
-            className={cn("h-8 w-8", isListening && "text-primary")}
+            className={cn("h-10 w-10 touch-target", isListening && "text-primary")}
             aria-label="Voice input"
             size="icon"
             onClick={toggleListening}
@@ -292,7 +292,7 @@ export function MessageInput({
           <Button
             type="button"
             size="icon"
-            className="h-8 w-8"
+            className="h-10 w-10 touch-target"
             aria-label="Stop generating"
             onClick={stop}
           >
@@ -302,7 +302,7 @@ export function MessageInput({
           <Button
             type="submit"
             size="icon"
-            className="h-8 w-8 transition-opacity"
+            className="h-10 w-10 touch-target transition-opacity"
             aria-label="Send message"
             disabled={(!props.value && !(props.allowAttachments && props.files?.length)) || isGenerating}
           >

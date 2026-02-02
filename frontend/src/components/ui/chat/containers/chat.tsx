@@ -186,10 +186,10 @@ export function Chat({
         )}
       </div>
 
-      {/* Input area - fixed height, never shrink */}
-      <div className="h-16 md:h-20 shrink-0 border-t bg-background px-3 md:px-0">
+      {/* Input area - sticky at bottom with safe area padding */}
+      <div className="shrink-0 border-t bg-background px-3 md:px-0 py-2 md:py-4 safe-area-bottom sticky bottom-0 z-20">
         <ChatForm
-          className="h-full max-w-[650px] mx-auto flex items-center"
+          className="max-w-[650px] mx-auto flex items-center"
           handleSubmit={handleSubmit}
         >
           {({ files, setFiles }) => (
@@ -202,7 +202,6 @@ export function Chat({
               stop={handleStop}
               isGenerating={isGenerating}
               transcribeAudio={transcribeAudio}
-              className="h-10 md:h-12"
             />
           )}
         </ChatForm>

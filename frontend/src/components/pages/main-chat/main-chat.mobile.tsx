@@ -112,21 +112,19 @@ export function MainChatMobile(props: MainChatProps) {
         </div>
       )}
 
-      {/* Chat Area */}
-      <div className="flex-1 min-h-0 relative">
-        <Chat
-          messages={messages}
-          input={input}
-          handleInputChange={handleInputChange}
-          handleSubmit={handleSubmit}
-          isGenerating={isLoading}
-          isHistoryLoading={isHistoryLoading}
-          stop={abort}
-          setMessages={setMessages}
-          className="h-full"
-          welcomeMessage={welcomeMessage}
-        />
-      </div>
+      {/* Chat Area - takes remaining space, Chat component handles its own flex layout */}
+      <Chat
+        messages={messages}
+        input={input}
+        handleInputChange={handleInputChange}
+        handleSubmit={handleSubmit}
+        isGenerating={isLoading}
+        isHistoryLoading={isHistoryLoading}
+        stop={abort}
+        setMessages={setMessages}
+        className="flex-1 min-h-0"
+        welcomeMessage={welcomeMessage}
+      />
 
       {/* Mobile Todo Sheet - slides up from bottom */}
       <Sheet open={todoSheetOpen} onOpenChange={setTodoSheetOpen}>

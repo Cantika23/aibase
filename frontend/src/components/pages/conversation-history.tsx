@@ -252,7 +252,7 @@ export function ConversationHistoryPage() {
                             )
                           }
                           disabled={regeneratingTitleId === conversation.convId}
-                          className="sm:opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0"
                           title="Regenerate title"
                         >
                           <RefreshCw className={`size-4 text-muted-foreground ${regeneratingTitleId === conversation.convId ? "animate-spin" : ""}`} />
@@ -267,7 +267,7 @@ export function ConversationHistoryPage() {
                               conversation.title
                             )
                           }
-                          className="sm:opacity-0  group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0"
                           title="Delete conversation"
                         >
                           <Trash2 className="size-4 text-destructive" />

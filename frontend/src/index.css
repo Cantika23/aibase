@@ -120,6 +120,28 @@
   .page-scrollable {
     @apply h-full overflow-y-auto;
   }
+
+  /* Mobile safe area handling for iOS notch and gesture bar */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* Mobile input container - stays above keyboard */
+  .mobile-input-sticky {
+    position: sticky;
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Minimum touch target size (44px per Apple/Google guidelines) */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 :root {
