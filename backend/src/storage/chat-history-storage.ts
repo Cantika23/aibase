@@ -272,17 +272,39 @@ export class ChatHistoryStorage {
 
       // Read all conversation directories (across all users)
       const entries = await fs.readdir(projectDir, { withFileTypes: true });
-      const userDirs = entries.filter(entry => entry.isDirectory());
+      const allDirs = entries.filter(entry => entry.isDirectory());
 
-      // Collect all conversation IDs from all users
-      const allConvIds = new Set<string>();
+      // Filter to only user directories (directories that contain other directories)
+      // Old-format conversation directories (e.g., wa_6281334373301) contain files like info.json
+      // New-format user directories (e.g., whatsapp_user_6281334373301) contain conversation subdirectories
+      const userDirs: typeof allDirs = [];
+      for (const dir of allDirs) {
+        const dirPath = path.join(projectDir, dir.name);
+        try {
+          const subEntries = await fs.readdir(dirPath, { withFileTypes: true });
+          const hasSubDirs = subEntries.some(e => e.isDirectory());
+          if (hasSubDirs) {
+            userDirs.push(dir);
+          }
+        } catch (error: any) {
+          // Skip directories we can't read
+        }
+      }
+
+      // Collect all conversation IDs with their associated userId
+      // Map structure: convId -> userId
+      const convIdToUserId = new Map<string, string>();
       for (const userDir of userDirs) {
         const userPath = path.join(projectDir, userDir.name);
         try {
           const convEntries = await fs.readdir(userPath, { withFileTypes: true });
           for (const convEntry of convEntries) {
             if (convEntry.isDirectory()) {
-              allConvIds.add(convEntry.name);
+              // Only add if we haven't seen this convId before
+              // If the same convId exists under multiple users, keep the first one found
+              if (!convIdToUserId.has(convEntry.name)) {
+                convIdToUserId.set(convEntry.name, userDir.name);
+              }
             }
           }
         } catch (error: any) {
@@ -292,9 +314,9 @@ export class ChatHistoryStorage {
         }
       }
 
-      // Get metadata for each conversation in parallel
-      const metadataPromises = Array.from(allConvIds).map(async (convId) => {
-        return await this.getChatHistoryMetadata(convId, projectId, tenantId);
+      // Get metadata for each conversation in parallel, with the correct userId
+      const metadataPromises = Array.from(convIdToUserId.entries()).map(async ([convId, userId]) => {
+        return await this.getChatHistoryMetadata(convId, projectId, tenantId, userId);
       });
 
       const metadataResults = await Promise.all(metadataPromises);
