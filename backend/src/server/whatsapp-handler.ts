@@ -1122,6 +1122,9 @@ async function processWhatsAppMessageWithAI(
     // Track tool execution results to send if AI response is empty
     const toolResults: Array<{ toolName: string; result: any }> = [];
     let toolResultSent = false;
+    
+    // Track sent notification messages to prevent duplicates
+    const sentNotifications = new Set<string>();
 
     // Load built-in tools for this conversation (includes script tool with extensions)
     const tools = getBuiltinTools(convId, projectId, tenantId, uid);
@@ -1163,6 +1166,14 @@ Always answer in the same language as the user (Indonesian/English).`,
               const progressMessage = args.__result.message;
               console.log("[WhatsApp] Script progress:", progressMessage);
 
+              // Check if we already sent this exact notification
+              const notificationKey = `progress:${progressMessage}`;
+              if (sentNotifications.has(notificationKey)) {
+                console.log("[WhatsApp] Skipping duplicate progress notification:", progressMessage);
+                return;
+              }
+              sentNotifications.add(notificationKey);
+
               // Send progress update to WhatsApp
               try {
                 await sendWhatsAppMessage(projectId, whatsappNumber, {
@@ -1187,6 +1198,14 @@ Always answer in the same language as the user (Indonesian/English).`,
             } else {
               notificationText = `🔧 Using tool: ${toolName}...`;
             }
+
+            // Check if we already sent this exact notification
+            const notificationKey = `tool:${notificationText}`;
+            if (sentNotifications.has(notificationKey)) {
+              console.log("[WhatsApp] Skipping duplicate tool notification:", notificationText);
+              return;
+            }
+            sentNotifications.add(notificationKey);
 
             console.log("[WhatsApp] Tool started:", toolName, notificationText);
             try {
