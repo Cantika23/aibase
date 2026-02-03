@@ -42,17 +42,20 @@ $jobs = @()
 if ($env:AIMEOW -eq "true") {
     $AimeowDir = Join-Path $ScriptDir "bins\aimeow"
     $AimeowBinary = Join-Path $AimeowDir "aimeow.win.exe"
-    $AimeowSource = Join-Path $AimeowDir "main.go"
 
-    # Check if we need to build
+    # Check if we need to build (check all .go files)
     $NeedBuild = $false
     if (!(Test-Path $AimeowBinary)) {
         $NeedBuild = $true
     } else {
         $binaryTime = (Get-Item $AimeowBinary).LastWriteTime
-        $sourceTime = (Get-Item $AimeowSource).LastWriteTime
-        if ($sourceTime -gt $binaryTime) {
-            $NeedBuild = $true
+        # Check if any .go file is newer than the binary
+        $goFiles = Get-ChildItem -Path $AimeowDir -Filter "*.go"
+        foreach ($file in $goFiles) {
+            if ($file.LastWriteTime -gt $binaryTime) {
+                $NeedBuild = $true
+                break
+            }
         }
     }
 
