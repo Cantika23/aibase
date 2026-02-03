@@ -408,16 +408,35 @@ export class SubClientStorage {
 
   /**
    * Get all users for a sub-client
+   * Note: Need to fetch user details from UserStorage since users table is in a different database
    */
   getUsers(subClientId: string): { id: number; username: string; email: string; role: SubClientUserRole }[] {
+    // Get user IDs and roles from sub_client_users table
     const stmt = this.db.prepare(`
-      SELECT u.id, u.username, u.email, scu.role
-      FROM users u
-      INNER JOIN sub_client_users scu ON u.id = scu.user_id
-      WHERE scu.sub_client_id = ?
-      ORDER BY u.username
+      SELECT user_id, role
+      FROM sub_client_users
+      WHERE sub_client_id = ?
+      ORDER BY user_id
     `);
-    return stmt.all(subClientId) as any[];
+    const subClientUsers = stmt.all(subClientId) as Array<{ user_id: number; role: SubClientUserRole }>;
+
+    // Fetch user details from UserStorage
+    const { UserStorage } = require('./user-storage');
+    const userStorage = UserStorage.getInstance();
+
+    return subClientUsers.map(scu => {
+      const user = userStorage.getById(scu.user_id);
+      if (!user) {
+        // User doesn't exist, skip
+        return null;
+      }
+      return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: scu.role,
+      };
+    }).filter((u): u is { id: number; username: string; email: string; role: SubClientUserRole } => u !== null);
   }
 
   /**

@@ -73,6 +73,7 @@ import {
   handleRemoveSubClientUser,
   handleUpdateSubClientUserRole,
   handleLookupSubClient,
+  handleGetProjectUsers,
 } from "./sub-client-handler";
 import {
   handleGetExtensions,
@@ -787,6 +788,13 @@ export class WebSocketServer {
         // GET /api/sub-clients/lookup - Lookup sub-client by pathname or custom domain
         if (pathname === "/api/sub-clients/lookup" && req.method === "GET") {
           return handleLookupSubClient(req);
+        }
+
+        // GET /api/projects/:projectId/users - Get users in project's tenant
+        const projectUsersMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/users$/);
+        if (projectUsersMatch && req.method === "GET") {
+          const projectId = projectUsersMatch[1];
+          return handleGetProjectUsers(req, projectId!);
         }
 
         // GET /api/projects/:projectId/sub-clients

@@ -697,3 +697,53 @@ export async function handleUpdateSubClientUserRole(req: Request, projectId: str
     );
   }
 }
+
+/**
+ * Handle GET /api/projects/:projectId/users - Get all users in the project's tenant
+ * This returns users that can potentially be added to sub-clients within the project
+ */
+export async function handleGetProjectUsers(req: Request, projectId: string): Promise<Response> {
+  try {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      return Response.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has access to the project
+    const hasAccess = projectStorage.userHasAccess(projectId, auth.user.id, auth.user.tenant_id);
+    if (!hasAccess) {
+      return Response.json(
+        { success: false, error: "Access denied" },
+        { status: 403 }
+      );
+    }
+
+    // Get project to find tenant
+    const project = projectStorage.getById(projectId);
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get all users in the project's tenant
+    const { UserStorage } = await import("../storage/user-storage");
+    const userStorage = UserStorage.getInstance();
+    const users = userStorage.getByTenantId(project.tenant_id ?? 0);
+
+    return Response.json({
+      success: true,
+      data: { users },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error getting project users");
+    return Response.json(
+      { success: false, error: error instanceof Error ? error.message : "Failed to get project users" },
+      { status: 500 }
+    );
+  }
+}

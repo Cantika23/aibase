@@ -144,6 +144,7 @@ if [ "$AIMEOW" = "true" ]; then
     BASE_URL=http://localhost:7031 \
     CALLBACK_URL=http://localhost:5040/api/whatsapp/webhook \
     DATA_DIR=. \
+    AIMEOW_LOG_CONFIG="$SCRIPT_DIR/logging.json" \
     "$AIMEOW_BINARY" 2>&1 &
 fi
 

@@ -1,10 +1,139 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
+	"sync"
 	"time"
 )
+
+// LoggingConfig represents the logging configuration from logging.json
+type LoggingConfig struct {
+	Enabled bool          `json:"enabled"`
+	Filters []FilterEntry `json:"filters"`
+	Outputs struct {
+		Console struct {
+			Enabled bool `json:"enabled"`
+		} `json:"console"`
+	} `json:"outputs"`
+}
+
+// FilterEntry represents a filter entry in logging.json
+type FilterEntry struct {
+	Executable string               `json:"executable"`
+	Level      string               `json:"level"`
+	Categories map[string]bool      `json:"categories"`
+}
+
+// Log level priorities
+var levelPriorities = map[string]int{
+	"trace": 0,
+	"debug": 1,
+	"info":  2,
+	"warn":  3,
+	"error": 4,
+	"fatal": 5,
+}
+
+var (
+	logConfig     *LoggingConfig
+	configOnce    sync.Once
+	configErr     error
+)
+
+// loadLoggingConfig loads and parses the logging.json file
+func loadLoggingConfig() (*LoggingConfig, error) {
+	var err error
+	configOnce.Do(func() {
+		// Try to find logging.json by checking environment variable or common locations
+		var configPath string
+
+		// Check if AIMEOW_LOG_CONFIG env var is set
+		if envPath := os.Getenv("AIMEOW_LOG_CONFIG"); envPath != "" {
+			configPath = envPath
+		} else {
+			// Try current directory first
+			configPath = "logging.json"
+			if _, err := os.Stat(configPath); os.IsNotExist(err) {
+				// Try parent directory (in case we're in data/services/whatsapp)
+				configPath = "../../logging.json"
+				if _, err := os.Stat(configPath); os.IsNotExist(err) {
+					// Try going up more directories
+					configPath = "../../../logging.json"
+					if _, err := os.Stat(configPath); os.IsNotExist(err) {
+						// File not found, use default
+						logConfig = &LoggingConfig{Enabled: true}
+						return
+					}
+				}
+			}
+		}
+
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			// If file doesn't exist, use default (log everything)
+			logConfig = &LoggingConfig{Enabled: true}
+			return
+		}
+
+		logConfig = &LoggingConfig{}
+		err = json.Unmarshal(data, logConfig)
+	})
+
+	return logConfig, err
+}
+
+// shouldLog determines if a log message should be output based on config
+func shouldLog(category string, level LogLevel) bool {
+	cfg, err := loadLoggingConfig()
+	if err != nil || !cfg.Enabled {
+		return false
+	}
+
+	if !cfg.Outputs.Console.Enabled {
+		return false
+	}
+
+	// Find matching filter for this executable
+	var filter *FilterEntry
+	for _, f := range cfg.Filters {
+		if f.Executable == "aimeow" || f.Executable == "*" {
+			filter = &f
+			break
+		}
+	}
+
+	if filter == nil {
+		return false
+	}
+
+	// Check level
+	levelStr := strings.ToLower(level.String())
+	if filterLevel, ok := levelPriorities[filter.Level]; ok {
+		if msgLevel, ok := levelPriorities[levelStr]; ok {
+			if msgLevel < filterLevel {
+				return false
+			}
+		}
+	}
+
+	// Check categories (case-insensitive)
+	categoryMatched := false
+	for cat, enabled := range filter.Categories {
+		if cat == "*" {
+			if enabled {
+				categoryMatched = true
+				break
+			}
+		} else if strings.EqualFold(cat, category) {
+			return enabled
+		}
+	}
+
+	return categoryMatched
+}
 
 // LogLevel represents the severity level
 type LogLevel int
@@ -95,6 +224,11 @@ func NewLogger(category string) *Logger {
 
 // log writes a formatted log message
 func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
+	// Check if this log should be output based on config
+	if !shouldLog(l.category, level) {
+		return
+	}
+
 	now := time.Now()
 	timestamp := now.Format("15:04:05.000")
 	reset := "\x1b[0m"

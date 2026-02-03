@@ -164,12 +164,14 @@ if ($env:AIMEOW -eq "true") {
     $env:BASE_URL = "http://localhost:7031"
     $env:CALLBACK_URL = "http://localhost:5040/api/whatsapp/webhook"
     $env:DATA_DIR = "."
+    $env:AIMEOW_LOG_CONFIG = Join-Path $ScriptDir "logging.json"
 
     Push-Location $AimeowDataDir
     $aimeowJob = Start-Job -ScriptBlock {
-        param($BinaryPath)
+        param($BinaryPath, $LogConfigPath)
+        $env:AIMEOW_LOG_CONFIG = $LogConfigPath
         & $BinaryPath 2>&1 | ForEach-Object { Write-Host $_ }
-    } -ArgumentList $AimeowBinary
+    } -ArgumentList $AimeowBinary, $env:AIMEOW_LOG_CONFIG
     $jobs += $aimeowJob
     Pop-Location
 }

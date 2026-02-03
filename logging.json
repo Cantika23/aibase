@@ -7,14 +7,14 @@
       "level": "info",
       "categories": {
         "Core": true,
-        "WebSocket": true,
-        "Auth": true,
-        "Storage": true,
-        "LLM": true,
-        "Extension": true,
-        "Tools": true,
-        "Handlers": true,
-        "Middleware": true,
+        "WebSocket": false,
+        "Auth": false,
+        "Storage": false,
+        "LLM": false,
+        "Extension": false,
+        "Tools": false,
+        "Handlers": false,
+        "Middleware": false,
         "Migration": false
       }
     },
@@ -23,13 +23,21 @@
       "level": "info",
       "categories": {
         "general": true,
-        "chat": true,
-        "files": true,
-        "auth": true,
-        "websocket": true,
-        "extensions": true,
-        "ui": true,
-        "api": true
+        "chat": false,
+        "files": false,
+        "auth": false,
+        "websocket": false,
+        "extensions": false,
+        "ui": false,
+        "api": false
+      }
+    },
+    {
+      "executable": "aimeow",
+      "level": "info",
+      "categories": {
+        "server": true,
+        "database": false
       }
     },
     {
