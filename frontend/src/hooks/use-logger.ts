@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useMemo, useRef } from 'react';
-import type { LogFeature, LogLevel } from '../lib/types/logs';
+import type { LogFeature } from '../lib/types/logs';
 import { logger, FeatureLogger } from '../lib/logger';
 
 /**

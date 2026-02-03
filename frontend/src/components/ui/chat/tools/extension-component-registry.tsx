@@ -179,7 +179,7 @@ async function loadComponentFromBackend(
 
       // Set current project ID for logging
       if (typeof window !== 'undefined' && projectId) {
-        (window as Record<string, unknown>).__currentProjectId = projectId;
+        ((window as unknown) as Record<string, unknown>).__currentProjectId = projectId;
       }
 
       // Execute with actual dependencies as arguments
@@ -200,7 +200,7 @@ async function loadComponentFromBackend(
 
       const windowFallback =
         typeof window !== "undefined"
-          ? ((window as Record<string, unknown>)[messageComponentName] ||
+          ? (((window as unknown) as Record<string, unknown>)[messageComponentName] ||
               (window as { libs?: Record<string, unknown> }).libs?.[messageComponentName])
           : null;
 

@@ -9,7 +9,7 @@ import type {
   LogEntry,
   LoggerConfig,
 } from './types/logs';
-import { LOG_LEVEL_PRIORITY, shouldLog } from './types/logs';
+import { shouldLog } from './types/logs';
 
 /**
  * Get auth token from localStorage (Zustand persist storage)
@@ -235,7 +235,11 @@ function createLog(
  * Logger class for a specific feature
  */
 export class FeatureLogger {
-  constructor(private feature: LogFeature) {}
+  private feature: LogFeature;
+  
+  constructor(feature: LogFeature) {
+    this.feature = feature;
+  }
 
   trace(message: string, context?: Record<string, unknown>): void {
     createLog('trace', this.feature, message, context);

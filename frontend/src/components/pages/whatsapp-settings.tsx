@@ -85,7 +85,7 @@ export function WhatsAppSettings() {
   const [conversationToDelete, setConversationToDelete] = useState<WhatsAppConversation | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef<boolean>(false as boolean); // Track latest connection status from WebSocket
-  const log = useLogger('whatsapp');
+  const log = useLogger('general');
 
   // Format phone number for display
   const formatPhoneNumber = (phone: string | null | undefined): string => {

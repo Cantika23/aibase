@@ -172,12 +172,9 @@ export function LoggerControls() {
     'general',
     'chat',
     'files',
-    'whatsapp',
     'auth',
     'websocket',
     'extensions',
-    'memory',
-    'context',
     'ui',
     'api',
   ];

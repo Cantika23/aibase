@@ -29,7 +29,7 @@ export interface UseMemoryReturn {
 
 export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
   const { projectId, autoLoad = true } = options;
-  const log = useLogger('memory');
+  const log = useLogger('general');
 
   const [memory, setMemory] = useState<MemoryStore>({});
   const [isLoading, setIsLoading] = useState(false);
