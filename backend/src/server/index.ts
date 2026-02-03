@@ -62,6 +62,17 @@ import {
   initWhatsAppNotifications,
 } from "./whatsapp-handler";
 import {
+  handleGetSubClients,
+  handleCreateSubClient,
+  handleGetSubClient,
+  handleUpdateSubClient,
+  handleDeleteSubClient,
+  handleGetSubClientUsers,
+  handleAddSubClientUser,
+  handleRemoveSubClientUser,
+  handleUpdateSubClientUserRole,
+} from "./sub-client-handler";
+import {
   handleGetExtensions,
   handleGetExtension,
   handleCreateExtension,
@@ -745,6 +756,84 @@ export class WebSocketServer {
           if (pathname === "/api/whatsapp/conversations/delete" && req.method === "DELETE") {
             return handleDeleteWhatsAppConversation(req);
           }
+
+          // Sub-client WhatsApp endpoints
+          // GET /api/projects/:projectId/sub-clients/:subClientId/whatsapp
+          const subClientWhatsAppMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/sub-clients\/([^\/]+)\/whatsapp$/);
+          if (subClientWhatsAppMatch && req.method === "GET") {
+            const projectId = subClientWhatsAppMatch[1];
+            const subClientId = subClientWhatsAppMatch[2];
+            // Delegate to handleGetWhatsAppClient with sub-client context
+            return handleGetWhatsAppClient(req, projectId!, subClientId);
+          }
+          if (subClientWhatsAppMatch && req.method === "POST") {
+            const projectId = subClientWhatsAppMatch[1];
+            const subClientId = subClientWhatsAppMatch[2];
+            // Create WhatsApp client for sub-client
+            return handleCreateWhatsAppClient(req, projectId!, subClientId);
+          }
+          if (subClientWhatsAppMatch && req.method === "DELETE") {
+            const projectId = subClientWhatsAppMatch[1];
+            const subClientId = subClientWhatsAppMatch[2];
+            // Delete WhatsApp client for sub-client
+            return handleDeleteWhatsAppClient(req, projectId!, subClientId);
+          }
+        }
+
+        // Sub-Clients API endpoints
+        // GET /api/projects/:projectId/sub-clients
+        const subClientsMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/sub-clients$/);
+        if (subClientsMatch) {
+          const projectId = subClientsMatch[1];
+          if (req.method === "GET") {
+            return handleGetSubClients(req, projectId!);
+          } else if (req.method === "POST") {
+            return handleCreateSubClient(req, projectId!);
+          }
+        }
+
+        // /api/projects/:projectId/sub-clients/:subClientId
+        const subClientIdMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/sub-clients\/([^\/]+)$/);
+        if (subClientIdMatch) {
+          const projectId = subClientIdMatch[1];
+          const subClientId = subClientIdMatch[2];
+          if (req.method === "GET") {
+            return handleGetSubClient(req, projectId!, subClientId!);
+          } else if (req.method === "PUT") {
+            return handleUpdateSubClient(req, projectId!, subClientId!);
+          } else if (req.method === "DELETE") {
+            return handleDeleteSubClient(req, projectId!, subClientId!);
+          }
+        }
+
+        // /api/projects/:projectId/sub-clients/:subClientId/users
+        const subClientUsersMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/sub-clients\/([^\/]+)\/users$/);
+        if (subClientUsersMatch) {
+          const projectId = subClientUsersMatch[1];
+          const subClientId = subClientUsersMatch[2];
+          if (req.method === "GET") {
+            return handleGetSubClientUsers(req, projectId!, subClientId!);
+          } else if (req.method === "POST") {
+            return handleAddSubClientUser(req, projectId!, subClientId!);
+          }
+        }
+
+        // /api/projects/:projectId/sub-clients/:subClientId/users/:userId
+        const subClientUserIdMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/sub-clients\/([^\/]+)\/users\/([^\/]+)$/);
+        if (subClientUserIdMatch && req.method === "DELETE") {
+          const projectId = subClientUserIdMatch[1];
+          const subClientId = subClientUserIdMatch[2];
+          const userId = subClientUserIdMatch[3];
+          return handleRemoveSubClientUser(req, projectId!, subClientId!, userId!);
+        }
+
+        // /api/projects/:projectId/sub-clients/:subClientId/users/:userId/role
+        const subClientUserRoleMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/sub-clients\/([^\/]+)\/users\/([^\/]+)\/role$/);
+        if (subClientUserRoleMatch && req.method === "PUT") {
+          const projectId = subClientUserRoleMatch[1];
+          const subClientId = subClientUserRoleMatch[2];
+          const userId = subClientUserRoleMatch[3];
+          return handleUpdateSubClientUserRole(req, projectId!, subClientId!, userId!);
         }
 
         // Embed Authentication endpoint

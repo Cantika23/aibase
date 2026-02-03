@@ -193,7 +193,7 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
     }
 
     const body = await req.json();
-    const { name, description, is_shared, show_history, show_files, show_context, show_memory, use_client_uid } = body as any;
+    const { name, description, is_shared, show_history, show_files, show_context, show_memory, use_client_uid, sub_clients_enabled } = body as any;
 
     const updates: {
       name?: string;
@@ -204,6 +204,7 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
       show_context?: boolean;
       show_memory?: boolean;
       use_client_uid?: boolean;
+      sub_clients_enabled?: boolean;
     } = {};
 
     if (name !== undefined) {
@@ -287,6 +288,13 @@ export async function handleUpdateProject(req: Request, projectId: string): Prom
         return Response.json({ success: false, error: "use_client_uid must be a boolean" }, { status: 400 });
       }
       updates.use_client_uid = use_client_uid;
+    }
+
+    if (sub_clients_enabled !== undefined) {
+      if (typeof sub_clients_enabled !== "boolean") {
+        return Response.json({ success: false, error: "sub_clients_enabled must be a boolean" }, { status: 400 });
+      }
+      updates.sub_clients_enabled = sub_clients_enabled;
     }
 
     const project = await projectStorage.update(projectId, auth.user.id, updates);

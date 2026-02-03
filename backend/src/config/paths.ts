@@ -132,6 +132,34 @@ export function getExtensionDir(projectId: string, extensionId: string, tenantId
 }
 
 /**
+ * Get sub-client directory path
+ */
+export function getSubClientDir(projectId: string, subClientId: string, tenantId: number | string): string {
+  return join(getProjectDir(projectId, tenantId), 'sub-clients', subClientId);
+}
+
+/**
+ * Get sub-client conversations directory
+ */
+export function getSubClientConversationsDir(projectId: string, subClientId: string, tenantId: number | string): string {
+  return join(getSubClientDir(projectId, subClientId, tenantId), 'conversations');
+}
+
+/**
+ * Get sub-client WhatsApp directory
+ */
+export function getSubClientWhatsAppDir(projectId: string, subClientId: string, tenantId: number | string): string {
+  return join(getSubClientDir(projectId, subClientId, tenantId), 'whatsapp');
+}
+
+/**
+ * Get sub-client files directory (shared files organized by sub-client)
+ */
+export function getSubClientFilesDir(projectId: string, subClientId: string, tenantId: number | string): string {
+  return join(getProjectFilesDir(projectId, tenantId), 'sub-clients', subClientId);
+}
+
+/**
  * Ensure all required directories exist
  */
 export async function ensureDirectories(): Promise<void> {

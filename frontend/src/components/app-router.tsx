@@ -31,6 +31,7 @@ const ExtensionsSettings = lazy(() => import("./pages/extensions-settings").then
 const ExtensionEditor = lazy(() => import("./pages/extension-editor").then(module => ({ default: module.ExtensionEditor })));
 const ExtensionAICreator = lazy(() => import("./pages/extension-ai-creator").then(module => ({ default: module.ExtensionAICreator })));
 const WhatsAppSettings = lazy(() => import("./pages/whatsapp-settings").then(module => ({ default: module.WhatsAppSettings })));
+const SubClientSettings = lazy(() => import("./pages/sub-client-settings").then(module => ({ default: module.SubClientSettings })));
 const DeveloperAPIPage = lazy(() => import("./pages/developer-api").then(module => ({ default: module.DeveloperAPIPage })));
 const ProfilePage = lazy(() => import("./pages/profile").then(module => ({ default: module.ProfilePage })));
 
@@ -263,6 +264,16 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
                     <ExtensionAICreator />
                   </ProjectRouteHandler>
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects/:projectId/sub-clients"
+              element={
+                <AdminRoute>
+                  <ProjectRouteHandler>
+                    <SubClientSettings />
+                  </ProjectRouteHandler>
+                </AdminRoute>
               }
             />
           </Route>

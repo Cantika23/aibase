@@ -27,6 +27,7 @@ export interface Project {
   show_context: boolean; // Show context tab
   show_memory: boolean; // Show memory tab
   use_client_uid: boolean; // Allow client to provide uid for persistence
+  sub_clients_enabled: boolean; // Whether sub-clients feature is enabled
   created_at: number;
   updated_at: number;
 }
@@ -42,6 +43,7 @@ export interface CreateProjectData {
   show_context?: boolean;
   show_memory?: boolean;
   use_client_uid?: boolean;
+  sub_clients_enabled?: boolean;
 }
 
 export interface UpdateProjectData {
@@ -53,6 +55,7 @@ export interface UpdateProjectData {
   show_context?: boolean;
   show_memory?: boolean;
   use_client_uid?: boolean;
+  sub_clients_enabled?: boolean;
 }
 
 export class ProjectStorage {
@@ -230,6 +233,56 @@ export class ProjectStorage {
       throw error;
     }
 
+    // Migration: Add sub_clients_enabled column if it doesn't exist
+    try {
+      const tableInfo = this.db.prepare('PRAGMA table_info(projects)').all() as any[];
+      const hasSubClientsEnabledColumn = tableInfo.some((col: any) => col.name === 'sub_clients_enabled');
+
+      if (!hasSubClientsEnabledColumn) {
+        logger.info('Migrating database: adding sub_clients_enabled column');
+        this.db.run('ALTER TABLE projects ADD COLUMN sub_clients_enabled INTEGER NOT NULL DEFAULT 0');
+        logger.info('Migration completed: sub_clients_enabled column added');
+      }
+    } catch (error) {
+      logger.error({ error }, 'sub_clients_enabled migration failed');
+      throw error;
+    }
+
+    // Create sub_clients table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS sub_clients (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        whatsapp_client_id TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create index for sub_clients lookups
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_project_id ON sub_clients(project_id)');
+
+    // Create sub_client_users table (junction table)
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS sub_client_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sub_client_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (sub_client_id) REFERENCES sub_clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(sub_client_id, user_id)
+      )
+    `);
+
+    // Create index for sub_client_users lookups
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_client_users_sub_client_id ON sub_client_users(sub_client_id)');
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_client_users_user_id ON sub_client_users(user_id)');
+
     logger.info(`Database initialized at ${this.dbPath}`);
   }
 
@@ -268,7 +321,8 @@ export class ProjectStorage {
 
     // Update with default values if provided
     if (data.show_history !== undefined || data.show_files !== undefined ||
-      data.show_context !== undefined || data.show_memory !== undefined || data.use_client_uid !== undefined) {
+      data.show_context !== undefined || data.show_memory !== undefined || 
+      data.use_client_uid !== undefined || data.sub_clients_enabled !== undefined) {
 
       const updates: string[] = [];
       const values: any[] = [];
@@ -278,6 +332,7 @@ export class ProjectStorage {
       if (data.show_context !== undefined) { updates.push('show_context = ?'); values.push(data.show_context ? 1 : 0); }
       if (data.show_memory !== undefined) { updates.push('show_memory = ?'); values.push(data.show_memory ? 1 : 0); }
       if (data.use_client_uid !== undefined) { updates.push('use_client_uid = ?'); values.push(data.use_client_uid ? 1 : 0); }
+      if (data.sub_clients_enabled !== undefined) { updates.push('sub_clients_enabled = ?'); values.push(data.sub_clients_enabled ? 1 : 0); }
 
       values.push(id);
 
@@ -315,6 +370,8 @@ export class ProjectStorage {
       show_files: row.show_files === 1,
       show_context: row.show_context === 1,
       show_memory: row.show_memory === 1,
+      use_client_uid: row.use_client_uid === 1,
+      sub_clients_enabled: row.sub_clients_enabled === 1,
     };
   }
 
@@ -352,6 +409,8 @@ export class ProjectStorage {
       show_files: row.show_files === 1,
       show_context: row.show_context === 1,
       show_memory: row.show_memory === 1,
+      use_client_uid: row.use_client_uid === 1,
+      sub_clients_enabled: row.sub_clients_enabled === 1,
     }));
   }
 
@@ -370,6 +429,8 @@ export class ProjectStorage {
       show_files: row.show_files === 1,
       show_context: row.show_context === 1,
       show_memory: row.show_memory === 1,
+      use_client_uid: row.use_client_uid === 1,
+      sub_clients_enabled: row.sub_clients_enabled === 1,
     }));
   }
 
@@ -437,6 +498,10 @@ export class ProjectStorage {
     if (updates.use_client_uid !== undefined) {
       fields.push('use_client_uid = ?');
       values.push(updates.use_client_uid ? 1 : 0);
+    }
+    if (updates.sub_clients_enabled !== undefined) {
+      fields.push('sub_clients_enabled = ?');
+      values.push(updates.sub_clients_enabled ? 1 : 0);
     }
 
     if (fields.length === 0) {
@@ -594,6 +659,8 @@ export class ProjectStorage {
       show_files: row.show_files === 1,
       show_context: row.show_context === 1,
       show_memory: row.show_memory === 1,
+      use_client_uid: row.use_client_uid === 1,
+      sub_clients_enabled: row.sub_clients_enabled === 1,
     };
   }
 

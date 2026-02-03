@@ -42,14 +42,15 @@ interface WhatsAppClient {
 }
 
 /**
- * Get WhatsApp client for a project
+ * Get WhatsApp client for a project or sub-client
  */
-export async function handleGetWhatsAppClient(req: Request, projectId?: string): Promise<Response> {
+export async function handleGetWhatsAppClient(req: Request, projectId?: string, subClientId?: string): Promise<Response> {
   try {
-    // Get project ID from query params if not provided
+    // Get IDs from query params if not provided
     if (!projectId) {
       const url = new URL(req.url);
       projectId = url.searchParams.get("projectId") || undefined;
+      subClientId = url.searchParams.get("subClientId") || undefined;
     }
 
     if (!projectId) {
@@ -70,9 +71,12 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
       );
     }
 
+    // Use sub-client ID as WhatsApp client ID if provided, otherwise use project ID
+    const whatsappClientId = subClientId || projectId;
+
     // Get client from aimeow API
     const url = `${WHATSAPP_API_URL}/clients`;
-    logger.info({ url }, "[WhatsApp] Fetching clients");
+    logger.info({ url, whatsappClientId }, "[WhatsApp] Fetching clients");
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -83,10 +87,10 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
 
     const data = await response.json();
 
-    // Find client for this project (client ID would be the projectId)
+    // Find client for this project or sub-client
     // Handle both array response and object with clients property
     const clientsArray = Array.isArray(data) ? data : (data as any).clients;
-    const client = clientsArray?.find((c: any) => c.id === projectId);
+    const client = clientsArray?.find((c: any) => c.id === whatsappClientId);
 
     if (!client) {
       return Response.json(
@@ -103,6 +107,7 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
         connected: client.is_connected || false,
         connectedAt: client.connectedAt,
         deviceName: client.osName || "WhatsApp Device",
+        subClientId: subClientId || null,
       },
     });
   } catch (error) {
@@ -115,12 +120,24 @@ export async function handleGetWhatsAppClient(req: Request, projectId?: string):
 }
 
 /**
- * Create new WhatsApp client for a project
+ * Create new WhatsApp client for a project or sub-client
  */
-export async function handleCreateWhatsAppClient(req: Request): Promise<Response> {
+export async function handleCreateWhatsAppClient(req: Request, projectId?: string, subClientId?: string): Promise<Response> {
   try {
-    const body = await req.json() as any;
-    const { projectId, osName } = body;
+    // If called directly with parameters, use them; otherwise parse from body
+    let osName: string;
+    let name: string;
+
+    if (!projectId) {
+      const body = await req.json() as any;
+      projectId = body.projectId;
+      subClientId = body.subClientId;
+      osName = body.osName;
+    } else {
+      // Called from server/index.ts with sub-client context
+      const body = await req.json() as any;
+      osName = body.osName;
+    }
 
     if (!projectId) {
       return Response.json(
@@ -140,15 +157,21 @@ export async function handleCreateWhatsAppClient(req: Request): Promise<Response
       );
     }
 
-    // Create client in aimeow API with projectId as the client ID
+    // Use sub-client ID as WhatsApp client ID if provided
+    const whatsappClientId = subClientId || projectId;
+    const clientName = osName || (subClientId 
+      ? `AIBase - ${project.name} (Sub-client)` 
+      : `AIBase - ${project.name}`);
+
+    // Create client in aimeow API
     const response = await fetch(`${WHATSAPP_API_URL}/clients/new`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        id: projectId,
-        os_name: osName || `AIBase - ${project.name}`,
+        id: whatsappClientId,
+        os_name: clientName,
       }),
     });
 
@@ -163,9 +186,10 @@ export async function handleCreateWhatsAppClient(req: Request): Promise<Response
     return Response.json({
       success: true,
       client: {
-        id: data.id || projectId,
+        id: data.id || whatsappClientId,
         connected: false,
-        deviceName: osName || `AIBase - ${project.name}`,
+        deviceName: clientName,
+        subClientId: subClientId || null,
       },
     });
   } catch (error) {
@@ -180,10 +204,15 @@ export async function handleCreateWhatsAppClient(req: Request): Promise<Response
 /**
  * Delete WhatsApp client
  */
-export async function handleDeleteWhatsAppClient(req: Request): Promise<Response> {
+export async function handleDeleteWhatsAppClient(req: Request, projectId?: string, subClientId?: string): Promise<Response> {
   try {
     const url = new URL(req.url);
-    const clientId = url.searchParams.get("clientId");
+    let clientId = url.searchParams.get("clientId");
+
+    // If called with sub-client context, use subClientId as clientId
+    if (!clientId && subClientId) {
+      clientId = subClientId;
+    }
 
     if (!clientId) {
       return Response.json(
@@ -203,6 +232,7 @@ export async function handleDeleteWhatsAppClient(req: Request): Promise<Response
 
     return Response.json({
       success: true,
+      subClientId: subClientId || null,
     });
   } catch (error) {
     logger.error({ error }, "[WhatsApp] Error deleting client");
@@ -289,8 +319,29 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       return Response.json({ success: true, ignored: true });
     }
 
-    // The clientId is the projectId
-    const projectId = clientId;
+    // The clientId could be a projectId or a subClientId
+    // Check if it's a sub-client first
+    const SubClientStorage = (await import("../storage/sub-client-storage")).SubClientStorage;
+    const subClientStorage = SubClientStorage.getInstance();
+    
+    let projectId: string;
+    let subClientId: string | null = null;
+    
+    // Try to find sub-client by ID (clientId starting with 'scl_' is a sub-client)
+    if (clientId.startsWith('scl_')) {
+      const subClient = subClientStorage.getById(clientId);
+      if (subClient) {
+        projectId = subClient.project_id;
+        subClientId = clientId;
+        logger.info({ projectId, subClientId }, "[WhatsApp] Message routed to sub-client");
+      } else {
+        logger.error({ clientId }, "[WhatsApp] Sub-client not found");
+        return Response.json({ success: false, error: "Sub-client not found" });
+      }
+    } else {
+      // It's a project ID
+      projectId = clientId;
+    }
 
     // Verify project exists
     const projectStorage = ProjectStorage.getInstance();
@@ -362,7 +413,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     // Extract WhatsApp phone number for reply target
     // For LID contacts: rawSenderAlt contains the actual phone number
     // For normal contacts: rawChat/rawSender contain the phone number
-    let whatsappNumber: string;
+    let whatsappNumber: string | undefined;
 
     // PRIORITY 1: rawSenderAlt - this always has the real phone number when available
     // This is critical for LID contacts where Chat/Sender contain the LID
@@ -497,12 +548,22 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
           });
 
           // === SAVE IMAGE TO WHATSAPP FOLDER ===
-          // Save image to data/projects/[tenant]/[project]/whatsapp/[phone]/
+          // Save image to data/projects/[tenant]/[project]/sub-clients/[sub-client]/whatsapp/[phone]/
+          // or data/projects/[tenant]/[project]/whatsapp/[phone]/ if no sub-client
           (async () => {
             try {
               const tenantId = project.tenant_id ? String(project.tenant_id) : 'default';
-              const projectDir = getProjectDir(projectId, tenantId);
-              const whatsappFilesDir = path.join(projectDir, "whatsapp", whatsappNumber);
+              let whatsappFilesDir: string;
+              
+              if (subClientId) {
+                // Use sub-client's whatsapp folder
+                const { getSubClientWhatsAppDir } = await import("../config/paths");
+                whatsappFilesDir = path.join(getSubClientWhatsAppDir(projectId, subClientId, tenantId), whatsappNumber);
+              } else {
+                // Use project's whatsapp folder
+                const projectDir = getProjectDir(projectId, tenantId);
+                whatsappFilesDir = path.join(projectDir, "whatsapp", whatsappNumber);
+              }
               
               // Ensure directory exists
               await fs.mkdir(whatsappFilesDir, { recursive: true });

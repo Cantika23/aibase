@@ -22,6 +22,7 @@ export interface Project {
   show_context: boolean;
   show_memory: boolean;
   use_client_uid: boolean;
+  sub_clients_enabled: boolean;
   created_at: number;
   updated_at: number;
 }

@@ -10,6 +10,7 @@ import {
   Puzzle,
   MessageCircle,
   Users,
+  Building2,
 } from "lucide-react"
 import { NavMain } from "@/components/layout/nav-main"
 import { NavUser } from "@/components/layout/nav-user"
@@ -74,25 +75,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
   ];
 
-  const workspaceItems = [
-    {
-      title: "Context",
-      url: getUrl("context"),
-      icon: FolderOpen,
-    },
-    {
-      title: "Files",
-      url: getUrl("files"),
-      icon: Files,
-    },
-    {
-      title: "Memory",
-      url: getUrl("memory"),
-      icon: Database,
-    },
-  ];
+  // Workspace items - admin only
+  const workspaceItems = [];
+  if (isAdmin) {
+    workspaceItems.push(
+      {
+        title: "Context",
+        url: getUrl("context"),
+        icon: FolderOpen,
+      },
+      {
+        title: "Files",
+        url: getUrl("files"),
+        icon: Files,
+      },
+      {
+        title: "Memory",
+        url: getUrl("memory"),
+        icon: Database,
+      }
+    );
+  }
 
-  const developerItems = [
+  // Developer items - admin only
+  const developerItems = [];
+  if (isAdmin) {
+    developerItems.push(
       {
           title: "API",
           url: getUrl("api"),
@@ -107,23 +115,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           title: "Extensions",
           url: getUrl("extensions"),
           icon: Puzzle,
-      },
-  ];
-
-  const managementItems = [];
-  if (aimeowEnabled) {
-      managementItems.push({
-          title: "WhatsApp",
-          url: getUrl("whatsapp"),
-          icon: MessageCircle,
-      });
+      }
+    );
   }
+
+  // Management items - admin only
+  const managementItems = [];
   if (isAdmin) {
-      managementItems.push({
-          title: "Users",
-          url: "/admin/users",
-          icon: Users,
-      });
+    if (aimeowEnabled) {
+        managementItems.push({
+            title: "WhatsApp",
+            url: getUrl("whatsapp"),
+            icon: MessageCircle,
+        });
+    }
+    managementItems.push({
+        title: "Sub-Clients",
+        url: getUrl("sub-clients"),
+        icon: Building2,
+    });
+    managementItems.push({
+        title: "Users",
+        url: "/admin/users",
+        icon: Users,
+    });
   }
 
 
@@ -138,9 +153,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain label="Platform" items={platformItems} />
-        <NavMain label="Workspace" items={workspaceItems} />
+        {(workspaceItems.length > 0) && <NavMain label="Workspace" items={workspaceItems} />}
         {(managementItems.length > 0) && <NavMain label="Management" items={managementItems} />}
-        {isAdmin && <NavMain label="Developer" items={developerItems} />}
+        {(developerItems.length > 0) && <NavMain label="Developer" items={developerItems} />}
       </SidebarContent>
       <SidebarFooter>
         {currentUser && (
