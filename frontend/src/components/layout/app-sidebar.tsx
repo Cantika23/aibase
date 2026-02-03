@@ -142,26 +142,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: Users,
     });
     
-    // Sub Client menu - items depend on enabled state
+    // Sub Client menu
     const subClientItems = [
       {
         title: "Settings",
         url: getUrl("sub-clients/settings"),
       },
     ];
-    
-    // Only show Dashboard and Management when sub-clients are enabled
+
+    // Only show Management when sub-clients are enabled
     if (subClientsEnabled) {
-      subClientItems.unshift(
-        {
-          title: "Dashboard",
-          url: getUrl("sub-clients"),
-        },
-        {
-          title: "Management",
-          url: getUrl("sub-clients/management"),
-        }
-      );
+      subClientItems.unshift({
+        title: "Management",
+        url: getUrl("sub-clients/management"),
+      });
     }
     
     items.push({

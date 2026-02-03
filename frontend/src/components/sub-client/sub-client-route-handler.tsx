@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSubClientStore } from "@/stores/sub-client-store";
-import { useProjectStore } from "@/stores/project-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogger } from "@/hooks/use-logger";
 import { buildApiUrl } from "@/lib/base-path";
@@ -21,6 +20,8 @@ interface SubClientLookupResponse {
       project_id: string;
       name: string;
       description: string | null;
+      short_id: string;
+      pathname: string;
     };
   };
   error?: string;
@@ -34,9 +35,8 @@ export function SubClientRouteHandler({ children }: SubClientRouteHandlerProps) 
   const log = useLogger('ui');
   const { shortPath } = useParams<{ shortPath: string }>();
   const navigate = useNavigate();
-  const { setCurrentSubClient, currentSubClient } = useSubClientStore();
-  const { currentProject } = useProjectStore();
-  const { user, isAuthenticated } = useAuthStore();
+  const { setCurrentSubClient } = useSubClientStore();
+  const { isAuthenticated } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,10 +77,13 @@ export function SubClientRouteHandler({ children }: SubClientRouteHandlerProps) 
 
         // Set the sub-client in store
         setCurrentSubClient({
-          ...subClient,
+          id: subClient.id,
           project_id: subClient.project_id,
+          name: subClient.name,
+          description: subClient.description,
           whatsapp_client_id: null,
-          pathname: pathname,
+          short_id: subClient.short_id,
+          pathname: subClient.pathname,
           custom_domain: null,
           created_at: 0,
           updated_at: 0,
@@ -97,7 +100,7 @@ export function SubClientRouteHandler({ children }: SubClientRouteHandlerProps) 
     };
 
     lookupSubClient();
-  }, [pathname, setCurrentSubClient, log]);
+  }, [shortPath, setCurrentSubClient, log]);
 
   // Show loading state
   if (isLoading) {
@@ -139,7 +142,7 @@ export function SubClientRouteHandler({ children }: SubClientRouteHandlerProps) 
             Please sign in to access this workspace
           </p>
           <button
-            onClick={() => navigate(`/s/${pathname}/login`)}
+            onClick={() => navigate(`/s/${shortPath}/login`)}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
             Sign In
