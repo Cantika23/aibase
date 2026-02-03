@@ -45,6 +45,7 @@ bins/duckdb/duckdb-manager
 bins/duckdb/duckdb-manager.exe
 bins/duckdb/bin/
 
-.agents
+.gemini
 .beads
 .crush
+.agents

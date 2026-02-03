@@ -1,4 +1,6 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Merriweather:wght@300;400;700&display=swap");
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -8,11 +10,35 @@
   --unparseable: 1;
 }
 
+/* Tiptap Editor Base Styles */
+.ProseMirror {
+  outline: none;
+  min-height: 500px;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Ensure clean typography inside editor */
+.prose {
+  max-width: none;
+}
+
 .sonner {
   --font-normal: 16px;
+  font-family: "Inter", sans-serif;
 }
 
 @theme {
+  --font-sans: "Inter", "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+  --font-serif: "Merriweather", "Georgia", "Cambria", "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "Monaco", monospace;
+
   --color-background: oklch(1 0 0);
   --color-foreground: oklch(0.145 0 0);
   --color-card: oklch(1 0 0);
@@ -97,6 +123,6 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased font-sans;
   }
 }
