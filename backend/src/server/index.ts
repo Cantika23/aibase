@@ -1111,7 +1111,6 @@ export class WebSocketServer {
     });
 
     logger.info(
-      { port: this.options.port, hostname: this.options.hostname },
       `WebSocket server started on http://${this.options.hostname}:${this.options.port}`
     );
   }
