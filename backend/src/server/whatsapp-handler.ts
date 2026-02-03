@@ -1370,14 +1370,19 @@ Always answer in the same language as the user (Indonesian/English).`,
     })();
 
     // Race between stream and timeout
-    await Promise.race([streamPromise, timeoutPromise]);
-    isComplete = true;
+    try {
+      await Promise.race([streamPromise, timeoutPromise]);
+      isComplete = true;
+      logger.info({ chunkCount, fullResponseLength: fullResponse.length }, "[WhatsApp] AI response complete");
+    } catch (error) {
+      logger.error({ error }, "[WhatsApp] Error or Timeout during AI processing");
+      // Continue to save history so we don't lose the user's message
+    }
 
-    logger.info({ chunkCount, fullResponseLength: fullResponse.length }, "[WhatsApp] AI response complete");
-
-    // Save conversation history
+    // Save conversation history (Filter out system prompt)
     const history = (conversation as any)._history || [];
-    await chatHistoryStorage.saveChatHistory(convId, history, projectId, tenantId, uid);
+    const cleanHistory = history.filter((msg: any) => msg.role !== 'system');
+    await chatHistoryStorage.saveChatHistory(convId, cleanHistory, projectId, tenantId, uid);
 
     // If tool result was already sent, we may not need to send AI's response
     // unless it contains additional useful information
@@ -1707,124 +1712,6 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
   }
 }
 
-/**
- * Get all WhatsApp conversations for a project
- */
-export async function handleGetWhatsAppConversations(req: Request): Promise<Response> {
-  try {
-    const url = new URL(req.url);
-    const projectId = url.searchParams.get("projectId");
 
-    if (!projectId) {
-      return Response.json(
-        { success: false, error: "Missing projectId" },
-        { status: 400 }
-      );
-    }
 
-    // Verify project exists
-    const projectStorage = ProjectStorage.getInstance();
-    const project = projectStorage.getById(projectId);
 
-    if (!project) {
-      return Response.json(
-        { success: false, error: "Project not found" },
-        { status: 404 }
-      );
-    }
-
-    // Load ChatHistoryStorage to get conversations
-    const { ChatHistoryStorage } = await import("../storage/chat-history-storage");
-    const chatHistoryStorage = ChatHistoryStorage.getInstance();
-
-    // Get all conversations for this project
-    const tenantId = project?.tenant_id ?? 'default'; // Use project's tenant
-    const allConversations = await chatHistoryStorage.listAllConversations(projectId, tenantId);
-
-    // Filter only WhatsApp conversations (convId starts with "wa_")
-    const whatsappConversations = allConversations
-      .filter((conv) => conv.convId.startsWith("wa_"))
-      .map((conv) => {
-        // Extract phone number from convId (format: wa_<phone_number>)
-        const phoneNumber = conv.convId.substring(3); // Remove "wa_" prefix
-        return {
-          convId: conv.convId,
-          phoneNumber: phoneNumber,
-          title: `WhatsApp - ${phoneNumber}`,
-          messageCount: conv.messageCount,
-          lastUpdatedAt: conv.lastUpdatedAt,
-          createdAt: conv.createdAt,
-        };
-      });
-
-    return Response.json({
-      success: true,
-      conversations: whatsappConversations,
-    });
-  } catch (error) {
-    logger.error({ error }, "[WhatsApp] Error getting conversations");
-    return Response.json(
-      { success: false, error: "Failed to get conversations" },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * Delete a WhatsApp conversation
- */
-export async function handleDeleteWhatsAppConversation(req: Request): Promise<Response> {
-  try {
-    const url = new URL(req.url);
-    const convId = url.searchParams.get("convId");
-    const projectId = url.searchParams.get("projectId");
-
-    if (!convId || !projectId) {
-      return Response.json(
-        { success: false, error: "Missing convId or projectId" },
-        { status: 400 }
-      );
-    }
-
-    // Verify conversation is a WhatsApp conversation
-    if (!convId.startsWith("wa_")) {
-      return Response.json(
-        { success: false, error: "Not a WhatsApp conversation" },
-        { status: 400 }
-      );
-    }
-
-    // Verify project exists
-    const projectStorage = ProjectStorage.getInstance();
-    const project = projectStorage.getById(projectId);
-
-    if (!project) {
-      return Response.json(
-        { success: false, error: "Project not found" },
-        { status: 404 }
-      );
-    }
-
-    // Delete conversation history
-    const { ChatHistoryStorage } = await import("../storage/chat-history-storage");
-    const chatHistoryStorage = ChatHistoryStorage.getInstance();
-
-    // Delete the conversation (using WhatsApp user UID)
-    const phoneNumber = convId.substring(3);
-    const uid = `whatsapp_user_${phoneNumber}`;
-    await chatHistoryStorage.deleteChatHistory(convId, projectId, uid);
-
-    logger.info({ convId, projectId }, "[WhatsApp] Deleted conversation");
-
-    return Response.json({
-      success: true,
-      message: "Conversation deleted successfully",
-    });
-  } catch (error) {
-    logger.error({ error }, "[WhatsApp] Error deleting conversation");
-    return Response.json(
-      { success: false, error: "Failed to delete conversation" },
-      { status: 500 }
-    );
-  }
-}

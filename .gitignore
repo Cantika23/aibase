@@ -49,3 +49,4 @@ bins/duckdb/bin/
 .beads
 .crush
 .agents
+.agent

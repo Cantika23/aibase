@@ -58,8 +58,6 @@ import {
   handleGetWhatsAppQRCode,
   handleWhatsAppWebhook,
   handleWhatsAppConnectionStatus,
-  handleGetWhatsAppConversations,
-  handleDeleteWhatsAppConversation,
   initWhatsAppNotifications,
 } from "./whatsapp-handler";
 import {
@@ -755,14 +753,6 @@ export class WebSocketServer {
 
           if (pathname === "/api/whatsapp/status" && req.method === "POST") {
             return handleWhatsAppConnectionStatus(req);
-          }
-
-          if (pathname === "/api/whatsapp/conversations" && req.method === "GET") {
-            return handleGetWhatsAppConversations(req);
-          }
-
-          if (pathname === "/api/whatsapp/conversations/delete" && req.method === "DELETE") {
-            return handleDeleteWhatsAppConversation(req);
           }
 
           // Sub-client WhatsApp endpoints
