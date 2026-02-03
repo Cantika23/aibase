@@ -244,6 +244,25 @@ export async function handleCreateNewChat(req: Request): Promise<Response> {
 
     const userId = body.userId as string || undefined; // Extract userId from body if sent
     
+    // Upsert contact/end-user if userId is provided (Web Channel)
+    if (userId && userId !== 'anonymous') {
+      try {
+        const { ContactStorage } = await import("../storage/contact-storage");
+        const contactStorage = ContactStorage.getInstance();
+        await contactStorage.upsert({
+          id: userId,
+          name: 'Web User', // We don't have a name yet for web/anonymous
+          channel: 'web',
+          metadata: {
+            projectId,
+            lastConvId: convId
+          }
+        });
+      } catch (err) {
+        logger.error({ err }, "Failed to upsert web contact");
+      }
+    }
+    
     // Get the chat directory path
     const chatDir = getConversationChatsDir(projectId as string, convId as string, tenantId, userId);
 

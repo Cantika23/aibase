@@ -5,9 +5,20 @@ import { logger } from "@/lib/logger";
 
 const API_BASE_URL = buildApiUrl("");
 
+export interface Contact {
+  id: string;
+  name: string;
+  channel: 'whatsapp' | 'web';
+  last_active: number;
+  metadata?: Record<string, any>;
+  created_at: number;
+  updated_at: number;
+}
+
 interface AdminStore {
   // State
   users: User[];
+  contacts: Contact[];
   isLoading: boolean;
   error: string | null;
 
@@ -18,6 +29,8 @@ interface AdminStore {
 
   // Async actions
   fetchUsers: (token: string) => Promise<void>;
+  fetchContacts: (token: string) => Promise<void>;
+  fetchContact: (token: string, contactId: string) => Promise<Contact | null>;
   createUser: (
     token: string,
     email: string,
@@ -26,6 +39,7 @@ interface AdminStore {
     role: "admin" | "user"
   ) => Promise<boolean>;
   deleteUser: (token: string, userId: number) => Promise<boolean>;
+  deleteContact: (token: string, contactId: string) => Promise<boolean>;
   impersonateUser: (token: string, userId: number) => Promise<{ user: User; token: string } | null>;
 
   // Tenant-specific user operations
@@ -47,9 +61,10 @@ interface AdminStore {
   deleteTenantUser: (token: string, tenantId: number, userId: number) => Promise<boolean>;
 }
 
-export const useAdminStore = create<AdminStore>((set, _get) => ({
+export const useAdminStore = create<AdminStore>((set, get) => ({
   // Initial state
   users: [],
+  contacts: [],
   isLoading: false,
   error: null,
 
@@ -371,4 +386,100 @@ export const useAdminStore = create<AdminStore>((set, _get) => ({
       return false;
     }
   },
+
+
+  // Contact operations
+  fetchContacts: async (token: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/contacts`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch contacts");
+      }
+
+      const data = await response.json();
+      set({ contacts: data.contacts, isLoading: false, error: null });
+    } catch (error: any) {
+      logger.auth.error("Fetch contacts error", { error: String(error) });
+      set({
+        error: error.message || "Failed to fetch contacts",
+        isLoading: false,
+      });
+    }
+  },
+
+  fetchContact: async (token: string, contactId: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/contacts/${contactId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch contact");
+      }
+
+      const contact = await response.json();
+      // Optionally update the contacts list with this single contact
+      set((state) => ({
+        contacts: state.contacts.some((c) => c.id === contactId) 
+          ? state.contacts.map((c) => c.id === contactId ? contact : c)
+          : [...state.contacts, contact],
+        isLoading: false, 
+        error: null 
+      }));
+      return contact;
+    } catch (error: any) {
+      logger.auth.error("Fetch contact error", { error: String(error) });
+      set({
+        error: error.message || "Failed to fetch contact",
+        isLoading: false,
+      });
+      return null;
+    }
+  },
+  deleteContact: async (token: string, contactId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/contacts/${contactId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to delete contact");
+        }
+
+        // Remove from list
+        const { contacts } = get();
+        set({
+            contacts: contacts.filter((c: Contact) => c.id !== contactId),
+            isLoading: false,
+            error: null
+        });
+        return true;
+    } catch (error: any) {
+        logger.auth.error("Delete contact error", { error: String(error) });
+        set({
+            error: error.message || "Failed to delete contact",
+            isLoading: false
+        });
+        return false;
+    }
+  }
 }));

@@ -129,6 +129,10 @@ export async function initializeStorage(options: InitializeOptions = {}): Promis
     await SessionStorage.getInstance().initialize();
     await TenantStorage.getInstance().initialize();
     await ProjectStorage.getInstance().initialize();
+    
+    // Initialize Contact Storage (New Unified User Management)
+    const { ContactStorage } = await import('./contact-storage');
+    await ContactStorage.getInstance().initialize();
 
     state.initialized = true;
     
@@ -173,6 +177,13 @@ export async function cleanupStorage(): Promise<void> {
   try {
     const { ProjectStorage } = await import('./project-storage');
     ProjectStorage.getInstance().close();
+  } catch (error) {
+    // Ignore - may not be initialized
+  }
+
+  try {
+    const { ContactStorage } = await import('./contact-storage');
+    ContactStorage.getInstance().close();
   } catch (error) {
     // Ignore - may not be initialized
   }

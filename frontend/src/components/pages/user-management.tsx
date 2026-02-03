@@ -7,6 +7,9 @@ import { useAuthStore } from "@/stores/auth-store";
 import { Users, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ContactsList } from "@/components/ui/contacts-list";
+import type { Contact } from "@/stores/admin-store";
 
 import {
   Dialog,
@@ -30,6 +33,9 @@ export function UserManagementPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // New: Tabs state
+  const [activeTab, setActiveTab] = useState("system-users");
 
   // Check if user has admin permissions
   const isAdmin = auth.user?.role === "admin";
@@ -76,6 +82,10 @@ export function UserManagementPage() {
 
       navigate("/");
     }
+  };
+
+  const handleViewContact = (contact: Contact) => {
+    navigate(`/admin/contacts/${contact.id}`);
   };
 
   if (!auth.isAuthenticated) {
@@ -129,13 +139,26 @@ export function UserManagementPage() {
           </h1>
         </div>
 
-        {/* Users List */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <UsersList
-            onDeleteUser={handleDeleteUser}
-            onImpersonateUser={handleImpersonateUser}
-          />
-        </div>
+        {/* Tabs */}
+        <Tabs defaultValue="system-users" className="flex-1 flex flex-col min-h-0" onValueChange={setActiveTab}>
+          <div className="flex items-center justify-center sm:justify-start mb-4">
+            <TabsList>
+              <TabsTrigger value="system-users">System Users</TabsTrigger>
+              <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="system-users" className="flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
+            <UsersList
+              onDeleteUser={handleDeleteUser}
+              onImpersonateUser={handleImpersonateUser}
+            />
+          </TabsContent>
+          
+          <TabsContent value="contacts" className="flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
+            <ContactsList onViewDetails={handleViewContact} />
+          </TabsContent>
+        </Tabs>
 
         {/* Create User Dialog */}
         <CreateUserDialog

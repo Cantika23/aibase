@@ -474,6 +474,9 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     // Ensure format is clean (digits only)
     if (whatsappNumber) {
       whatsappNumber = whatsappNumber.replace(/[^0-9]/g, '');
+    } else {
+      // Should not happen due to checks above, but needed for TS
+      return Response.json({ success: false, error: "Could not determine phone number" });
     }
 
     // FIX: Remove device-specific suffix if present (e.g. "33" or "32" at end of phone number)
@@ -503,6 +506,23 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     }
 
     const uid = `whatsapp_user_${whatsappNumber ?? ''}`;
+
+    // Upsert contact to Unified User Management
+    const { ContactStorage } = await import("../storage/contact-storage");
+    const contactStorage = ContactStorage.getInstance();
+    
+    await contactStorage.upsert({
+      id: whatsappNumber, // Use phone number as ID for contacts
+      name: messageData.pushName || whatsappNumber,
+      channel: 'whatsapp',
+      metadata: {
+        uid, // Link to the chat uid
+        projectId,
+        subClientId,
+        deviceName: messageData.deviceName,
+        isGroup: messageData.isGroup
+      }
+    });
 
     // Get or create conversation for this WhatsApp contact
     const { ChatHistoryStorage } = await import("../storage/chat-history-storage");

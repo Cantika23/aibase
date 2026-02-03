@@ -26,6 +26,7 @@ const FilesManagerPage = lazy(() => import("./pages/files-manager").then(module 
 const FileDetailPage = lazy(() => import("./pages/file-detail").then(module => ({ default: module.FileDetailPage })));
 const ProjectSelectorPage = lazy(() => import("./pages/project-selector").then(module => ({ default: module.ProjectSelectorPage })));
 const UserManagementPage = lazy(() => import("./pages/user-management").then(module => ({ default: module.UserManagementPage })));
+const ContactDetailPage = lazy(() => import("./pages/contact-detail").then(module => ({ default: module.ContactDetailPage })));
 const LoginPage = lazy(() => import("./pages/login").then(module => ({ default: module.LoginPage })));
 const AdminSetupPage = lazy(() => import("./pages/admin-setup").then(module => ({ default: module.AdminSetupPage })));
 const EmbedChatPage = lazy(() => import("./pages/embed-chat").then(module => ({ default: module.EmbedChatPage })));
@@ -135,6 +136,14 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               element={
                 <AdminRoute>
                   <UserManagementPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/contacts/:id"
+              element={
+                <AdminRoute>
+                  <ContactDetailPage />
                 </AdminRoute>
               }
             />

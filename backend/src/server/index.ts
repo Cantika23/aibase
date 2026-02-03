@@ -170,6 +170,10 @@ import {
   handleDeleteTenant as handleDeleteTenantAdmin,
   handleCheckSetup,
 } from "./setup-handler";
+
+// Contacts API endpoints
+import { handleGetContacts, handleGetContact, handleDeleteContact } from "./contacts-handler";
+
 import { handleFrontendLogs, handleLogsOptions } from "./logs-handler";
 import { tenantCheckMiddleware } from "../middleware/tenant-check";
 import { embedRateLimiter, embedWsRateLimiter, getClientIp } from "../middleware/rate-limiter";
@@ -1031,6 +1035,22 @@ export class WebSocketServer {
           } else if (req.method === "DELETE") {
             return handleDeleteTenantUser(req, tenantId!, userId!);
           }
+        }
+
+        // Match /api/contacts/:contactId endpoints
+        const contactIdMatch = pathname.match(/^\/api\/contacts\/([^\/]+)$/);
+        if (contactIdMatch) {
+          const contactId = contactIdMatch[1];
+          if (req.method === "GET") {
+             return handleGetContact(req, contactId!);
+          } else if (req.method === "DELETE") {
+             return handleDeleteContact(req, contactId!);
+          }
+        }
+
+        // Contacts API endpoints
+        if (pathname === "/api/contacts" && req.method === "GET") {
+          return handleGetContacts(req);
         }
 
         // Match /api/tenants/:tenantId/users endpoints
