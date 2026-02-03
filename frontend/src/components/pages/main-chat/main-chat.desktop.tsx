@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Chat } from "@/components/ui/chat/containers/chat";
 import { TodoPanel } from "@/components/status/todo-panel";
 import { CompactionStatus } from "@/components/status/compaction-status";
@@ -46,7 +47,10 @@ export function MainChatDesktop(props: MainChatProps) {
     <div className={cn("flex flex-col h-full", className)}>
       {/* Desktop Top Bar - fixed height with proper spacing for sidebar */}
       <div className="h-14 flex items-center justify-between px-6 border-b flex-shrink-0 bg-background">
-        <div>
+        <div className="flex items-center gap-2">
+           {!isEmbedMode && (
+             <SidebarTrigger />
+           )}
           {!isEmbedMode && messages.length > 0 && (
             <PageActionButton
               icon={Plus}

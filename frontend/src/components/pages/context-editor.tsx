@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/page-action-button";
 import { Save, Zap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { useProjectStore } from "@/stores/project-store";
@@ -187,8 +188,12 @@ export function ContextEditor() {
     <div className="flex h-full flex-col w-full max-w-full min-w-0">
 
       {/* Sticky Header */}
-      <div className="sticky top-16 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
-        <h1 className="text-lg font-semibold">Context Editor</h1>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger />
+          <h1 className="text-lg font-semibold">Context Editor</h1>
+        </div>
         <div className="flex items-center gap-4">
           {hasChanges && (
             <span className="text-sm text-amber-600 dark:text-amber-400 hidden md:inline-block">

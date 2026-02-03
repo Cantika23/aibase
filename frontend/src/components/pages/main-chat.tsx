@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Chat } from "@/components/ui/chat";
 import { TodoPanel } from "@/components/status/todo-panel";
 import { CompactionStatus } from "@/components/status/compaction-status";
@@ -175,8 +176,11 @@ export function MainChat({
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Top bar - fixed height and sticky */}
-      <div className="sticky top-16 z-20 h-12 md:h-14 flex items-center justify-between px-4 border-b flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div>
+      <div className="sticky top-0 z-20 h-12 md:h-14 flex items-center justify-between px-4 border-b flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center gap-2">
+          {!isEmbedMode && (
+             <SidebarTrigger />
+          )}
           {!isEmbedMode && messages.length > 0 && (
             <PageActionButton
               icon={Plus}

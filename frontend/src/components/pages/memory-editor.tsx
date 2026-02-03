@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMemory } from "@/hooks/use-memory";
 import { useProjectStore } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   PageActionButton,
 } from "@/components/ui/page-action-button";
@@ -182,10 +183,13 @@ export function MemoryEditor() {
   return (
     <div className="flex h-full flex-col">
       {/* Sticky Header Section */}
-      <div className="sticky top-16 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="flex flex-col gap-4 px-4 py-4 md:px-6">
           <div className="space-y-1">
-            <h1 className="text-lg font-semibold">Memory</h1>
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
+              <h1 className="text-lg font-semibold">Memory</h1>
+            </div>
             <p className="text-muted-foreground text-sm line-clamp-1 md:line-clamp-none">
               Store sensitive information securely and give the AI permanent knowledge.
             </p>
