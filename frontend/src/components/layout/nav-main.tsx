@@ -26,6 +26,7 @@ export function NavMain({
     url: string
     icon?: LucideIcon
     isActive?: boolean
+    defaultOpen?: boolean
     items?: {
       title: string
       url: string
@@ -59,7 +60,7 @@ export function NavMain({
             <Collapsible
               key={item.title}
               asChild
-              defaultOpen={isActive} // Open if active
+              defaultOpen={isActive || item.defaultOpen} // Open if active or explicitly set
               className="group/collapsible"
             >
               <SidebarMenuItem>

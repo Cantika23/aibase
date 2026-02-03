@@ -44,6 +44,7 @@ export function SubClientSettings() {
     subClients, 
     isLoading, 
     enabled,
+    setEnabled,
     fetchSubClients,
     createSubClient,
     deleteSubClient,
@@ -65,6 +66,16 @@ export function SubClientSettings() {
 
   // Check if user is project owner
   const isProjectOwner = currentProject?.user_id === useAuthStore.getState().user?.id;
+
+  // Sync enabled state from project when it changes
+  useEffect(() => {
+    if (currentProject) {
+      const projectEnabled = currentProject.sub_clients_enabled ?? false;
+      if (projectEnabled !== enabled) {
+        setEnabled(projectEnabled);
+      }
+    }
+  }, [currentProject?.id, currentProject?.sub_clients_enabled]);
 
   // Load sub-clients when project changes
   useEffect(() => {
@@ -95,9 +106,12 @@ export function SubClientSettings() {
 
       const data = await response.json();
       if (data.success) {
-        updateProject(currentProject.id, { sub_clients_enabled: !enabled });
-        toast.success(enabled ? "Sub-clients disabled" : "Sub-clients enabled");
-        if (!enabled) {
+        const newEnabled = !enabled;
+        updateProject(currentProject.id, { sub_clients_enabled: newEnabled });
+        // Also update the sub-client store's enabled state
+        useSubClientStore.getState().setEnabled(newEnabled);
+        toast.success(newEnabled ? "Sub-clients enabled" : "Sub-clients disabled");
+        if (newEnabled) {
           // Just enabled - fetch sub-clients
           fetchSubClients(currentProject.id);
         }

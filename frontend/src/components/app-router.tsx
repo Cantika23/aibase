@@ -279,6 +279,26 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
                 </AdminRoute>
               }
             />
+            <Route
+              path="/projects/:projectId/sub-clients/management"
+              element={
+                <AdminRoute>
+                  <ProjectRouteHandler>
+                    <SubClientSettings />
+                  </ProjectRouteHandler>
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/projects/:projectId/sub-clients/settings"
+              element={
+                <AdminRoute>
+                  <ProjectRouteHandler>
+                    <SubClientSettings />
+                  </ProjectRouteHandler>
+                </AdminRoute>
+              }
+            />
           </Route>
 
           {/* Sub-Client Routes */}

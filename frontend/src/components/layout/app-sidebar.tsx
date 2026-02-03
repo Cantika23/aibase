@@ -55,30 +55,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }, []);
 
   // Generate the URL for the current project
-  const getUrl = (path: string) => {
+  const getUrl = React.useCallback((path: string) => {
     if (!currentProject?.id) return "#";
     return `/projects/${currentProject.id}/${path}`;
-  };
+  }, [currentProject?.id]);
 
-  // Build Menu Data
-  const platformItems = [
+  // Build Menu Data - memoized to prevent unnecessary re-renders
+  const platformItems = React.useMemo(() => [
     {
       title: "Chat Interface",
       url: getUrl("chat"),
       icon: MessageSquare,
-      isActive: true, // Default active logic handled by NavMain checking URL
+      isActive: true,
     },
     {
         title: "History",
         url: getUrl("history"),
         icon: History,
     }
-  ];
+  ], [getUrl]);
 
   // Workspace items - admin only
-  const workspaceItems = [];
-  if (isAdmin) {
-    workspaceItems.push(
+  const workspaceItems = React.useMemo(() => {
+    if (!isAdmin) return [];
+    return [
       {
         title: "Context",
         url: getUrl("context"),
@@ -94,13 +94,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         url: getUrl("memory"),
         icon: Database,
       }
-    );
-  }
+    ];
+  }, [isAdmin, getUrl]);
 
   // Developer items - admin only
-  const developerItems = [];
-  if (isAdmin) {
-    developerItems.push(
+  const developerItems = React.useMemo(() => {
+    if (!isAdmin) return [];
+    return [
       {
           title: "API",
           url: getUrl("api"),
@@ -116,30 +116,64 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: getUrl("extensions"),
           icon: Puzzle,
       }
-    );
-  }
+    ];
+  }, [isAdmin, getUrl]);
 
-  // Management items - admin only
-  const managementItems = [];
-  if (isAdmin) {
+  // Check if sub-clients are enabled for current project
+  const subClientsEnabled = currentProject?.sub_clients_enabled ?? false;
+
+  // Management items - admin only - re-computed when project changes
+  const managementItems = React.useMemo(() => {
+    if (!isAdmin) return [];
+    
+    const items = [];
+    
     if (aimeowEnabled) {
-        managementItems.push({
+        items.push({
             title: "WhatsApp",
             url: getUrl("whatsapp"),
             icon: MessageCircle,
         });
     }
-    managementItems.push({
-        title: "Sub-Clients",
-        url: getUrl("sub-clients"),
-        icon: Building2,
-    });
-    managementItems.push({
+    
+    items.push({
         title: "Users",
         url: "/admin/users",
         icon: Users,
     });
-  }
+    
+    // Sub Client menu - items depend on enabled state
+    const subClientItems = [
+      {
+        title: "Settings",
+        url: getUrl("sub-clients/settings"),
+      },
+    ];
+    
+    // Only show Dashboard and Management when sub-clients are enabled
+    if (subClientsEnabled) {
+      subClientItems.unshift(
+        {
+          title: "Dashboard",
+          url: getUrl("sub-clients"),
+        },
+        {
+          title: "Management",
+          url: getUrl("sub-clients/management"),
+        }
+      );
+    }
+    
+    items.push({
+        title: "Sub Client",
+        url: getUrl("sub-clients"),
+        icon: Building2,
+        defaultOpen: subClientsEnabled,
+        items: subClientItems,
+    });
+    
+    return items;
+  }, [isAdmin, aimeowEnabled, subClientsEnabled, getUrl]);
 
 
   return (
