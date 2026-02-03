@@ -143,8 +143,8 @@ function getCategoryColor(category: string): string {
   const group = getCategoryGroup(category);
   
   // Check config-defined colors first (for groups)
-  if (config.categories?.[group]?.color) {
-    return config.categories[group].color!;
+  if (config.categoryColors?.[group]) {
+    return config.categoryColors[group];
   }
   
   // Fall back to built-in group colors

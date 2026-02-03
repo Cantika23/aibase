@@ -5,37 +5,39 @@
     {
       "executable": "backend",
       "level": "info",
-      "categories": [
-        "Core",
-        "WebSocket",
-        "Auth",
-        "Storage",
-        "LLM",
-        "Extension",
-        "Tools",
-        "Handlers",
-        "Middleware",
-        "Migration"
-      ]
+      "categories": {
+        "Core": true,
+        "WebSocket": true,
+        "Auth": true,
+        "Storage": true,
+        "LLM": true,
+        "Extension": true,
+        "Tools": true,
+        "Handlers": true,
+        "Middleware": true,
+        "Migration": false
+      }
     },
     {
       "executable": "frontend",
       "level": "info",
-      "categories": [
-        "general",
-        "chat",
-        "files",
-        "auth",
-        "websocket",
-        "extensions",
-        "ui",
-        "api"
-      ]
+      "categories": {
+        "general": true,
+        "chat": true,
+        "files": true,
+        "auth": true,
+        "websocket": true,
+        "extensions": true,
+        "ui": true,
+        "api": true
+      }
     },
     {
       "executable": "*",
       "level": "error",
-      "categories": ["*"]
+      "categories": {
+        "*": true
+      }
     }
   ],
   "outputs": {
@@ -51,24 +53,24 @@
       "maxFiles": 5
     }
   },
-  "categories": {
-    "Core": { "color": "magenta" },
-    "WebSocket": { "color": "blue" },
-    "Auth": { "color": "yellow" },
-    "Storage": { "color": "green" },
-    "LLM": { "color": "cyan" },
-    "Extension": { "color": "magenta" },
-    "Tools": { "color": "white" },
-    "Handlers": { "color": "cyan" },
-    "Middleware": { "color": "yellow" },
-    "Migration": { "color": "yellow" },
-    "general": { "color": "white" },
-    "chat": { "color": "blue" },
-    "files": { "color": "green" },
-    "auth_frontend": { "color": "yellow" },
-    "websocket": { "color": "cyan" },
-    "extensions": { "color": "magenta" },
-    "ui": { "color": "magenta" },
-    "api": { "color": "cyan" }
+  "categoryColors": {
+    "Core": "magenta",
+    "WebSocket": "blue",
+    "Auth": "yellow",
+    "Storage": "green",
+    "LLM": "cyan",
+    "Extension": "magenta",
+    "Tools": "white",
+    "Handlers": "cyan",
+    "Middleware": "yellow",
+    "Migration": "yellow",
+    "general": "white",
+    "chat": "blue",
+    "files": "green",
+    "auth": "yellow",
+    "websocket": "cyan",
+    "extensions": "magenta",
+    "ui": "magenta",
+    "api": "cyan"
   }
 }

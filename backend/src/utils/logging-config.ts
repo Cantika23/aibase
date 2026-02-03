@@ -81,14 +81,17 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   fatal: 5,
 };
 
+/** Category filter - can be object with boolean values or array of strings (legacy) */
+export type CategoryFilter = Record<string, boolean> | string[] | string;
+
 /** Individual filter rule from config */
 export interface LogFilter {
   /** Executable name pattern (e.g., "backend", "*", "start.*") */
   executable: string;
   /** Minimum log level (e.g., "info", "debug") */
   level: LogLevel;
-  /** Category patterns - array of patterns, * for all */
-  categories: string[];
+  /** Category filters - object with boolean values, or array of patterns, or "*" for all */
+  categories: CategoryFilter;
 }
 
 /** Parsed category pattern */
@@ -120,8 +123,8 @@ export interface LoggingConfig {
     console?: OutputConfig;
     file?: OutputConfig;
   };
-  /** Category-specific settings */
-  categories?: Record<string, { color?: string }>;
+  /** Category colors for display */
+  categoryColors?: Record<string, string>;
 }
 
 /** Raw config from JSON file */
@@ -130,12 +133,15 @@ interface RawLoggingConfig {
   filters?: Array<{
     executable?: string;
     level?: string;
-    categories?: string[] | string;
+    categories?: CategoryFilter;
   }>;
   outputs?: {
     console?: OutputConfig;
     file?: OutputConfig;
   };
+  /** Category colors - simple format: { "Category": "color" } */
+  categoryColors?: Record<string, string>;
+  /** Legacy category settings */
   categories?: Record<string, { color?: string }>;
 }
 
@@ -144,7 +150,7 @@ const DEFAULT_CONFIG: LoggingConfig = {
   enabled: true,
   executable: 'app',
   filters: [
-    { executable: '*', level: 'info', categories: ['*'] }
+    { executable: '*', level: 'info', categories: { '*': true } }
   ],
   outputs: {
     console: { enabled: true, colorize: true, timestamp: true },
@@ -237,14 +243,48 @@ function parseCategoryPattern(category: string): CategoryPattern {
 }
 
 /**
- * Parse categories from config (handles string or array)
+ * Check if a category is enabled in the filter
+ * Handles new object format { "Category": true } and legacy array/string formats
  */
-function parseCategories(categories: string[] | string | undefined): string[] {
-  if (!categories) return ['*'];
-  if (typeof categories === 'string') {
-    return categories.split(',').map(c => c.trim());
+function isCategoryEnabled(category: string, filterCategories: CategoryFilter): boolean {
+  // Handle object format: { "Core": true, "Auth": false }
+  if (typeof filterCategories === 'object' && !Array.isArray(filterCategories)) {
+    // Check exact match
+    if (filterCategories[category] === true) {
+      return true;
+    }
+    // Check wildcard "*"
+    if (filterCategories['*'] === true) {
+      return true;
+    }
+    // Check group match
+    const group = getCategoryGroup(category);
+    if (filterCategories[group] === true) {
+      return true;
+    }
+    return false;
   }
-  return categories;
+  
+  // Handle legacy array format: ["Core", "Auth"]
+  if (Array.isArray(filterCategories)) {
+    return categoriesMatchLegacy(category, filterCategories);
+  }
+  
+  // Handle legacy string format: "*" or "Core,Auth"
+  if (typeof filterCategories === 'string') {
+    const patterns = filterCategories.split(',').map(c => c.trim());
+    return categoriesMatchLegacy(category, patterns);
+  }
+  
+  return false;
+}
+
+/**
+ * Legacy category matching for array format
+ */
+function categoriesMatchLegacy(category: string, patterns: string[]): boolean {
+  const parsedPatterns = patterns.map(parseCategoryPattern);
+  return parsedPatterns.some(pattern => categoryMatches(category, pattern));
 }
 
 /**
@@ -292,14 +332,28 @@ export function loadLoggingConfig(): LoggingConfig {
       filters.push({
         executable: rawFilter.executable || '*',
         level: parseLevel(rawFilter.level || 'info'),
-        categories: parseCategories(rawFilter.categories),
+        categories: rawFilter.categories || { '*': true },
       });
     }
   }
   
   // If no valid filters, use default
   if (filters.length === 0) {
-    filters = [{ executable: '*', level: 'info', categories: ['*'] }];
+    filters = [{ executable: '*', level: 'info', categories: { '*': true } }];
+  }
+  
+  // Convert categoryColors - use new format or convert legacy format
+  let categoryColors: Record<string, string> | undefined;
+  if (rawConfig?.categoryColors) {
+    categoryColors = rawConfig.categoryColors;
+  } else if (rawConfig?.categories) {
+    // Convert legacy { "Category": { "color": "red" } } to { "Category": "red" }
+    categoryColors = {};
+    for (const [key, value] of Object.entries(rawConfig.categories)) {
+      if (value.color) {
+        categoryColors[key] = value.color;
+      }
+    }
   }
   
   return {
@@ -307,7 +361,7 @@ export function loadLoggingConfig(): LoggingConfig {
     executable,
     filters,
     outputs: rawConfig?.outputs || DEFAULT_CONFIG.outputs,
-    categories: rawConfig?.categories,
+    categoryColors,
   };
 }
 
@@ -421,9 +475,6 @@ export function shouldLog(level: LogLevel, category: string): boolean {
     return false;
   }
 
-  // Get the group for this category (for simplified filtering)
-  const group = getCategoryGroup(category);
-
   // Check each filter - if ANY filter matches, allow the log
   for (const filter of config.filters) {
     // Check executable match
@@ -436,8 +487,8 @@ export function shouldLog(level: LogLevel, category: string): boolean {
       continue;
     }
 
-    // Check category match (either specific category or its group)
-    if (!categoriesMatch(category, filter.categories) && !categoriesMatch(group, filter.categories)) {
+    // Check category match (handles object, array, and string formats)
+    if (!isCategoryEnabled(category, filter.categories)) {
       continue;
     }
 

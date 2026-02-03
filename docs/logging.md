@@ -22,24 +22,101 @@ The logging system is controlled by a single configuration file `logging.json` i
     {
       "executable": "backend",
       "level": "info",
-      "categories": ["Storage", "LLM", "Auth"]
+      "categories": {
+        "Core": true,
+        "WebSocket": true,
+        "Auth": true,
+        "Storage": true,
+        "LLM": true,
+        "Extension": true,
+        "Tools": false,
+        "Handlers": true,
+        "Middleware": false,
+        "Migration": false
+      }
     },
     {
       "executable": "frontend",
       "level": "info",
-      "categories": ["chat", "auth", "api"]
+      "categories": {
+        "general": true,
+        "chat": true,
+        "files": true,
+        "auth": true,
+        "websocket": true,
+        "extensions": true,
+        "ui": true,
+        "api": true
+      }
     }
   ],
   "outputs": {
     "console": { "enabled": true, "colorize": true },
     "file": { "enabled": true, "path": "./logs" }
+  },
+  "categoryColors": {
+    "Core": "magenta",
+    "WebSocket": "blue",
+    "Auth": "yellow",
+    "Storage": "green",
+    "LLM": "cyan"
   }
+}
+```
+
+## Turning Categories On/Off
+
+Categories are now controlled by **boolean values** in the filter:
+
+```json
+{
+  "executable": "backend",
+  "level": "info",
+  "categories": {
+    "Core": true,        // Enabled
+    "WebSocket": true,   // Enabled
+    "Auth": true,        // Enabled
+    "Storage": false,    // Disabled - no logs
+    "Tools": false       // Disabled - no logs
+  }
+}
+```
+
+### Quick Toggle Examples
+
+**Turn off WebSocket logs:**
+```json
+"categories": {
+  "WebSocket": false
+}
+```
+
+**Turn on only Storage and Auth:**
+```json
+"categories": {
+  "Core": false,
+  "WebSocket": false,
+  "Auth": true,
+  "Storage": true,
+  "LLM": false,
+  "Extension": false,
+  "Tools": false,
+  "Handlers": false,
+  "Middleware": false,
+  "Migration": false
+}
+```
+
+**Enable all with wildcard:**
+```json
+"categories": {
+  "*": true
 }
 ```
 
 ## Category Groups
 
-Categories are organized into **groups** for simplified filtering. You can filter by group or specific category.
+Categories are organized into **groups** for simplified filtering:
 
 | Group | Description | Example Categories |
 |-------|-------------|-------------------|
@@ -77,43 +154,68 @@ Filters determine which logs are output. A log is output if **ANY** filter match
 |----------|------|-------------|---------|
 | `executable` | string | Executable name pattern | `"backend"`, `"*"`, `"start.*"` |
 | `level` | string | Minimum log level | `"trace"`, `"debug"`, `"info"`, `"warn"`, `"error"`, `"fatal"` |
-| `categories` | string[] | Category/group patterns | `["Storage"]`, `["*Handler"]`, `["*"]` |
+| `categories` | object | Categories with boolean values | `{ "Storage": true, "WebSocket": false }` |
 
-### Pattern Matching
+### Complete Examples
 
-#### Executable Patterns
-- `"backend"` - Exact match
-- `"*"` - Matches any executable
-- `"start.*"` - Matches executables starting with "start."
+**Development - verbose:**
+```json
+{
+  "executable": "backend",
+  "level": "debug",
+  "categories": {
+    "*": true
+  }
+}
+```
 
-#### Category Patterns
-- `"*"` - Matches all
-- `"Storage"` - Matches the Storage group (all storage categories)
-- `"UserStorage"` - Matches specific category
-- `"*Storage"` - Matches categories ending with "Storage"
+**Production - errors only:**
+```json
+{
+  "executable": "*",
+  "level": "error",
+  "categories": {
+    "*": true
+  }
+}
+```
 
-### Filter Examples
-
+**Focus on specific areas:**
 ```json
 {
   "filters": [
-    // Backend: debug+ for Storage and LLM groups
+    {
+      "executable": "backend",
+      "level": "info",
+      "categories": {
+        "Storage": true,
+        "LLM": true,
+        "Auth": true
+      }
+    }
+  ]
+}
+```
+
+**Different levels for different categories:**
+```json
+{
+  "filters": [
     {
       "executable": "backend",
       "level": "debug",
-      "categories": ["Storage", "LLM"]
+      "categories": {
+        "Storage": true,
+        "LLM": true
+      }
     },
-    // Frontend: info+ for all frontend categories
     {
-      "executable": "frontend",
-      "level": "info",
-      "categories": ["*"]
-    },
-    // All executables: error+ only
-    {
-      "executable": "*",
-      "level": "error",
-      "categories": ["*"]
+      "executable": "backend",
+      "level": "warn",
+      "categories": {
+        "WebSocket": true,
+        "Tools": true
+      }
     }
   ]
 }
@@ -199,20 +301,21 @@ Example:
 
 ## Category Colors
 
-Categories have colors for console output (defined in `logging.json`):
+Category colors are defined in `categoryColors`:
 
-| Group | Color |
-|-------|-------|
-| Core | Magenta |
-| WebSocket | Blue |
-| Auth | Yellow |
-| Storage | Green |
-| LLM | Cyan |
-| Extension | Magenta |
-| Tools | White |
-| Handlers | Cyan |
-| Middleware | Yellow |
-| Migration | Yellow |
+```json
+{
+  "categoryColors": {
+    "Core": "magenta",
+    "WebSocket": "blue",
+    "Auth": "yellow",
+    "Storage": "green",
+    "LLM": "cyan"
+  }
+}
+```
+
+Available colors: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `bright*` variants.
 
 ## Hot Reload
 
@@ -231,6 +334,28 @@ To completely disable logging:
 Or via environment variable:
 ```bash
 LOG_ENABLED=false npm run dev
+```
+
+## Legacy Format Support
+
+The system still supports the legacy array format for backward compatibility:
+
+```json
+{
+  "categories": ["Core", "Auth", "Storage"]
+}
+```
+
+But the new object format with boolean values is recommended:
+
+```json
+{
+  "categories": {
+    "Core": true,
+    "Auth": true,
+    "Storage": true
+  }
+}
 ```
 
 ## See Also

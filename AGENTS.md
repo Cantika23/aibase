@@ -110,7 +110,7 @@ The project uses a **centralized logging configuration** via `logging.json` in t
 
 #### Configuration File (`logging.json`)
 
-Categories are organized into **groups** for simplified configuration:
+Categories are organized into **groups** with **boolean values** for easy toggling:
 
 | Group | Includes |
 |-------|----------|
@@ -129,16 +129,26 @@ Categories are organized into **groups** for simplified configuration:
 {
   "enabled": true,
   "filters": [
-    { "executable": "backend", "level": "info", "categories": ["Storage", "LLM", "Auth"] },
-    { "executable": "*", "level": "warn", "categories": ["*"] }
+    { 
+      "executable": "backend", 
+      "level": "info", 
+      "categories": {
+        "Core": true,
+        "WebSocket": true,
+        "Auth": true,
+        "Storage": false,
+        "LLM": true,
+        "Tools": false
+      }
+    }
   ]
 }
 ```
 
-**Pattern wildcards:**
-- `"*"` - matches all
-- `"prefix*"` - matches categories starting with "prefix"
-- `"*suffix"` - matches categories ending with "suffix"
+**Toggle categories:**
+- `"Category": true` - enabled
+- `"Category": false` - disabled
+- `"*": true` - matches all categories
 
 **Note:** You can filter by group name (e.g., `Storage`) or specific category (e.g., `UserStorage`). Both work!
 
