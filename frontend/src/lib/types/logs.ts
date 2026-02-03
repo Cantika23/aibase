@@ -5,17 +5,14 @@
 /** Log severity levels */
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
-/** Feature domains for categorizing logs */
+/** Feature domains for categorizing logs - aligned with logging.json */
 export type LogFeature = 
   | 'general'
   | 'chat'
   | 'files'
-  | 'whatsapp'
   | 'auth'
   | 'websocket'
   | 'extensions'
-  | 'memory'
-  | 'context'
   | 'ui'
   | 'api';
 

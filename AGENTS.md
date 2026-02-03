@@ -102,7 +102,45 @@ All pages MUST follow consistent layout patterns to ensure proper spacing and pr
 
 ### Logging Guidelines
 
-**Use the centralized logging system instead of console.log:**
+The project uses a **centralized logging configuration** via `logging.json` in the project root. This file controls logging for **all executables** (backend, frontend, Go apps) based on three dimensions:
+
+1. **Executable name** - Which binary is running (e.g., `backend`, `frontend`, `start.macos`)
+2. **Level** - Minimum severity to log (`trace`, `debug`, `info`, `warn`, `error`, `fatal`)
+3. **Category** - Component name (e.g., `Server`, `Auth`, `Database`)
+
+#### Configuration File (`logging.json`)
+
+Categories are organized into **groups** for simplified configuration:
+
+| Group | Includes |
+|-------|----------|
+| `Core` | Server, Setup, Logging |
+| `WebSocket` | WebSocketServer, WSEvents, WhatsAppWS |
+| `Auth` | Auth, AuthService, EmbedAuth |
+| `Storage` | *Storage, StorageFactory, SQLiteAdapter |
+| `LLM` | Conversation, TitleGenerator, ContextBuilder |
+| `Extension` | Extension*, ExcelExtension, PDFExtension, etc. |
+| `Tools` | ScriptTool, DependencyBundler |
+| `Handlers` | Projects, Files, Upload, Tenant, etc. |
+| `Middleware` | TenantCheck |
+| `Migration` | Migration, Migrator |
+
+```json
+{
+  "enabled": true,
+  "filters": [
+    { "executable": "backend", "level": "info", "categories": ["Storage", "LLM", "Auth"] },
+    { "executable": "*", "level": "warn", "categories": ["*"] }
+  ]
+}
+```
+
+**Pattern wildcards:**
+- `"*"` - matches all
+- `"prefix*"` - matches categories starting with "prefix"
+- `"*suffix"` - matches categories ending with "suffix"
+
+**Note:** You can filter by group name (e.g., `Storage`) or specific category (e.g., `UserStorage`). Both work!
 
 #### Frontend Logging
 ```typescript
@@ -126,11 +164,23 @@ function MyComponent() {
 // ❌ DON'T use console.log
 console.log('[Auth] User logged in');
 
-// ✅ DO use pino logger
+// ✅ DO use the logger with category
 import { createLogger } from '../utils/logger';
-const logger = createLogger('AuthService');
+const logger = createLogger('Auth');
 logger.info('User logged in');
 logger.error({ error }, 'Login failed');
+```
+
+#### Go Logging
+```go
+// Initialize logging (usually in main())
+import "yourproject/logging"
+logging.Init("") // auto-detects executable name
+
+// Create logger and use
+log := logging.For("Server")
+log.Info("Server starting", "port", 8080)
+log.Error("Connection failed", "error", err)
 ```
 
 #### Log Levels
@@ -141,9 +191,6 @@ logger.error({ error }, 'Login failed');
 - `error` - Errors
 - `fatal` - Critical errors
 
-#### Features (Frontend)
-Available features: `general`, `chat`, `files`, `whatsapp`, `auth`, `websocket`, `extensions`, `memory`, `context`, `ui`, `api`
-
 #### When to Use Each Level
 - **trace**: High-frequency events (every render, every message received)
 - **debug**: Development-only info (state changes, configuration)
@@ -153,11 +200,16 @@ Available features: `general`, `chat`, `files`, `whatsapp`, `auth`, `websocket`,
 - **fatal**: System-wide failures (database connection lost, cannot start)
 
 #### Best Practices
-1. Always use feature-specific loggers
+1. Use descriptive category names (e.g., `UserService` not `US`)
 2. Include relevant context (IDs, timestamps) but never PII/passwords
 3. Use structured objects instead of string concatenation
 4. Remove debug logs before production or use appropriate levels
-5. In development, logs are sent to backend and appear in `backend.log`
+5. Edit `logging.json` to control output - don't change code to disable logs
+
+#### Environment Variable Overrides
+- `LOG_CONFIG_PATH` - Path to `logging.json` (default: auto-detect)
+- `LOG_ENABLED` - Override the enabled setting (`true`/`false`)
+- `LOG_EXECUTABLE` - Override executable name (auto-detected if not set)
 
 ## Landing the Plane (Session Completion)
 

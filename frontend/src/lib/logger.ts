@@ -301,16 +301,6 @@ export const logger = {
     return new FeatureLogger('extensions');
   },
 
-  /** Quick access to memory logger */
-  get memory() {
-    return new FeatureLogger('memory');
-  },
-
-  /** Quick access to context logger */
-  get context() {
-    return new FeatureLogger('context');
-  },
-
   /** Quick access to ui logger */
   get ui() {
     return new FeatureLogger('ui');
@@ -319,11 +309,6 @@ export const logger = {
   /** Quick access to api logger */
   get api() {
     return new FeatureLogger('api');
-  },
-
-  /** Quick access to whatsapp logger */
-  get whatsapp() {
-    return new FeatureLogger('whatsapp');
   },
 
   /** Update logger configuration */
