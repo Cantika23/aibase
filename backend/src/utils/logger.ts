@@ -286,28 +286,6 @@ function prettyPrint(logObject: any): string {
     output += ` ${msg}`;
   }
 
-  // Add extra fields if present (excluding pid, hostname, and extracted id fields)
-  const extractedFields = new Set(ID_FIELDS);
-  const keys = Object.keys(rest).filter(k => 
-    k !== 'pid' && 
-    k !== 'hostname' && 
-    !extractedFields.has(k)
-  );
-  
-  if (keys.length > 0) {
-    const extras = keys.map(k => {
-      const v = rest[k];
-      if (k === 'error' && v instanceof Error) {
-        return `${k}=${v.stack || v.message}`;
-      }
-      if (typeof v === 'object') {
-        return `${k}=${JSON.stringify(v)}`;
-      }
-      return `${k}=${v}`;
-    }).join(' ');
-    output += ` | ${extras}`;
-  }
-
   return output;
 }
 
