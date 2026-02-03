@@ -614,7 +614,7 @@ func buildAimeow(projectRoot string) (string, error) {
 
 	// Build the binary (Go will add .exe on Windows automatically)
 	// We use the base name without extension for the -o flag
-	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", binaryName, "main.go")
+	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", binaryName, ".")
 	cmd.Dir = aimeowDir
 	// Set CGO_ENABLED=1 for Windows to ensure proper binary
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=1")
