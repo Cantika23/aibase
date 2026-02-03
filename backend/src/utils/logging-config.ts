@@ -81,8 +81,8 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   fatal: 5,
 };
 
-/** Category filter - can be object with boolean values or array of strings (legacy) */
-export type CategoryFilter = Record<string, boolean> | string[] | string;
+/** Category filter - object with category names as keys and boolean values */
+export type CategoryFilter = Record<string, boolean>;
 
 /** Individual filter rule from config */
 export interface LogFilter {
@@ -90,14 +90,8 @@ export interface LogFilter {
   executable: string;
   /** Minimum log level (e.g., "info", "debug") */
   level: LogLevel;
-  /** Category filters - object with boolean values, or array of patterns, or "*" for all */
+  /** Category filters - object with boolean values */
   categories: CategoryFilter;
-}
-
-/** Parsed category pattern */
-interface CategoryPattern {
-  type: 'exact' | 'prefix' | 'suffix' | 'all';
-  value: string;
 }
 
 /** Output configuration */
@@ -139,10 +133,8 @@ interface RawLoggingConfig {
     console?: OutputConfig;
     file?: OutputConfig;
   };
-  /** Category colors - simple format: { "Category": "color" } */
+  /** Category colors - { "Category": "color" } */
   categoryColors?: Record<string, string>;
-  /** Legacy category settings */
-  categories?: Record<string, { color?: string }>;
 }
 
 /** Default configuration when file doesn't exist */
@@ -228,63 +220,26 @@ function parseLevel(level: string): LogLevel {
 }
 
 /**
- * Parse category pattern into structured format
- */
-function parseCategoryPattern(category: string): CategoryPattern {
-  if (category === '*') {
-    return { type: 'all', value: '' };
-  } else if (category.endsWith('*')) {
-    return { type: 'prefix', value: category.slice(0, -1) };
-  } else if (category.startsWith('*')) {
-    return { type: 'suffix', value: category.slice(1) };
-  } else {
-    return { type: 'exact', value: category };
-  }
-}
-
-/**
  * Check if a category is enabled in the filter
- * Handles new object format { "Category": true } and legacy array/string formats
+ * @param category - The category to check
+ * @param filterCategories - Object with category names as keys and boolean values
+ * @returns true if the category is enabled
  */
 function isCategoryEnabled(category: string, filterCategories: CategoryFilter): boolean {
-  // Handle object format: { "Core": true, "Auth": false }
-  if (typeof filterCategories === 'object' && !Array.isArray(filterCategories)) {
-    // Check exact match
-    if (filterCategories[category] === true) {
-      return true;
-    }
-    // Check wildcard "*"
-    if (filterCategories['*'] === true) {
-      return true;
-    }
-    // Check group match
-    const group = getCategoryGroup(category);
-    if (filterCategories[group] === true) {
-      return true;
-    }
-    return false;
+  // Check exact match
+  if (filterCategories[category] === true) {
+    return true;
   }
-  
-  // Handle legacy array format: ["Core", "Auth"]
-  if (Array.isArray(filterCategories)) {
-    return categoriesMatchLegacy(category, filterCategories);
+  // Check wildcard "*"
+  if (filterCategories['*'] === true) {
+    return true;
   }
-  
-  // Handle legacy string format: "*" or "Core,Auth"
-  if (typeof filterCategories === 'string') {
-    const patterns = filterCategories.split(',').map(c => c.trim());
-    return categoriesMatchLegacy(category, patterns);
+  // Check group match
+  const group = getCategoryGroup(category);
+  if (filterCategories[group] === true) {
+    return true;
   }
-  
   return false;
-}
-
-/**
- * Legacy category matching for array format
- */
-function categoriesMatchLegacy(category: string, patterns: string[]): boolean {
-  const parsedPatterns = patterns.map(parseCategoryPattern);
-  return parsedPatterns.some(pattern => categoryMatches(category, pattern));
 }
 
 /**
@@ -342,26 +297,12 @@ export function loadLoggingConfig(): LoggingConfig {
     filters = [{ executable: '*', level: 'info', categories: { '*': true } }];
   }
   
-  // Convert categoryColors - use new format or convert legacy format
-  let categoryColors: Record<string, string> | undefined;
-  if (rawConfig?.categoryColors) {
-    categoryColors = rawConfig.categoryColors;
-  } else if (rawConfig?.categories) {
-    // Convert legacy { "Category": { "color": "red" } } to { "Category": "red" }
-    categoryColors = {};
-    for (const [key, value] of Object.entries(rawConfig.categories)) {
-      if (value.color) {
-        categoryColors[key] = value.color;
-      }
-    }
-  }
-  
   return {
     enabled,
     executable,
     filters,
     outputs: rawConfig?.outputs || DEFAULT_CONFIG.outputs,
-    categoryColors,
+    categoryColors: rawConfig?.categoryColors,
   };
 }
 
@@ -409,32 +350,6 @@ function setupConfigWatcher(): void {
 export function reloadLoggingConfig(): LoggingConfig {
   cachedConfig = loadLoggingConfig();
   return cachedConfig;
-}
-
-/**
- * Check if a category matches a pattern
- */
-function categoryMatches(category: string, pattern: CategoryPattern): boolean {
-  switch (pattern.type) {
-    case 'all':
-      return true;
-    case 'exact':
-      return category === pattern.value;
-    case 'prefix':
-      return category.startsWith(pattern.value);
-    case 'suffix':
-      return category.endsWith(pattern.value);
-    default:
-      return false;
-  }
-}
-
-/**
- * Check if any category in the filter matches
- */
-function categoriesMatch(category: string, patterns: string[]): boolean {
-  const parsedPatterns = patterns.map(parseCategoryPattern);
-  return parsedPatterns.some(pattern => categoryMatches(category, pattern));
 }
 
 /**

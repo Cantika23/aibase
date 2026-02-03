@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "./docs/logging.schema.json",
+  "title": "Logging Configuration Schema",
+  "description": "Schema for AI Base logging configuration file",
+  "type": "object",
+  "required": ["enabled", "filters"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema file"
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Master switch to enable/disable logging globally",
+      "default": true
+    },
+    "filters": {
+      "type": "array",
+      "description": "List of logging filters applied in order (first match wins)",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/filter"
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Output configuration for logging destinations",
+      "additionalProperties": false,
+      "properties": {
+        "console": {
+          "$ref": "#/definitions/consoleOutput"
+        },
+        "file": {
+          "$ref": "#/definitions/fileOutput"
+        }
+      }
+    },
+    "categoryColors": {
+      "type": "object",
+      "description": "Color mapping for log categories in console output",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "black",
+          "red",
+          "green",
+          "yellow",
+          "blue",
+          "magenta",
+          "cyan",
+          "white",
+          "gray",
+          "brightRed",
+          "brightGreen",
+          "brightYellow",
+          "brightBlue",
+          "brightMagenta",
+          "brightCyan",
+          "brightWhite"
+        ]
+      },
+      "properties": {
+        "Core": { "type": "string" },
+        "WebSocket": { "type": "string" },
+        "Auth": { "type": "string" },
+        "Storage": { "type": "string" },
+        "LLM": { "type": "string" },
+        "Extension": { "type": "string" },
+        "Tools": { "type": "string" },
+        "Handlers": { "type": "string" },
+        "Middleware": { "type": "string" },
+        "Migration": { "type": "string" },
+        "general": { "type": "string" },
+        "chat": { "type": "string" },
+        "files": { "type": "string" },
+        "auth": { "type": "string" },
+        "websocket": { "type": "string" },
+        "extensions": { "type": "string" },
+        "ui": { "type": "string" },
+        "api": { "type": "string" }
+      }
+    }
+  },
+  "definitions": {
+    "filter": {
+      "type": "object",
+      "description": "A logging filter that matches executables and controls which categories to log",
+      "required": ["executable", "level", "categories"],
+      "additionalProperties": false,
+      "properties": {
+        "executable": {
+          "type": "string",
+          "description": "Name of the executable to match, or '*' for all executables",
+          "examples": ["backend", "frontend", "start.macos", "*"]
+        },
+        "level": {
+          "type": "string",
+          "description": "Minimum log level to output",
+          "enum": ["trace", "debug", "info", "warn", "error", "fatal"],
+          "default": "info"
+        },
+        "categories": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "Category group or specific category mappings",
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "properties": {
+                "Core": { "type": "boolean" },
+                "WebSocket": { "type": "boolean" },
+                "Auth": { "type": "boolean" },
+                "Storage": { "type": "boolean" },
+                "LLM": { "type": "boolean" },
+                "Extension": { "type": "boolean" },
+                "Tools": { "type": "boolean" },
+                "Handlers": { "type": "boolean" },
+                "Middleware": { "type": "boolean" },
+                "Migration": { "type": "boolean" },
+                "general": { "type": "boolean" },
+                "chat": { "type": "boolean" },
+                "files": { "type": "boolean" },
+                "auth": { "type": "boolean" },
+                "websocket": { "type": "boolean" },
+                "extensions": { "type": "boolean" },
+                "ui": { "type": "boolean" },
+                "api": { "type": "boolean" }
+              }
+            },
+            {
+              "type": "object",
+              "description": "Wildcard to match all categories",
+              "properties": {
+                "*": {
+                  "type": "boolean",
+                  "enum": [true]
+                }
+              },
+              "required": ["*"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      }
+    },
+    "consoleOutput": {
+      "type": "object",
+      "description": "Console output configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to output logs to console",
+          "default": true
+        },
+        "colorize": {
+          "type": "boolean",
+          "description": "Whether to apply colors to console output",
+          "default": true
+        },
+        "timestamp": {
+          "type": "boolean",
+          "description": "Whether to include timestamps in console output",
+          "default": true
+        }
+      }
+    },
+    "fileOutput": {
+      "type": "object",
+      "description": "File output configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to output logs to file",
+          "default": false
+        },
+        "path": {
+          "type": "string",
+          "description": "Directory path for log files",
+          "default": "./logs"
+        },
+        "maxSize": {
+          "type": "string",
+          "description": "Maximum size of a single log file before rotation",
+          "pattern": "^\\d+(KB|MB|GB)$",
+          "examples": ["10MB", "100MB", "1GB"],
+          "default": "10MB"
+        },
+        "maxFiles": {
+          "type": "integer",
+          "description": "Maximum number of rotated log files to keep",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 5
+        }
+      }
+    }
+  }
+}
