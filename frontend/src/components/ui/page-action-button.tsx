@@ -166,11 +166,11 @@ export const PageActionGroup = ({
     return (
       <>
         {/* Mobile: Fixed positioned at top-right, aligned with navbar */}
-        <div className={`fixed top-0 right-0 mx-3 my-2 flex gap-2 z-50 md:hidden ${className}`}>
+        <div className={`md:hidden fixed top-0 right-0 mx-3 my-2 flex gap-2 z-50 ${className}`}>
           {children}
         </div>
-        {/* Desktop: Absolute positioned (parent-relative) */}
-        <div className={`hidden md:flex absolute top-4 right-3 sm:right-4 flex gap-2 z-10 ${className}`}>
+        {/* Desktop: Static (inline) positioned within parent */}
+        <div className={`hidden md:flex gap-2 ${className}`}>
           {children}
         </div>
       </>

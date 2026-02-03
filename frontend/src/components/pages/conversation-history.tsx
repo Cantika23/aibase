@@ -153,7 +153,7 @@ export function ConversationHistoryPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen items-center px-4 pt-[60px] md:px-6 pb-4">
+    <div className="flex flex-col h-full">
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deletingConversation} onOpenChange={(open) => !open && setDeletingConversation(null)}>
         <DialogContent className="max-w-md">
@@ -198,8 +198,9 @@ export function ConversationHistoryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* New Conversation Button - Absolute positioned top right */}
-      <PageActionGroup isFixedOnMobile={true}>
+      {/* Sticky Header */}
+      <div className="sticky top-16 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <h1 className="text-lg font-semibold">Conversation History</h1>
         <PageActionButton
           icon={Plus}
           label="New"
@@ -208,13 +209,12 @@ export function ConversationHistoryPage() {
           size="sm"
           title="Start a new conversation"
         />
-      </PageActionGroup>
+      </div>
 
-      <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col">
+      <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col mx-auto px-4 py-6">
         {/* Conversations List */}
         {conversations.length > 0 ? (
-          <div className="overflow-auto relative flex-1 ">
-            <div className="p-4 space-y-3 absolute inset-0">
+          <div className="space-y-3">
               {conversations.map((conversation) => (
                 <Card
                   key={conversation.convId}
@@ -277,7 +277,6 @@ export function ConversationHistoryPage() {
                   </CardHeader>
                 </Card>
               ))}
-            </div>
           </div>
         ) : (
           <div className="text-center py-12 space-y-4 border rounded-lg bg-background/50 backdrop-blur">

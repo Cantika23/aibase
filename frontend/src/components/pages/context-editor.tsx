@@ -184,74 +184,79 @@ export function ContextEditor() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 px-4 pt-[60px] md:px-6 pb-4 w-full max-w-full min-w-0">
+    <div className="flex h-full flex-col w-full max-w-full min-w-0">
 
-      {/* Header */}
-      <div className="flex items-center justify-end gap-4 shrink-0">
-        {hasChanges && (
-          <span className="text-sm text-amber-600 dark:text-amber-400">
-            You have unsaved changes
-          </span>
-        )}
-        <PageActionGroup isFixedOnMobile={true}>
+      {/* Sticky Header */}
+      <div className="sticky top-16 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+        <h1 className="text-lg font-semibold">Context Editor</h1>
+        <div className="flex items-center gap-4">
           {hasChanges && (
+            <span className="text-sm text-amber-600 dark:text-amber-400 hidden md:inline-block">
+              You have unsaved changes
+            </span>
+          )}
+          <PageActionGroup isFixedOnMobile={true}>
+            {hasChanges && (
+              <PageActionButton
+                icon={RefreshCw}
+                label="Discard"
+                onClick={handleReset}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                confirmMessage="Discard all unsaved changes?"
+              />
+            )}
             <PageActionButton
-              icon={RefreshCw}
-              label="Discard Changes"
-              onClick={handleReset}
+              icon={Zap}
+              label="Reset"
+              onClick={handleResetToDefault}
               variant="outline"
               size="sm"
               disabled={isLoading}
-              confirmMessage="Discard all unsaved changes?"
+              isLoading={isLoading}
+              confirmMessage="Reset to default template? This will discard all current content."
             />
-          )}
-          <PageActionButton
-            icon={Zap}
-            label="Reset"
-            onClick={handleResetToDefault}
-            variant="outline"
-            size="sm"
-            disabled={isLoading}
-            isLoading={isLoading}
-            confirmMessage="Reset to default template? This will discard all current content."
-          />
-          <PageActionButton
-            icon={Save}
-            label="Save Changes"
-            onClick={handleSave}
-            size="sm"
-            disabled={!hasChanges || isLoading}
-            isLoading={isSaving}
-            loadingText="Saving..."
-          />
-        </PageActionGroup>
+            <PageActionButton
+              icon={Save}
+              label="Save"
+              onClick={handleSave}
+              size="sm"
+              disabled={!hasChanges || isLoading}
+              isLoading={isSaving}
+              loadingText="Saving..."
+            />
+          </PageActionGroup>
+        </div>
       </div>
 
-      {/* Editor */}
-      {isLoading && !content ? (
-        <div className="flex flex-1 items-center justify-center">
-          <div className="text-muted-foreground">
-            Loading context template...
+      {/* Editor Container */}
+      <div className="flex-1 overflow-hidden p-4">
+        {isLoading && !content ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-muted-foreground">
+              Loading context template...
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-auto rounded-lg border min-h-0 w-full max-w-full">
-          <CodeMirror
-            value={content}
-            height="100%"
-            extensions={[markdown()]}
-            onChange={(value) => setContent(value)}
-            theme="light"
-            basicSetup={{
-              lineNumbers: true,
-              foldGutter: true,
-              highlightActiveLineGutter: true,
-              highlightActiveLine: true,
-            }}
-            style={{ fontSize: "14px" }}
-          />
-        </div>
-      )}
+        ) : (
+          <div className="h-full overflow-hidden rounded-lg border w-full max-w-full">
+            <CodeMirror
+              value={content}
+              height="100%"
+              extensions={[markdown()]}
+              onChange={(value) => setContent(value)}
+              theme="light"
+              basicSetup={{
+                lineNumbers: true,
+                foldGutter: true,
+                highlightActiveLineGutter: true,
+                highlightActiveLine: true,
+              }}
+              style={{ fontSize: "14px", height: "100%" }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

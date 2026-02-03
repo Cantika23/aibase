@@ -180,28 +180,31 @@ export function MemoryEditor() {
   }
 
   return (
-    <div className="flex h-full flex-col px-4 pt-12 md:pt-4 md:px-6 pb-4">
-      {/* Header */}
-      <div className="space-y-1 mb-4">
-        <h1 className="text-3xl font-bold tracking-tight">Memory</h1>
-        <p className="text-muted-foreground text-sm">
-          Store sensitive information securely and give the AI permanent knowledge.
-          Information stored here won't be directly mentioned in responses and persists across conversations.
-        </p>
+    <div className="flex h-full flex-col">
+      {/* Sticky Header Section */}
+      <div className="sticky top-16 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="flex flex-col gap-4 px-4 py-4 md:px-6">
+          <div className="space-y-1">
+            <h1 className="text-lg font-semibold">Memory</h1>
+            <p className="text-muted-foreground text-sm line-clamp-1 md:line-clamp-none">
+              Store sensitive information securely and give the AI permanent knowledge.
+            </p>
+          </div>
+          
+          {/* Search */}
+          <div className="flex gap-2 pb-2">
+            <input
+              type="text"
+              placeholder="Search categories, keys, or values..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-background border-input placeholder:text-muted-foreground flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-4 flex-1 overflow-hidden">
-      {/* Search */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Search categories, keys, or values..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-background border-input placeholder:text-muted-foreground flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-        />
-      </div>
-
+      <div className="flex flex-col gap-4 flex-1 overflow-hidden p-4 md:px-6">
       {/* Editing Form */}
       {editingEntry && (
         <Card className="border-primary">
@@ -353,7 +356,7 @@ export function MemoryEditor() {
           ))
         )}
       </div>
-      </div>
     </div>
+  </div>
   );
 }
