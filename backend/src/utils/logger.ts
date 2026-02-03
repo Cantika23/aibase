@@ -305,7 +305,7 @@ function prettyPrint(logObject: any): string {
       }
       return `${k}=${v}`;
     }).join(' ');
-    output += `\n    ${extras}`;
+    output += ` | ${extras}`;
   }
 
   return output;
