@@ -66,7 +66,7 @@ The logging system is controlled by a single configuration file `logging.json` i
 
 ## Turning Categories On/Off
 
-Categories are now controlled by **boolean values** in the filter:
+Categories are controlled by **boolean values** in the filter:
 
 ```json
 {
@@ -107,7 +107,7 @@ Categories are now controlled by **boolean values** in the filter:
 }
 ```
 
-**Enable all with wildcard:**
+**All on with wildcard:**
 ```json
 "categories": {
   "*": true
@@ -334,28 +334,6 @@ To completely disable logging:
 Or via environment variable:
 ```bash
 LOG_ENABLED=false npm run dev
-```
-
-## Legacy Format Support
-
-The system still supports the legacy array format for backward compatibility:
-
-```json
-{
-  "categories": ["Core", "Auth", "Storage"]
-}
-```
-
-But the new object format with boolean values is recommended:
-
-```json
-{
-  "categories": {
-    "Core": true,
-    "Auth": true,
-    "Storage": true
-  }
-}
 ```
 
 ## See Also
