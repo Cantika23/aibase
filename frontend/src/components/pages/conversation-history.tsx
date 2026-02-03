@@ -1,14 +1,18 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/skeleton";
+import type { ConversationWithTitle } from "@/lib/conversation-api";
+
 import {
   Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  // CardDescription, // Unused in new layout but keep if needed
+  // CardHeader,      // Unused in new layout
+  // CardTitle,       // Unused in new layout
 } from "@/components/ui/card";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   PageActionButton,
+  // PageActionGroup,
 } from "@/components/ui/page-action-button";
 import { Button } from "@/components/ui/button";
 import { useConvId } from "@/lib/conv-id";
@@ -38,6 +42,22 @@ import {
 import { RefreshCw } from "lucide-react";
 import { useLogger } from "@/hooks/use-logger";
 
+// Helper to check dates
+const isToday = (date: Date) => {
+  const today = new Date();
+  return date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
+};
+
+const isYesterday = (date: Date) => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+};
+
 export function ConversationHistoryPage() {
   const navigate = useNavigate();
   const { projectId } = useParams();
@@ -63,27 +83,15 @@ export function ConversationHistoryPage() {
 
   const handleSelectConversation = async (convId: string) => {
     if (!projectId) return;
-
-    // Set the conversation ID
     setConvId(convId);
-
-    // Clear current messages (will be loaded by main-chat)
     clearMessages();
-
-    // Navigate to chat page with the selected conversation
     navigate(`/projects/${projectId}/chat`);
   };
 
   const handleNewConversation = () => {
     if (!projectId) return;
-
-    // Clear conversation ID to start fresh
     clearConvId();
-
-    // Clear current messages
     clearMessages();
-
-    // Navigate to chat page for new conversation
     navigate(`/projects/${projectId}/chat`);
   };
 
@@ -92,24 +100,20 @@ export function ConversationHistoryPage() {
     convId: string,
     title: string
   ) => {
-    e.stopPropagation(); // Prevent card click
-
+    e.stopPropagation();
     if (!projectId) return;
 
-    // Load files for this conversation
     try {
       const files = await fetchConversationFiles(convId, projectId);
       setDeletingConversation({ convId, title, files });
     } catch (error) {
       log.error("Error loading files", { error: String(error) });
-      // Still allow deletion even if files can't be loaded
       setDeletingConversation({ convId, title, files: [] });
     }
   };
 
   const confirmDelete = async () => {
     if (!deletingConversation || !projectId) return;
-
     const success = await removeConversation(deletingConversation.convId, projectId);
     if (success) {
       toast.success("Conversation deleted successfully");
@@ -122,17 +126,12 @@ export function ConversationHistoryPage() {
     convId: string,
     _currentTitle: string
   ) => {
-    e.stopPropagation(); // Prevent card click
-
+    e.stopPropagation();
     if (!projectId) return;
-
     setRegeneratingTitleId(convId);
-
     try {
       await regenerateConversationTitle(convId, projectId);
       toast.success("Title regenerated successfully");
-
-      // Reload conversations to get the updated title
       await loadConversations(projectId);
     } catch (error) {
       log.error("Error regenerating title", { error: String(error) });
@@ -142,18 +141,98 @@ export function ConversationHistoryPage() {
     }
   };
 
-  if (isLoading && conversations.length === 0) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="text-lg font-medium">Loading conversations...</div>
+  // Group conversations by time period
+  const groupedConversations = (() => {
+    const groups: Record<string, ConversationWithTitle[]> = {
+      "Today": [],
+      "Yesterday": [],
+      "Previous 7 Days": [],
+      "Older": []
+    };
+
+    conversations.forEach(conv => {
+      const date = new Date(conv.lastUpdatedAt);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+      if (isToday(date)) {
+        groups["Today"].push(conv);
+      } else if (isYesterday(date)) {
+        groups["Yesterday"].push(conv);
+      } else if (diffDays <= 7) {
+        groups["Previous 7 Days"].push(conv);
+      } else {
+        groups["Older"].push(conv);
+      }
+    });
+
+    return groups;
+  })();
+
+  const renderConversationCard = (conversation: ConversationWithTitle) => (
+    <Card
+      key={conversation.convId}
+      className="cursor-pointer transition-all hover:bg-accent/50 hover:shadow-sm border-transparent hover:border-border group pt-3 pb-3 bg-card/50"
+      onClick={() => handleSelectConversation(conversation.convId)}
+    >
+      <div className="px-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex size-9 rounded-full bg-primary/10 items-center justify-center flex-shrink-0">
+            <MessageSquare className="size-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium leading-none truncate mb-1">
+              {conversation.title}
+            </p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                {formatRelativeTime(conversation.lastUpdatedAt)}
+              </span>
+              <span>•</span>
+              <span>{conversation.messageCount} msgs</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={(e) =>
+              handleRegenerateTitle(
+                e,
+                conversation.convId,
+                conversation.title
+              )
+            }
+            disabled={regeneratingTitleId === conversation.convId}
+            title="Regenerate title"
+          >
+            <RefreshCw className={`size-3.5 text-muted-foreground ${regeneratingTitleId === conversation.convId ? "animate-spin" : ""}`} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 hover:bg-destructive/10 hover:text-destructive"
+            onClick={(e) =>
+              handleDeleteConversation(
+                e,
+                conversation.convId,
+                conversation.title
+              )
+            }
+            title="Delete conversation"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
         </div>
       </div>
-    );
-  }
+    </Card>
+  );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background/50">
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deletingConversation} onOpenChange={(open) => !open && setDeletingConversation(null)}>
         <DialogContent className="max-w-md">
@@ -199,98 +278,71 @@ export function ConversationHistoryPage() {
       </Dialog>
 
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
-          <h1 className="text-lg font-semibold">Conversation History</h1>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">History</h1>
+            <p className="text-sm text-muted-foreground">Your conversation details</p>
+          </div>
         </div>
         <PageActionButton
           icon={Plus}
-          label="New"
+          label="New Chat"
           onClick={handleNewConversation}
-          variant="outline"
+          variant="default"
           size="sm"
-          title="Start a new conversation"
+          className="shadow-sm"
         />
       </div>
 
-      <div className="w-full select-none max-w-3xl space-y-6 h-full flex flex-col mx-auto px-4 py-6">
-        {/* Conversations List */}
-        {conversations.length > 0 ? (
-          <div className="space-y-3">
-              {conversations.map((conversation) => (
-                <Card
-                  key={conversation.convId}
-                  className="cursor-pointer transition-all hover:shadow-lg hover:scale-[1.01] group pt-3 pb-1"
-                  onClick={() => handleSelectConversation(conversation.convId)}
-                >
-                  <CardHeader className="min-h-0 h-auto">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="sm:flex size-10 rounded-full bg-primary/10 hidden items-center justify-center flex-shrink-0 mt-1">
-                          <MessageSquare className="size-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0 ">
-                          <CardTitle className="text-lg line-clamp-2 break-words">
-                            {conversation.title}
-                          </CardTitle>
-                          <CardDescription className="flex items-center gap-2 mt-1">
-                            <span>
-                              {formatRelativeTime(conversation.lastUpdatedAt)}
-                            </span>
-                            <span>•</span>
-                            <span>{conversation.messageCount} messages</span>
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) =>
-                            handleRegenerateTitle(
-                              e,
-                              conversation.convId,
-                              conversation.title
-                            )
-                          }
-                          disabled={regeneratingTitleId === conversation.convId}
-                          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0"
-                          title="Regenerate title"
-                        >
-                          <RefreshCw className={`size-4 text-muted-foreground ${regeneratingTitleId === conversation.convId ? "animate-spin" : ""}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) =>
-                            handleDeleteConversation(
-                              e,
-                              conversation.convId,
-                              conversation.title
-                            )
-                          }
-                          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0"
-                          title="Delete conversation"
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
+      <div className="w-full max-w-4xl mx-auto px-6 py-8 flex-1">
+        {isLoading && conversations.length === 0 ? (
+           <div className="space-y-8">
+             <div className="space-y-4">
+               <Skeleton className="h-5 w-32" />
+               <div className="space-y-3">
+                 {[1, 2, 3].map((i) => (
+                   <div key={i} className="flex items-center gap-4 p-4 border rounded-lg bg-card/50">
+                     <Skeleton className="size-10 rounded-full" />
+                     <div className="space-y-2 flex-1">
+                       <Skeleton className="h-4 w-3/4" />
+                       <Skeleton className="h-3 w-1/4" />
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           </div>
+        ) : conversations.length > 0 ? (
+          <div className="space-y-8 pb-10">
+            {Object.entries(groupedConversations).map(([groupName, groupConvs]) => {
+              if (groupConvs.length === 0) return null;
+              return (
+                <div key={groupName} className="space-y-3">
+                  <h3 className="text-sm font-medium text-muted-foreground sticky top-[5.5rem] bg-background/95 backdrop-blur py-2 z-10 w-fit px-2 rounded-md">
+                    {groupName}
+                  </h3>
+                  <div className="grid gap-2">
+                    {groupConvs.map(renderConversationCard)}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <div className="text-center py-12 space-y-4 border rounded-lg bg-background/50 backdrop-blur">
-            <div className="size-16 rounded-full bg-muted flex items-center justify-center mx-auto">
-              <MessageSquare className="size-8 text-muted-foreground" />
+          <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in-50">
+            <div className="size-20 rounded-full bg-muted/50 flex items-center justify-center">
+              <MessageSquare className="size-10 text-muted-foreground/50" />
             </div>
-            <div className="space-y-2">
-              <p className="text-lg font-medium">No conversations yet</p>
+            <div className="space-y-2 max-w-sm">
+              <h3 className="text-lg font-semibold">No conversations</h3>
               <p className="text-muted-foreground">
-                Start a new conversation to see it here
+                Your chat history will appear here. Start a new conversation to get begun.
               </p>
+              <Button onClick={handleNewConversation} className="mt-4">
+                Start Chatting
+              </Button>
             </div>
           </div>
         )}

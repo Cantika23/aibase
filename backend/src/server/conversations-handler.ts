@@ -8,7 +8,7 @@ import { FileStorage } from "../storage/file-storage";
 import { ProjectStorage } from "../storage/project-storage";
 import { generateConversationTitle, getConversationTitle, regenerateConversationTitle } from "../llm/conversation-title-generator";
 import { createLogger } from "../utils/logger";
-import { getConversationChatsDir } from "../config/paths";
+import { getConversationChatsDir, DEFAULT_USER_ID } from "../config/paths";
 
 const logger = createLogger("Conversations");
 
@@ -38,8 +38,12 @@ export async function handleGetConversations(req: Request): Promise<Response> {
     const project = projectStorage.getById(projectId);
     const tenantId = project?.tenant_id ?? 'default';
 
-    // Get all conversation metadata
-    const conversations = await chatHistoryStorage.listAllConversations(projectId, tenantId);
+    // Get userId from query params (optional)
+    const userId = url.searchParams.get("userId") || DEFAULT_USER_ID;
+
+    // Get conversation metadata for this specific user
+    // This prevents WA chats (different userId) from showing up in web history (anonymous)
+    const conversations = await chatHistoryStorage.listUserConversations(projectId, tenantId, userId);
 
     // Enrich with cached titles only - don't generate on list to avoid slow LLM calls
     const enrichedConversations = await Promise.all(
@@ -96,14 +100,17 @@ export async function handleGetConversationMessages(
     const project = projectStorage.getById(projectId);
     const tenantId = project?.tenant_id ?? 'default';
 
+    // Get userId from query params (optional) attached by frontend
+    const userId = url.searchParams.get("userId") || undefined;
+    
     // Load conversation messages
-    const messages = await chatHistoryStorage.loadChatHistory(convId, projectId, tenantId);
+    const messages = await chatHistoryStorage.loadChatHistory(convId, projectId, tenantId, userId);
 
     // Filter out system messages - they should never be sent to client
     const clientMessages = messages.filter((msg) => msg.role !== "system");
 
     // Get metadata
-    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId, tenantId);
+    const metadata = await chatHistoryStorage.getChatHistoryMetadata(convId, projectId, tenantId, userId);
 
     if (!metadata) {
       return Response.json(
@@ -157,6 +164,7 @@ export async function handleDeleteConversation(
   try {
     const url = new URL(req.url);
     const projectId = url.searchParams.get("projectId");
+    const userId = url.searchParams.get("userId") || undefined;
 
     if (!projectId) {
       return Response.json(
@@ -186,7 +194,7 @@ export async function handleDeleteConversation(
     }
 
     // Delete conversation chat history
-    await chatHistoryStorage.deleteChatHistory(convId, projectId, tenantId);
+    await chatHistoryStorage.deleteChatHistory(convId, projectId, tenantId, userId);
 
     // Also delete all associated files
     await fileStorage.deleteAllFiles(convId, projectId, tenantId);
@@ -214,7 +222,7 @@ export async function handleDeleteConversation(
  */
 export async function handleCreateNewChat(req: Request): Promise<Response> {
   try {
-    const body = await req.json() as { projectId?: unknown; convId?: unknown };
+    const body = await req.json() as { projectId?: unknown; convId?: unknown; userId?: unknown };
     const { projectId, convId } = body;
 
     if (!projectId || !convId) {
@@ -234,8 +242,10 @@ export async function handleCreateNewChat(req: Request): Promise<Response> {
     // Create new chat file with current timestamp
     const timestamp = Date.now();
 
+    const userId = body.userId as string || undefined; // Extract userId from body if sent
+    
     // Get the chat directory path
-    const chatDir = getConversationChatsDir(projectId as string, convId as string, tenantId);
+    const chatDir = getConversationChatsDir(projectId as string, convId as string, tenantId, userId);
 
     // Ensure directory exists
     await fs.mkdir(chatDir, { recursive: true });
@@ -271,7 +281,7 @@ export async function handleCreateNewChat(req: Request): Promise<Response> {
         convId,
         projectId,
         timestamp,
-        filePath: `${projectId}/${convId}/chats/${timestamp}.json`,
+        filePath: `${projectId}/${userId || 'anonymous'}/${convId}/chats/${timestamp}.json`,
       },
     });
   } catch (error) {
@@ -441,7 +451,7 @@ export async function handleDeleteEmbedConversation(
     }
 
     // Delete conversation chat history (with userId)
-    await chatHistoryStorage.deleteChatHistory(convId, projectId, tenantId);
+    await chatHistoryStorage.deleteChatHistory(convId, projectId, tenantId, userId);
 
     // Also delete all associated files
     await fileStorage.deleteAllFiles(convId, projectId, tenantId);

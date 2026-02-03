@@ -1,6 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import { getConversationDir } from "../config/paths";
+import { getConversationDir, DEFAULT_USER_ID, getProjectDir } from "../config/paths";
 
 export interface TokenUsage {
   promptTokens: number;
@@ -26,15 +26,18 @@ export interface ConversationInfo {
 /**
  * Get the path to the conversation info file
  */
-function getInfoFilePath(convId: string, projectId: string, tenantId: number | string): string {
-  return path.join(getConversationDir(projectId, convId, tenantId), "info.json");
+function getInfoFilePath(convId: string, projectId: string, tenantId: number | string, userId: string = DEFAULT_USER_ID): string {
+  return path.join(getConversationDir(projectId, convId, tenantId, userId), "info.json");
 }
 
 /**
  * Ensure the conversation directory exists
  */
-async function ensureConvDirectory(convId: string, projectId: string, tenantId: number | string): Promise<void> {
-  const convDir = getConversationDir(projectId, convId, tenantId);
+/**
+ * Ensure the conversation directory exists
+ */
+async function ensureConvDirectory(convId: string, projectId: string, tenantId: number | string, userId: string = DEFAULT_USER_ID): Promise<void> {
+  const convDir = getConversationDir(projectId, convId, tenantId, userId);
   try {
     await fs.mkdir(convDir, { recursive: true });
   } catch (error: any) {
@@ -48,15 +51,25 @@ async function ensureConvDirectory(convId: string, projectId: string, tenantId: 
 export async function loadConversationInfo(
   convId: string,
   projectId: string,
-  tenantId: number | string
+  tenantId: number | string,
+  userId: string = DEFAULT_USER_ID
 ): Promise<ConversationInfo | null> {
-  const infoPath = getInfoFilePath(convId, projectId, tenantId);
+  const infoPath = getInfoFilePath(convId, projectId, tenantId, userId);
 
   try {
     const content = await fs.readFile(infoPath, "utf-8");
     return JSON.parse(content);
   } catch (error: any) {
-    // File doesn't exist or is invalid
+    // Try legacy paths logic
+    if (userId === DEFAULT_USER_ID) {
+      const projectDir = getProjectDir(projectId, tenantId);
+      // Logic for legacy paths: project/{projectId}/conversations/{convId}/info.json
+      const legacyPath = path.join(projectDir, "conversations", convId, "info.json");
+      try {
+        const content = await fs.readFile(legacyPath, "utf-8");
+        return JSON.parse(content);
+      } catch (e) {}
+    }
     return null;
   }
 }
@@ -100,13 +113,14 @@ export async function updateTokenUsage(
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
-  }
+  },
+  userId: string = DEFAULT_USER_ID
 ): Promise<ConversationInfo> {
   // Ensure directory exists
-  await ensureConvDirectory(convId, projectId, tenantId);
+  await ensureConvDirectory(convId, projectId, tenantId, userId);
 
   // Load existing info or create new
-  let info = await loadConversationInfo(convId, projectId, tenantId);
+  let info = await loadConversationInfo(convId, projectId, tenantId, userId);
   if (!info) {
     info = initializeConversationInfo(convId, projectId, tenantId);
   }
@@ -133,7 +147,7 @@ export async function updateTokenUsage(
   info.totalMessages += 1;
 
   // Save to file
-  const infoPath = getInfoFilePath(convId, projectId, tenantId);
+  const infoPath = getInfoFilePath(convId, projectId, tenantId, userId);
   await fs.writeFile(infoPath, JSON.stringify(info, null, 2), "utf-8");
 
   return info;
@@ -145,7 +159,8 @@ export async function updateTokenUsage(
 export async function getConversationInfo(
   convId: string,
   projectId: string,
-  tenantId: number | string
+  tenantId: number | string,
+  userId: string = DEFAULT_USER_ID
 ): Promise<ConversationInfo | null> {
-  return await loadConversationInfo(convId, projectId, tenantId);
+  return await loadConversationInfo(convId, projectId, tenantId, userId);
 }

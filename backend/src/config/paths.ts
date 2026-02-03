@@ -1,22 +1,26 @@
 /**
  * Centralized path configuration for the data folder
  *
- * New organized structure:
+ * Organized structure with user isolation:
  * data/
  * ├── app/               # Application-wide data
  * │   ├── databases/     # SQLite databases
  * │   ├── config/        # App configuration
  * │   └── assets/        # App-wide assets (logo, favicon)
- * ├── projects/         # User content (renamed from {projectId} pattern)
- * │   └── {projectId}/
- * │       ├── conversations/
- * │       │   └── {convId}/
- * │       │       ├── chats/
- * │       │       └── info.json
- * │       ├── files/
- * │       │   └── {convId}/
- * │       └── extensions/
- * │           └── {extensionId}/
+ * ├── projects/         # User content
+ * │   └── {tenantId}/
+ * │       └── {projectId}/
+ * │           ├── conversations/
+ * │           │   └── {userId}/           # 'anonymous', 'user_123', 'whatsapp_user_xxx'
+ * │           │       └── {convId}/
+ * │           │           ├── info.json   # Metadata, title, token usage
+ * │           │           ├── todos.json  # Task list (if any)
+ * │           │           └── chats/
+ * │           │               └── {timestamp}.json
+ * │           ├── files/
+ * │           │   └── {convId}/
+ * │           └── extensions/
+ * │               └── {extensionId}/
  * ├── logs/             # All logs consolidated
  * │   ├── backend/
  * │   ├── whatsapp/
@@ -36,6 +40,9 @@ import { fileURLToPath } from "url";
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(dirname(dirname(currentDir)));
 const DATA_BASE = join(projectRoot, "data");
+
+// Default user ID for unauthenticated users
+export const DEFAULT_USER_ID = 'anonymous';
 
 // Application data paths
 export const PATHS = {
@@ -90,24 +97,54 @@ export function getTenantDir(tenantId: number | string): string {
 
 /**
  * Get project directory path
- * @deprecated Use getProjectConversationDir instead
  */
 export function getProjectDir(projectId: string, tenantId: number | string): string {
   return join(getTenantDir(tenantId), projectId);
 }
 
 /**
- * Get conversation directory path
+ * Get project conversations base directory (contains all user folders)
  */
-export function getConversationDir(projectId: string, convId: string, tenantId: number | string): string {
-  return join(getProjectDir(projectId, tenantId), "conversations", convId);
+export function getProjectConversationsDir(projectId: string, tenantId: number | string): string {
+  return join(getProjectDir(projectId, tenantId), "conversations");
 }
 
 /**
- * Get conversation chats directory
+ * Get user directory within a project's conversations
+ * This is the folder that contains all conversations for a specific user
  */
-export function getConversationChatsDir(projectId: string, convId: string, tenantId: number | string): string {
-  return join(getConversationDir(projectId, convId, tenantId), "chats");
+export function getUserConversationsDir(
+  projectId: string,
+  tenantId: number | string,
+  userId: string = DEFAULT_USER_ID
+): string {
+  return join(getProjectConversationsDir(projectId, tenantId), userId);
+}
+
+/**
+ * Get conversation directory path (with user isolation)
+ * Structure: {projectId}/conversations/{userId}/{convId}/
+ */
+export function getConversationDir(
+  projectId: string,
+  convId: string,
+  tenantId: number | string,
+  userId: string = DEFAULT_USER_ID
+): string {
+  return join(getUserConversationsDir(projectId, tenantId, userId), convId);
+}
+
+/**
+ * Get conversation chats directory (with user isolation)
+ * Structure: {projectId}/conversations/{userId}/{convId}/chats/
+ */
+export function getConversationChatsDir(
+  projectId: string,
+  convId: string,
+  tenantId: number | string,
+  userId: string = DEFAULT_USER_ID
+): string {
+  return join(getConversationDir(projectId, convId, tenantId, userId), "chats");
 }
 
 /**

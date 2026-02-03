@@ -14,13 +14,14 @@ import { Conversation, Tool } from "../llm/conversation";
 import { getBuiltinTools } from "../tools";
 import { WSEventEmitter } from "./events";
 import { MessagePersistence } from "./msg-persistance";
-import { getConversationInfo } from "../llm/conversation-info";
 import { generateConversationTitle, getConversationTitle } from "../llm/conversation-title-generator";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { AuthService } from "../services/auth-service";
 import { ProjectStorage } from "../storage/project-storage";
 import { createLogger } from "../utils/logger";
+import { getConversationDir, getConversationChatsDir } from "../config/paths";
+import { getConversationInfo, updateTokenUsage, loadConversationInfo } from "../llm/conversation-info";
 
 const logger = createLogger('WebSocketServer');
 import { FileStorage } from "../storage/file-storage";
@@ -1171,10 +1172,12 @@ export class WSServer extends WSEventEmitter {
           let todos = null;
           try {
             const todosPath = path.join(
-              process.cwd(),
-              "data",
-              connectionInfo.projectId,
-              connectionInfo.convId,
+              getConversationDir(
+                connectionInfo.projectId,
+                connectionInfo.convId,
+                connectionInfo.tenantId,
+                connectionInfo.userId
+              ),
               "todos.json"
             );
             const todosContent = await fs.readFile(todosPath, "utf-8");
@@ -1253,7 +1256,8 @@ export class WSServer extends WSEventEmitter {
           try {
             const compactionResult = await this.messagePersistence.checkAndCompact(
               connectionInfo.projectId,
-              connectionInfo.convId
+              connectionInfo.convId,
+              connectionInfo.userId
             );
 
             this.sendToWebSocket(ws, {
@@ -1281,7 +1285,8 @@ export class WSServer extends WSEventEmitter {
           try {
             const status = await this.messagePersistence.getCompactionStatus(
               connectionInfo.projectId || "A1",
-              connectionInfo.convId
+              connectionInfo.convId,
+              connectionInfo.userId
             );
 
             this.sendToWebSocket(ws, {
