@@ -3,6 +3,25 @@
 # Get the script directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Function to write error and exit
+function Error-Exit {
+    param([string]$Message)
+    Write-Host "ERROR: $Message" -ForegroundColor Red
+    exit 1
+}
+
+# Function to write warning
+function Warn {
+    param([string]$Message)
+    Write-Host "WARNING: $Message" -ForegroundColor Yellow
+}
+
+# Function to write success
+function Success {
+    param([string]$Message)
+    Write-Host $Message -ForegroundColor Green
+}
+
 # Function to cleanup background processes
 function Cleanup {
     # Stop all background jobs
@@ -22,18 +41,82 @@ function Cleanup {
 $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Cleanup }
 trap { Cleanup }
 
-# Load .env file if it exists
+# Check if .env file exists
 $envFile = Join-Path $ScriptDir ".env"
-if (Test-Path $envFile) {
-    # Read .env file and set environment variables
-    Get-Content $envFile | ForEach-Object {
-        if ($_ -notmatch '^#' -and $_ -match '^(.+?)=(.*)$') {
-            $name = $matches[1]
-            $value = $matches[2]
-            [Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
+if (-not (Test-Path $envFile)) {
+    Error-Exit ".env file not found. Please copy .env.example to .env and configure it."
+}
+
+# Load .env file
+Get-Content $envFile | ForEach-Object {
+    if ($_ -notmatch '^#' -and $_ -match '^(.+?)=(.*)$') {
+        $name = $matches[1]
+        $value = $matches[2]
+        [Environment]::SetEnvironmentVariable($name, $value, "Process")
     }
 }
+
+# Function to check required environment variables
+function Check-RequiredEnv {
+    $missingVars = @()
+
+    $apiKey = [Environment]::GetEnvironmentVariable("OPENAI_API_KEY")
+    if ([string]::IsNullOrEmpty($apiKey) -or $apiKey -eq "your-zai-api-key" -or $apiKey -eq "your-openrouter-api-key") {
+        $missingVars += "OPENAI_API_KEY"
+    }
+
+    $baseUrl = [Environment]::GetEnvironmentVariable("OPENAI_BASE_URL")
+    if ([string]::IsNullOrEmpty($baseUrl)) {
+        $missingVars += "OPENAI_BASE_URL"
+    }
+
+    $model = [Environment]::GetEnvironmentVariable("OPENAI_MODEL")
+    if ([string]::IsNullOrEmpty($model)) {
+        $missingVars += "OPENAI_MODEL"
+    }
+
+    if ($missingVars.Count -gt 0) {
+        Write-Host ""
+        Error-Exit "Missing or invalid required environment variables:
+  - $($missingVars -join "`n  - ")
+
+Please configure these variables in your .env file."
+    }
+
+    Success "Environment variables validated"
+}
+
+# Function to check and install dependencies
+function Check-And-InstallDependencies {
+    param(
+        [string]$Dir,
+        [string]$Name
+    )
+
+    Write-Host "Checking $Name dependencies..."
+
+    $nodeModules = Join-Path $Dir "node_modules"
+    if (-not (Test-Path $nodeModules)) {
+        Warn "$Name node_modules not found. Installing..."
+        Push-Location $Dir
+        bun install
+        if ($LASTEXITCODE -ne 0) {
+            Pop-Location
+            Error-Exit "Failed to install $Name dependencies"
+        }
+        Pop-Location
+        Success "$Name dependencies installed"
+    } else {
+        Success "$Name dependencies OK"
+    }
+}
+
+# Run checks
+Check-RequiredEnv
+Check-And-InstallDependencies (Join-Path $ScriptDir "backend") "Backend"
+Check-And-InstallDependencies (Join-Path $ScriptDir "frontend") "Frontend"
+
+Write-Host ""
 
 # Array to store background jobs
 $jobs = @()

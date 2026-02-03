@@ -5,6 +5,28 @@
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print error message and exit
+error_exit() {
+    echo -e "${RED}ERROR: $1${NC}" >&2
+    exit 1
+}
+
+# Function to print warning message
+warn() {
+    echo -e "${YELLOW}WARNING: $1${NC}"
+}
+
+# Function to print success message
+success() {
+    echo -e "${GREEN}$1${NC}"
+}
+
 # Function to kill background processes on exit
 cleanup() {
     kill $(jobs -p) 2>/dev/null
@@ -15,12 +37,70 @@ cleanup() {
 # Trap SIGINT and SIGTERM to run cleanup
 trap cleanup SIGINT SIGTERM
 
-# Load .env file if it exists
-if [ -f "$SCRIPT_DIR/.env" ]; then
-    set -a
-    source "$SCRIPT_DIR/.env"
-    set +a
+# Check if .env file exists
+if [ ! -f "$SCRIPT_DIR/.env" ]; then
+    error_exit ".env file not found. Please copy .env.example to .env and configure it."
 fi
+
+# Load .env file
+set -a
+source "$SCRIPT_DIR/.env"
+set +a
+
+# Check required environment variables
+check_required_env() {
+    local missing_vars=()
+
+    if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "your-zai-api-key" ] || [ "$OPENAI_API_KEY" = "your-openrouter-api-key" ]; then
+        missing_vars+=("OPENAI_API_KEY")
+    fi
+
+    if [ -z "$OPENAI_BASE_URL" ]; then
+        missing_vars+=("OPENAI_BASE_URL")
+    fi
+
+    if [ -z "$OPENAI_MODEL" ]; then
+        missing_vars+=("OPENAI_MODEL")
+    fi
+
+    if [ ${#missing_vars[@]} -gt 0 ]; then
+        echo ""
+        error_exit "Missing or invalid required environment variables:
+  - ${missing_vars[*]}
+
+Please configure these variables in your .env file."
+    fi
+
+    success "Environment variables validated"
+}
+
+# Check and install dependencies for a directory
+check_and_install_dependencies() {
+    local dir=$1
+    local name=$2
+
+    echo "Checking $name dependencies..."
+
+    if [ ! -d "$dir/node_modules" ]; then
+        warn "$name node_modules not found. Installing..."
+        cd "$dir"
+        bun install
+        if [ $? -ne 0 ]; then
+            error_exit "Failed to install $name dependencies"
+        fi
+        cd "$SCRIPT_DIR"
+        success "$name dependencies installed"
+    else
+        success "$name dependencies OK"
+    fi
+}
+
+# Run checks
+check_required_env
+check_and_install_dependencies "$SCRIPT_DIR/backend" "Backend"
+check_and_install_dependencies "$SCRIPT_DIR/frontend" "Frontend"
+
+echo ""
 
 # Check if AIMEOW is enabled
 if [ "$AIMEOW" = "true" ]; then
