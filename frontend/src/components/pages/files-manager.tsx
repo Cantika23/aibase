@@ -509,7 +509,7 @@ export function FilesManagerPage() {
         onDrop={onDrop}
       >
         <div className="w-full flex-1 flex flex-col pt-0">
-          <div className="flex flex-col sticky top-0 z-20 px-5 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3 space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0 border-b">
+          <div className="flex h-14 items-center justify-between sticky top-0 z-20 px-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
             {/* Breadcrumbs */}
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <SidebarTrigger className="-ml-1 mr-1" />

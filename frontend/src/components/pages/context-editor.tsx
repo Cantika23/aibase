@@ -189,7 +189,7 @@ export function ContextEditor() {
 
       {/* Sticky Header */}
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+      <div className="sticky top-0 z-20 flex h-14 items-center justify-between px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
           <h1 className="text-lg font-semibold">Context Editor</h1>

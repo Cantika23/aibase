@@ -183,28 +183,21 @@ export function MemoryEditor() {
   return (
     <div className="flex h-full flex-col">
       {/* Sticky Header Section */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="flex flex-col gap-4 px-4 py-4 md:px-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              <h1 className="text-lg font-semibold">Memory</h1>
-            </div>
-            <p className="text-muted-foreground text-sm line-clamp-1 md:line-clamp-none">
-              Store sensitive information securely and give the AI permanent knowledge.
-            </p>
-          </div>
-          
-          {/* Search */}
-          <div className="flex gap-2 pb-2">
-            <input
-              type="text"
-              placeholder="Search categories, keys, or values..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-background border-input placeholder:text-muted-foreground flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </div>
+      <div className="sticky top-0 z-20 flex h-14 items-center justify-between px-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger />
+          <h1 className="text-lg font-semibold">Memory</h1>
+        </div>
+        
+        {/* Search */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-background border-input placeholder:text-muted-foreground flex h-9 w-64 rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+          />
         </div>
       </div>
 

@@ -278,12 +278,11 @@ export function ConversationHistoryPage() {
       </Dialog>
 
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="sticky top-0 z-20 flex h-14 items-center justify-between px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">History</h1>
-            <p className="text-sm text-muted-foreground">Your conversation details</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">History</h1>
           </div>
         </div>
         <PageActionButton
