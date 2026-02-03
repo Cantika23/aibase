@@ -153,10 +153,11 @@ export class WSConnectionManager {
   }
 
   private generateConnectionKey(options: WSClientOptions): string {
-    // Create a unique key based on URL and key options, including projectId and convId
+    // Create a unique key based on URL and key options, including projectId, subClientId, and convId
     const keyParts = [
       options.url,
       options.projectId || 'no-project', // Include projectId in the key
+      options.subClientId || 'no-subclient', // Include subClientId in the key
       options.convId || 'no-conv', // Include convId in the key (for embed mode)
       options.uid || 'no-uid', // Include uid in the key
       options.reconnectAttempts?.toString() || '5',
@@ -191,6 +192,7 @@ export function useWSConnection(options: WSClientOptions) {
   const memoizedOptions = useMemo(() => options, [
     options.url,
     options.projectId, // Include projectId so connection is recreated when project changes
+    options.subClientId, // Include subClientId so connection is recreated when sub-client changes
     options.convId, // Include convId (embed mode)
     options.uid, // Include uid (embed auth)
     options.embedToken, // Include embedToken

@@ -16,6 +16,76 @@ const projectStorage = ProjectStorage.getInstance();
 subClientStorage.initialize().catch((error) => logger.error({ error }, "Failed to initialize sub-client storage"));
 
 /**
+ * Handle GET /api/sub-clients/lookup - Lookup sub-client by shortId+pathname or custom domain
+ * Query params: shortPath (e.g., x7m2-marketing) or host
+ */
+export async function handleLookupSubClient(req: Request): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const shortPath = url.searchParams.get('shortPath');
+    const host = url.searchParams.get('host');
+
+    let subClient = null;
+
+    if (shortPath) {
+      // Lookup by combined shortId-pathname (e.g., x7m2-marketing)
+      subClient = subClientStorage.getByShortIdAndPathname(shortPath);
+    } else if (host) {
+      // Lookup by custom domain (e.g., marketing.company.com)
+      subClient = subClientStorage.getByCustomDomain(host);
+    } else {
+      return Response.json(
+        { success: false, error: "Either 'shortPath' or 'host' query parameter is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!subClient) {
+      return Response.json(
+        { success: false, error: "Sub-client not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get the project to check if sub-clients are enabled
+    const project = projectStorage.getById(subClient.project_id);
+
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Associated project not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!project.sub_clients_enabled) {
+      return Response.json(
+        { success: false, error: "Sub-clients feature is not enabled for this project" },
+        { status: 400 }
+      );
+    }
+
+    // Return sub-client info without exposing sensitive data
+    return Response.json({
+      success: true,
+      data: {
+        subClient: {
+          id: subClient.id,
+          project_id: subClient.project_id,
+          name: subClient.name,
+          description: subClient.description,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error looking up sub-client");
+    return Response.json(
+      { success: false, error: error instanceof Error ? error.message : "Failed to lookup sub-client" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * Handle GET /api/projects/:projectId/sub-clients - Get all sub-clients for a project
  */
 export async function handleGetSubClients(req: Request, projectId: string): Promise<Response> {

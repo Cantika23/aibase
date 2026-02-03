@@ -248,22 +248,38 @@ export class ProjectStorage {
       throw error;
     }
 
-    // Create sub_clients table
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS sub_clients (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        whatsapp_client_id TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      )
-    `);
+    // Create sub_clients table with schema validation
+    const subClientsExists = this.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='sub_clients'`).get() as any;
 
-    // Create index for sub_clients lookups
-    this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_project_id ON sub_clients(project_id)');
+    if (!subClientsExists) {
+      // Table doesn't exist, create with current schema
+      this.db.run(`
+        CREATE TABLE sub_clients (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          whatsapp_client_id TEXT,
+          short_id TEXT UNIQUE,
+          pathname TEXT UNIQUE,
+          custom_domain TEXT UNIQUE,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `);
+
+      // Create indexes
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_project_id ON sub_clients(project_id)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_short_id ON sub_clients(short_id)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_pathname ON sub_clients(pathname)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_custom_domain ON sub_clients(custom_domain)');
+
+      logger.info('Created sub_clients table with current schema');
+    } else {
+      // Table exists, validate and migrate if needed
+      await this.migrateSubClientsTable();
+    }
 
     // Create sub_client_users table (junction table)
     this.db.run(`
@@ -292,6 +308,114 @@ export class ProjectStorage {
   private generateId(): string {
     const timestamp = Date.now();
     return `proj_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Migrate sub_clients table to match latest schema
+   * This handles the case where the database has an old schema
+   */
+  private async migrateSubClientsTable(): Promise<void> {
+    const tableInfo = this.db.prepare('PRAGMA table_info(sub_clients)').all() as any[];
+    const hasPathnameColumn = tableInfo.some((col: any) => col.name === 'pathname');
+    const hasCustomDomainColumn = tableInfo.some((col: any) => col.name === 'custom_domain');
+    const hasShortIdColumn = tableInfo.some((col: any) => col.name === 'short_id');
+
+    // Check if table needs migration
+    const needsMigration = !hasShortIdColumn || !hasPathnameColumn || !hasCustomDomainColumn;
+
+    if (!needsMigration) {
+      logger.info('Sub-clients table schema is up to date');
+      return;
+    }
+
+    // Check if table has data
+    const rowCount = this.db.prepare('SELECT COUNT(*) as count FROM sub_clients').get() as { count: number };
+    const hasData = rowCount.count > 0;
+
+    logger.warn({
+      existingColumns: tableInfo.map((c: any) => c.name),
+      dataCount: rowCount.count,
+    }, 'Sub-clients table has old schema. Auto-migrating...');
+
+    if (hasData) {
+      logger.info('Dropping and recreating sub_clients table with updated schema (data will be lost)');
+
+      // Drop old table
+      this.db.run('DROP TABLE IF EXISTS sub_clients');
+      this.db.run('DROP TABLE IF EXISTS sub_client_users');
+
+      // Recreate with current schema
+      this.db.run(`
+        CREATE TABLE sub_clients (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          whatsapp_client_id TEXT,
+          short_id TEXT UNIQUE,
+          pathname TEXT UNIQUE,
+          custom_domain TEXT UNIQUE,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `);
+
+      // Create indexes
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_project_id ON sub_clients(project_id)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_short_id ON sub_clients(short_id)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_pathname ON sub_clients(pathname)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_custom_domain ON sub_clients(custom_domain)');
+
+      logger.info('Sub-clients table recreated with new schema (old data was cleared)');
+    } else {
+      // Table is empty, add columns without UNIQUE constraint first
+      if (!hasShortIdColumn) {
+        this.db.run('ALTER TABLE sub_clients ADD COLUMN short_id TEXT');
+      }
+      if (!hasPathnameColumn) {
+        this.db.run('ALTER TABLE sub_clients ADD COLUMN pathname TEXT');
+      }
+      if (!hasCustomDomainColumn) {
+        this.db.run('ALTER TABLE sub_clients ADD COLUMN custom_domain TEXT');
+      }
+
+      // Now recreate table with proper schema
+      this.db.run(`
+        CREATE TABLE sub_clients_new (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          whatsapp_client_id TEXT,
+          short_id TEXT UNIQUE,
+          pathname TEXT UNIQUE,
+          custom_domain TEXT UNIQUE,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `);
+
+      // Copy data (empty, so no actual rows copied)
+      this.db.run(`
+        INSERT INTO sub_clients_new (id, project_id, name, description, whatsapp_client_id, short_id, pathname, custom_domain, created_at, updated_at)
+        SELECT id, project_id, name, description, whatsapp_client_id, short_id, pathname, custom_domain, created_at, updated_at
+        FROM sub_clients
+      `);
+
+      // Drop old table and rename
+      this.db.run('DROP TABLE sub_clients');
+      this.db.run('ALTER TABLE sub_clients_new RENAME TO sub_clients');
+
+      // Recreate indexes
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_project_id ON sub_clients(project_id)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_short_id ON sub_clients(short_id)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_pathname ON sub_clients(pathname)');
+      this.db.run('CREATE INDEX IF NOT EXISTS idx_sub_clients_custom_domain ON sub_clients(custom_domain)');
+
+      logger.info('Sub-clients table migration completed successfully');
+    }
   }
 
   /**

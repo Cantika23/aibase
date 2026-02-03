@@ -3,14 +3,19 @@
  */
 
 import { AuthService } from "../services/auth-service";
+import { SubClientStorage } from "../storage/sub-client-storage";
+import { ProjectStorage } from "../storage/project-storage";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("Auth");
 
 const authService = AuthService.getInstance();
+const subClientStorage = SubClientStorage.getInstance();
+const projectStorage = ProjectStorage.getInstance();
 
 // Initialize auth service on module load
 authService.initialize().catch((error) => logger.error({ error }, "Failed to initialize auth service"));
+subClientStorage.initialize().catch((error) => logger.error({ error }, "Failed to initialize sub-client storage"));
 
 /**
  * Extract session token from Authorization header or cookie
@@ -79,6 +84,81 @@ export async function handleRegister(req: Request): Promise<Response> {
     );
   } catch (error: any) {
     logger.error({ error }, "Registration error");
+    return Response.json(
+      { error: error.message || "Registration failed" },
+      { status: 400 }
+    );
+  }
+}
+
+/**
+ * POST /api/auth/register-subclient
+ * Register a new user for a specific sub-client
+ * Used for sub-client-specific registration at /s/{shortId}-{pathname}/register
+ */
+export async function handleSubClientRegister(req: Request, shortPath: string): Promise<Response> {
+  try {
+    const body = await req.json() as { email?: unknown; username?: unknown; password?: unknown };
+
+    if (!body.email || !body.username || !body.password) {
+      return Response.json(
+        { error: "Email, username, and password are required" },
+        { status: 400 }
+      );
+    }
+
+    // Look up the sub-client by shortId-pathname (e.g., x7m2-marketing)
+    const subClient = subClientStorage.getByShortIdAndPathname(shortPath);
+    if (!subClient) {
+      return Response.json(
+        { error: "Invalid workspace" },
+        { status: 404 }
+      );
+    }
+
+    // Check if sub-clients are enabled for the project
+    const project = projectStorage.getById(subClient.project_id);
+    if (!project || !project.sub_clients_enabled) {
+      return Response.json(
+        { error: "Workspace is not available" },
+        { status: 400 }
+      );
+    }
+
+    // Register the user
+    const result = await authService.register({
+      email: body.email as string,
+      username: body.username as string,
+      password: body.password as string,
+    });
+
+    // Automatically add the user to the sub-client
+    await subClientStorage.addUser(subClient.id, result.user.id, 'user');
+
+    logger.info(`User ${result.user.username} registered for sub-client ${subClient.name} (${subClient.id})`);
+
+    // Set session token in cookie
+    const headers = new Headers();
+    headers.set("Content-Type", "application/json");
+    headers.set(
+      "Set-Cookie",
+      `session_token=${result.session.token}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Strict`
+    );
+
+    return new Response(
+      JSON.stringify({
+        user: result.user,
+        token: result.session.token,
+        subClient: {
+          id: subClient.id,
+          name: subClient.name,
+          project_id: subClient.project_id,
+        },
+      }),
+      { status: 201, headers }
+    );
+  } catch (error: any) {
+    logger.error({ error }, "Sub-client registration error");
     return Response.json(
       { error: error.message || "Registration failed" },
       { status: 400 }

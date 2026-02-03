@@ -10,6 +10,7 @@ import { useConvId } from "@/lib/conv-id";
 import { useWSConnection } from "@/lib/ws/ws-connection-manager";
 import { useChatStore } from "@/stores/chat-store";
 import { useProjectStore } from "@/stores/project-store";
+import { useSubClientStore } from "@/stores/sub-client-store";
 import { useFileStore } from "@/stores/file-store";
 import { AlertCircle, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, type ChangeEvent } from "react";
@@ -29,6 +30,7 @@ interface ShadcnChatInterfaceProps {
   uid?: string;
   embedToken?: string;
   projectId?: string;
+  subClientId?: string;
 }
 
 export function MainChat({
@@ -42,6 +44,7 @@ export function MainChat({
   uid,
   embedToken,
   projectId,
+  subClientId,
 }: ShadcnChatInterfaceProps) {
   const {
     messages,
@@ -84,6 +87,7 @@ export function MainChat({
   );
 
   const { currentProject } = useProjectStore();
+  const { currentSubClient } = useSubClientStore();
   const defaultConvIdHook = useConvId();
   const convId = embedConvId ?? defaultConvIdHook.convId;
   const generateNewConvId = embedGenerateNewConvId ?? defaultConvIdHook.generateNewConvId;
@@ -91,6 +95,7 @@ export function MainChat({
   const wsClient = useWSConnection({
     url: wsUrl,
     projectId: projectId ?? currentProject?.id,
+    subClientId: subClientId ?? currentSubClient?.id,
     uid,
     embedToken,
     convId: embedConvId,

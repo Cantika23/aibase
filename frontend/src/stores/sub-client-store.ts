@@ -19,6 +19,9 @@ export interface SubClient {
   name: string;
   description: string | null;
   whatsapp_client_id: string | null;
+  short_id: string | null;
+  pathname: string | null;
+  custom_domain: string | null;
   created_at: number;
   updated_at: number;
   users?: SubClientUser[];
@@ -44,8 +47,8 @@ interface SubClientStore {
 
   // Async actions
   fetchSubClients: (projectId: string) => Promise<void>;
-  createSubClient: (projectId: string, name: string, description?: string) => Promise<SubClient | null>;
-  updateSubClientDetails: (projectId: string, subClientId: string, name: string, description?: string) => Promise<boolean>;
+  createSubClient: (projectId: string, name: string, description?: string, pathname?: string) => Promise<SubClient | null>;
+  updateSubClientDetails: (projectId: string, subClientId: string, name: string, description?: string, pathname?: string) => Promise<boolean>;
   deleteSubClient: (projectId: string, subClientId: string) => Promise<boolean>;
   addUserToSubClient: (projectId: string, subClientId: string, userId: number, role?: SubClientUserRole) => Promise<boolean>;
   removeUserFromSubClient: (projectId: string, subClientId: string, userId: number) => Promise<boolean>;
@@ -128,7 +131,7 @@ export const useSubClientStore = create<SubClientStore>((set, get) => ({
     }
   },
 
-  createSubClient: async (projectId: string, name: string, description?: string) => {
+  createSubClient: async (projectId: string, name: string, description?: string, pathname?: string) => {
     const state = get();
     state.setIsLoading(true);
     state.setError(null);
@@ -137,7 +140,7 @@ export const useSubClientStore = create<SubClientStore>((set, get) => ({
       const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/sub-clients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, pathname }),
       });
 
       if (!response.ok) {
@@ -166,7 +169,7 @@ export const useSubClientStore = create<SubClientStore>((set, get) => ({
     }
   },
 
-  updateSubClientDetails: async (projectId: string, subClientId: string, name: string, description?: string) => {
+  updateSubClientDetails: async (projectId: string, subClientId: string, name: string, description?: string, pathname?: string) => {
     const state = get();
     state.setIsLoading(true);
     state.setError(null);
@@ -175,7 +178,7 @@ export const useSubClientStore = create<SubClientStore>((set, get) => ({
       const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/sub-clients/${subClientId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, pathname }),
       });
 
       if (!response.ok) {

@@ -116,6 +116,7 @@ export interface ConnectionStats {
 export interface WSClientOptions {
   url: string;
   projectId?: string; // Current project ID for the connection
+  subClientId?: string; // Current sub-client ID for the connection
   convId?: string; // Optional conversation ID (for embed mode)
   token?: string;
   uid?: string;

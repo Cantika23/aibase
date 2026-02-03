@@ -183,6 +183,20 @@ export function getSubClientConversationsDir(projectId: string, subClientId: str
 }
 
 /**
+ * Get sub-client conversation directory (specific conversation)
+ */
+export function getSubClientConversationDir(projectId: string, subClientId: string, convId: string, tenantId: number | string): string {
+  return join(getSubClientConversationsDir(projectId, subClientId, tenantId), convId);
+}
+
+/**
+ * Get sub-client conversation chats directory
+ */
+export function getSubClientConversationChatsDir(projectId: string, subClientId: string, convId: string, tenantId: number | string): string {
+  return join(getSubClientConversationDir(projectId, subClientId, convId, tenantId), 'chats');
+}
+
+/**
  * Get sub-client WhatsApp directory
  */
 export function getSubClientWhatsAppDir(projectId: string, subClientId: string, tenantId: number | string): string {

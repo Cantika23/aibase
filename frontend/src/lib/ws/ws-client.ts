@@ -89,6 +89,11 @@ export class WSClient extends WSEventEmitter {
       url.searchParams.set("projectId", this.options.projectId);
     }
 
+    // Add subClientId if provided (for sub-client context)
+    if (this.options.subClientId) {
+      url.searchParams.set("subClientId", this.options.subClientId);
+    }
+
     // Add token if provided (Authentication)
     if (this.options.token) {
       url.searchParams.set("token", this.options.token);

@@ -71,6 +71,7 @@ import {
   handleAddSubClientUser,
   handleRemoveSubClientUser,
   handleUpdateSubClientUserRole,
+  handleLookupSubClient,
 } from "./sub-client-handler";
 import {
   handleGetExtensions,
@@ -116,6 +117,7 @@ import {
 import { migrateEmbedConversations } from "../scripts/migrate-embed-conversations";
 import {
   handleRegister,
+  handleSubClientRegister,
   handleLogin,
   handleLogout,
   handleGetCurrentUser,
@@ -781,6 +783,11 @@ export class WebSocketServer {
         }
 
         // Sub-Clients API endpoints
+        // GET /api/sub-clients/lookup - Lookup sub-client by pathname or custom domain
+        if (pathname === "/api/sub-clients/lookup" && req.method === "GET") {
+          return handleLookupSubClient(req);
+        }
+
         // GET /api/projects/:projectId/sub-clients
         const subClientsMatch = pathname.match(/^\/api\/projects\/([^\/]+)\/sub-clients$/);
         if (subClientsMatch) {
@@ -946,6 +953,13 @@ export class WebSocketServer {
         // if (pathname === "/api/auth/register" && req.method === "POST") {
         //   return handleRegister(req);
         // }
+
+        // Sub-client specific registration
+        // Format: /api/auth/register-subclient/:shortId-pathname (e.g., /api/auth/register-subclient/x7m2-marketing)
+        const subClientRegisterMatch = pathname.match(/^\/api\/auth\/register-subclient\/(.+)$/);
+        if (subClientRegisterMatch && req.method === "POST") {
+          return handleSubClientRegister(req, subClientRegisterMatch[1]);
+        }
 
         if (pathname === "/api/auth/login" && req.method === "POST") {
           return handleLogin(req);

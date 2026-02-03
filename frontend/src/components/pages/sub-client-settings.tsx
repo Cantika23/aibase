@@ -61,6 +61,7 @@ export function SubClientSettings() {
   const [newSubClientDescription, setNewSubClientDescription] = useState("");
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editPathname, setEditPathname] = useState("");
 
   // Check if user is project owner
   const isProjectOwner = currentProject?.user_id === useAuthStore.getState().user?.id;
@@ -111,7 +112,10 @@ export function SubClientSettings() {
 
   // Create new sub-client
   const handleCreateSubClient = async () => {
-    if (!currentProject || !newSubClientName.trim()) return;
+    if (!currentProject || !newSubClientName.trim()) {
+      toast.error("Name is required");
+      return;
+    }
 
     const result = await createSubClient(
       currentProject.id,
@@ -120,7 +124,7 @@ export function SubClientSettings() {
     );
 
     if (result) {
-      toast.success("Sub-client created successfully");
+      toast.success(`Sub-client created! URL: /s/${result.short_id}-${result.pathname}`);
       setCreateDialogOpen(false);
       setNewSubClientName("");
       setNewSubClientDescription("");
@@ -148,7 +152,8 @@ export function SubClientSettings() {
       currentProject.id,
       subClientToEdit,
       editName.trim(),
-      editDescription.trim() || undefined
+      editDescription.trim() || undefined,
+      editPathname.trim() || undefined
     );
 
     if (success) {
@@ -157,6 +162,7 @@ export function SubClientSettings() {
       setSubClientToEdit(null);
       setEditName("");
       setEditDescription("");
+      setEditPathname("");
     }
   };
 
@@ -165,6 +171,7 @@ export function SubClientSettings() {
     setSubClientToEdit(subClient.id);
     setEditName(subClient.name);
     setEditDescription(subClient.description || "");
+    setEditPathname(subClient.pathname || "");
     setEditDialogOpen(true);
   };
 
@@ -268,7 +275,12 @@ export function SubClientSettings() {
                           <div>
                             <CardTitle className="text-lg">{subClient.name}</CardTitle>
                             <CardDescription>
-                              {subClient.users?.length || 0} users
+                              {subClient.short_id && subClient.pathname && (
+                                <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
+                                  /s/{subClient.short_id}-{subClient.pathname}
+                                </span>
+                              )}
+                              <span className="ml-2">{subClient.users?.length || 0} users</span>
                               {subClient.whatsapp_client_id && " • WhatsApp connected"}
                             </CardDescription>
                           </div>
@@ -392,6 +404,20 @@ export function SubClientSettings() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="edit-pathname">Pathname</Label>
+                <Input
+                  id="edit-pathname"
+                  placeholder="marketing-dept"
+                  value={editPathname}
+                  onChange={(e) => setEditPathname(e.target.value)}
+                  pattern="[a-z0-9-]+"
+                  title="Lowercase letters, numbers, and hyphens only"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to auto-generate from name. Lowercase letters, numbers, and hyphens only.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="edit-description">Description</Label>
                 <Textarea
                   id="edit-description"
@@ -407,6 +433,9 @@ export function SubClientSettings() {
                 onClick={() => {
                   setEditDialogOpen(false);
                   setSubClientToEdit(null);
+                  setEditName("");
+                  setEditDescription("");
+                  setEditPathname("");
                 }}
               >
                 Cancel

@@ -19,6 +19,9 @@ export interface SubClient {
   name: string;
   description: string | null;
   whatsapp_client_id: string | null;
+  short_id: string | null;
+  pathname: string | null;
+  custom_domain: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -45,12 +48,18 @@ export interface CreateSubClientData {
   name: string;
   description?: string;
   whatsapp_client_id?: string;
+  pathname?: string;
+  custom_domain?: string;
+  short_id?: string;
 }
 
 export interface UpdateSubClientData {
   name?: string;
   description?: string;
   whatsapp_client_id?: string | null;
+  pathname?: string;
+  custom_domain?: string | null;
+  short_id?: string;
 }
 
 export class SubClientStorage {
@@ -92,15 +101,59 @@ export class SubClientStorage {
   }
 
   /**
+   * Generate unique short ID (4 case-sensitive alphanumeric characters)
+   * Retries if collision occurs
+   */
+  private generateShortId(): string {
+    const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    while (attempts < maxAttempts) {
+      let shortId = '';
+      for (let i = 0; i < 4; i++) {
+        shortId += chars[Math.floor(Math.random() * chars.length)];
+      }
+
+      // Check if this short_id already exists
+      const existing = this.db.prepare('SELECT id FROM sub_clients WHERE short_id = ?').get(shortId);
+      if (!existing) {
+        return shortId;
+      }
+
+      attempts++;
+    }
+
+    throw new Error('Failed to generate unique short_id after maximum attempts');
+  }
+
+  /**
+   * Generate a URL-safe pathname from a name
+   * Converts to lowercase, replaces spaces with hyphens, removes special chars
+   */
+  private generatePathname(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+  }
+
+  /**
    * Create a new sub-client
    */
   async create(data: CreateSubClientData): Promise<SubClient> {
     const now = Date.now();
     const id = this.generateId();
+    const shortId = data.short_id || this.generateShortId();
+    // Auto-generate pathname from name if not provided
+    const pathname = data.pathname || this.generatePathname(data.name);
 
     const stmt = this.db.prepare(`
-      INSERT INTO sub_clients (id, project_id, name, description, whatsapp_client_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sub_clients (id, project_id, name, description, whatsapp_client_id, short_id, pathname, custom_domain, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -109,6 +162,9 @@ export class SubClientStorage {
       data.name,
       data.description ?? null,
       data.whatsapp_client_id ?? null,
+      shortId,
+      pathname,
+      data.custom_domain ?? null,
       now,
       now
     );
@@ -122,7 +178,7 @@ export class SubClientStorage {
       throw new Error('Failed to create sub-client');
     }
 
-    logger.info(`Created sub-client: ${subClient.name} (${subClient.id}) for project ${data.project_id}`);
+    logger.info(`Created sub-client: ${subClient.name} (${subClient.id}) with short_id ${shortId}, pathname ${pathname} for project ${data.project_id}`);
     return subClient;
   }
 
@@ -141,6 +197,9 @@ export class SubClientStorage {
       name: row.name,
       description: row.description,
       whatsapp_client_id: row.whatsapp_client_id,
+      short_id: row.short_id,
+      pathname: row.pathname,
+      custom_domain: row.custom_domain,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };
@@ -166,8 +225,8 @@ export class SubClientStorage {
    */
   getByProjectId(projectId: string): SubClient[] {
     const stmt = this.db.prepare(`
-      SELECT * FROM sub_clients 
-      WHERE project_id = ? 
+      SELECT * FROM sub_clients
+      WHERE project_id = ?
       ORDER BY created_at DESC
     `);
     const rows = stmt.all(projectId) as any[];
@@ -178,6 +237,9 @@ export class SubClientStorage {
       name: row.name,
       description: row.description,
       whatsapp_client_id: row.whatsapp_client_id,
+      short_id: row.short_id,
+      pathname: row.pathname,
+      custom_domain: row.custom_domain,
       created_at: row.created_at,
       updated_at: row.updated_at,
     }));
@@ -213,6 +275,9 @@ export class SubClientStorage {
       name: row.name,
       description: row.description,
       whatsapp_client_id: row.whatsapp_client_id,
+      short_id: row.short_id,
+      pathname: row.pathname,
+      custom_domain: row.custom_domain,
       created_at: row.created_at,
       updated_at: row.updated_at,
     }));
@@ -239,6 +304,18 @@ export class SubClientStorage {
     if (updates.whatsapp_client_id !== undefined) {
       fields.push('whatsapp_client_id = ?');
       values.push(updates.whatsapp_client_id);
+    }
+    if (updates.short_id !== undefined) {
+      fields.push('short_id = ?');
+      values.push(updates.short_id);
+    }
+    if (updates.pathname !== undefined) {
+      fields.push('pathname = ?');
+      values.push(updates.pathname);
+    }
+    if (updates.custom_domain !== undefined) {
+      fields.push('custom_domain = ?');
+      values.push(updates.custom_domain);
     }
 
     if (fields.length === 0) {
@@ -392,6 +469,86 @@ export class SubClientStorage {
     `);
     const result = stmt.get(subClientId, userId) as { role: SubClientUserRole } | undefined;
     return result?.role ?? null;
+  }
+
+  /**
+   * Get sub-client by pathname
+   */
+  getByPathname(pathname: string): SubClient | null {
+    const stmt = this.db.prepare('SELECT * FROM sub_clients WHERE pathname = ?');
+    const row = stmt.get(pathname) as any;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      project_id: row.project_id,
+      name: row.name,
+      description: row.description,
+      whatsapp_client_id: row.whatsapp_client_id,
+      short_id: row.short_id,
+      pathname: row.pathname,
+      custom_domain: row.custom_domain,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  }
+
+  /**
+   * Get sub-client by custom domain
+   */
+  getByCustomDomain(customDomain: string): SubClient | null {
+    const stmt = this.db.prepare('SELECT * FROM sub_clients WHERE custom_domain = ?');
+    const row = stmt.get(customDomain) as any;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      project_id: row.project_id,
+      name: row.name,
+      description: row.description,
+      whatsapp_client_id: row.whatsapp_client_id,
+      short_id: row.short_id,
+      pathname: row.pathname,
+      custom_domain: row.custom_domain,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  }
+
+  /**
+   * Get sub-client by short_id and pathname
+   * Parses the combined shortId-pathname format (e.g., "x7M2-marketing")
+   * Case-sensitive matching for short_id
+   */
+  getByShortIdAndPathname(combined: string): SubClient | null {
+    // Parse the combined format: shortId-pathname (case-sensitive)
+    const match = combined.match(/^([a-zA-Z0-9]{4})-(.+)$/);
+    if (!match) {
+      return null;
+    }
+
+    const shortId = match[1];
+    const pathname = match[2];
+
+    const stmt = this.db.prepare('SELECT * FROM sub_clients WHERE short_id = ? AND pathname = ?');
+    const row = stmt.get(shortId, pathname) as any;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      project_id: row.project_id,
+      name: row.name,
+      description: row.description,
+      whatsapp_client_id: row.whatsapp_client_id,
+      short_id: row.short_id,
+      pathname: row.pathname,
+      custom_domain: row.custom_domain,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
   }
 
   /**

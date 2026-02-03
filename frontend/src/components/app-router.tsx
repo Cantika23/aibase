@@ -1,5 +1,6 @@
 import { Routes, Route, useLocation } from "react-router-dom";
 import { ProjectRouteHandler } from "./project/project-route-handler";
+import { SubClientRouteHandler } from "./sub-client/sub-client-route-handler";
 import { ProtectedRoute } from "./auth/protected-route";
 import { AdminRoute } from "./auth/admin-route";
 import { Toaster } from "./ui/sonner";
@@ -16,6 +17,8 @@ import DashboardLayout from "@/components/layout/dashboard-layout";
 
 // Lazy load page components
 const MainChat = lazy(() => import("./pages/main-chat").then(module => ({ default: module.MainChat })));
+const SubClientLoginPage = lazy(() => import("./pages/sub-client-login").then(module => ({ default: module.SubClientLoginPage })));
+const SubClientRegisterPage = lazy(() => import("./pages/sub-client-register").then(module => ({ default: module.SubClientRegisterPage })));
 const MemoryEditor = lazy(() => import("./pages/memory-editor").then(module => ({ default: module.MemoryEditor })));
 const ContextEditor = lazy(() => import("./pages/context-editor").then(module => ({ default: module.ContextEditor })));
 const ConversationHistoryPage = lazy(() => import("./pages/conversation-history").then(module => ({ default: module.ConversationHistoryPage })));
@@ -277,6 +280,23 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
               }
             />
           </Route>
+
+          {/* Sub-Client Routes */}
+          <Route path="/s/:shortPath/login" element={<SubClientLoginPage />} />
+          <Route path="/s/:shortPath/register" element={<SubClientRegisterPage />} />
+          <Route
+            path="/s/:shortPath/chat"
+            element={
+              <ProtectedRoute>
+                <SubClientRouteHandler>
+                  <MainChat
+                    wsUrl={wsUrl}
+                    isTodoPanelVisible={true}
+                  />
+                </SubClientRouteHandler>
+              </ProtectedRoute>
+            }
+          />
 
           {/* Catch-all route - redirect to root */}
           <Route path="*" element={<ProtectedRoute><ProjectSelectorPage /></ProtectedRoute>} />
