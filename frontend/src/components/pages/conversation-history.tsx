@@ -6,9 +6,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   PageActionButton,
-  PageActionGroup,
 } from "@/components/ui/page-action-button";
 import { Button } from "@/components/ui/button";
 import { useConvId } from "@/lib/conv-id";
@@ -199,8 +199,11 @@ export function ConversationHistoryPage() {
       </Dialog>
 
       {/* Sticky Header */}
-      <div className="sticky top-16 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <h1 className="text-lg font-semibold">Conversation History</h1>
+      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger />
+          <h1 className="text-lg font-semibold">Conversation History</h1>
+        </div>
         <PageActionButton
           icon={Plus}
           label="New"
