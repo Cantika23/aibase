@@ -7,7 +7,7 @@
  * The extensionHookRegistry is passed as a parameter during evaluation
  */
 
-import { createLogger } from '../../utils/logger';
+import { createLogger } from '../../../../utils/logger';
 
 const logger = createLogger('ImageExtension');
 
@@ -72,7 +72,6 @@ declare global {
 }
 
 // Check if extensionHookRegistry is available (passed as argument)
-declare const extensionHookRegistry: ExtensionHookRegistry | undefined;
 const hookRegistry = typeof extensionHookRegistry !== 'undefined' ? extensionHookRegistry : null;
 
 /**

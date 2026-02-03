@@ -131,13 +131,13 @@ export async function generateExtensionContext(extension: Extension): Promise<st
   const returnMatch = code.match(/return\s+(\w+(?:\.\w+)*)/);
   let namespace: string;
 
-  if (returnMatch && returnMatch[1].includes('.')) {
+  if (returnMatch && returnMatch[1] && returnMatch[1].includes('.')) {
     // Direct function export like "return postgresqlExtension.postgresql"
     // Use the base extension name
     namespace = toCamelCase(fullNamespace);
   } else {
     // Regular object export - use namespace logic
-    const firstWord = fullNamespace.split(/(?=[A-Z])/)[0].toLowerCase();
+    const firstWord = fullNamespace.split(/(?=[A-Z])/)[0]?.toLowerCase() || '';
     const commonPrefixes = ['show', 'web', 'image', 'pdf', 'word', 'powerpoint', 'extension'];
 
     if (commonPrefixes.includes(firstWord) && fullNamespace !== firstWord) {
@@ -195,6 +195,10 @@ export async function generateExtensionContext(extension: Extension): Promise<st
   if (contextMatch) {
     // Extension has its own context - use it directly
     let extractedContext = contextMatch[1];
+
+    if (!extractedContext) {
+      return '';
+    }
 
     // If context was built with string concatenation ('' + '...' + ''), clean it up
     if (extractedContext.includes("'") || extractedContext.includes('+')) {

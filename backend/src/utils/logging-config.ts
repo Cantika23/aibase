@@ -447,7 +447,7 @@ export function getLoggingDebugInfo(): Record<string, unknown> {
     executable: config.executable,
     filters: config.filters,
     outputs: config.outputs,
-    categories: config.categories,
+    categoryColors: config.categoryColors,
   };
 }
 

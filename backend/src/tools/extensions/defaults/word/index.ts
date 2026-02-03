@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractTextFromDocx, isDocxFile } from '../../../../utils/document-extractor';
 import { getProjectFilesDir } from '../../../../config/paths';
-import { createLogger } from '../../utils/logger';
+import { createLogger } from '../../../../utils/logger';
 
 const logger = createLogger('WordExtension');
 
@@ -182,7 +182,7 @@ if (hookRegistry) {
       logger.info({ fileName: _context.fileName, fileType: _context.fileType }, 'Hook called for file');
 
       // Only process Word documents
-      if (!_context.fileType.match(/(^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)|\.doc|\.docx)/i)) {
+      if (!_context.fileType || !_context.fileType.match(/(^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)|\.doc|\.docx/i)) {
         logger.info('Skipping non-Word file');
         return;
       }

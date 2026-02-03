@@ -193,16 +193,20 @@ export class ExtensionLoader {
           // Single-key export: use the key name as namespace (postgresql → postgresql)
           // But if the key doesn't match the ID, use full camelCase
           const exportKey = functionNames[0];
-          const expectedKey = toCamelCase(fullNamespace);
-          if (exportKey === expectedKey || exportKey.toLowerCase() === fullNamespace.toLowerCase()) {
-            namespace = exportKey;
-          } else {
+          if (!exportKey) {
             namespace = toCamelCase(fullNamespace);
+          } else {
+            const expectedKey = toCamelCase(fullNamespace);
+            if (exportKey === expectedKey || exportKey.toLowerCase() === fullNamespace.toLowerCase()) {
+              namespace = exportKey;
+            } else {
+              namespace = toCamelCase(fullNamespace);
+            }
           }
         } else {
           // Multi-key export: use one-word namespace for descriptive IDs (excel-document → excel)
           // But use full camelCase for common prefixes (show-chart → showChart)
-          const firstWord = fullNamespace.split(/(?=[A-Z])/)[0].toLowerCase();
+          const firstWord = fullNamespace.split(/(?=[A-Z])/)[0]?.toLowerCase() || '';
           const commonPrefixes = ['show', 'web', 'image', 'pdf', 'word', 'powerpoint', 'extension'];
 
           if (commonPrefixes.includes(firstWord) && fullNamespace !== firstWord) {
@@ -311,8 +315,10 @@ export class ExtensionLoader {
 
       // Method 1: Look for @ts-expect-error pattern
       for (let i = 0; i < lines.length - 1; i++) {
-        if (lines[i].includes('@ts-expect-error') && lines[i].includes('Extension loader wraps')) {
+        const line = lines[i];
+        if (line?.includes('@ts-expect-error') && line.includes('Extension loader wraps')) {
           const nextLine = lines[i + 1];
+          if (!nextLine) continue;
           const returnMatch = nextLine.match(/^\s*return\s+(.+)/);
           if (returnMatch) {
             lines[i + 1] = nextLine.replace(/^\s*return\s+(.+)/, 'module.exports = $1');
@@ -327,10 +333,12 @@ export class ExtensionLoader {
       if (!converted && lines.length > 5) {
         const lastLines = lines.slice(-5);
         for (let i = 0; i < lastLines.length; i++) {
-          const returnMatch = lastLines[i].match(/^\s*return\s+(.+)/);
-          if (returnMatch) {
+          const line = lastLines[i];
+          if (!line) continue;
+          const returnMatch = line.match(/^\s*return\s+(.+)/);
+          if (returnMatch && line) {
             const actualIndex = lines.length - 5 + i;
-            lines[actualIndex] = lastLines[i].replace(/^\s*return\s+(.+)/, 'module.exports = $1');
+            lines[actualIndex] = line.replace(/^\s*return\s+(.+)/, 'module.exports = $1');
             converted = true;
             convertedLine = actualIndex;
             break;

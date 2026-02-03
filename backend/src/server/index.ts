@@ -5,7 +5,8 @@
  * between WebSocket clients and LLM conversation systems.
  */
 
-// Load environment variables from .env file
+// Load environment variables from .env file (suppress all output)
+process.env.DOTENV_SILENT = 'true';
 import { config } from 'dotenv';
 config();
 
@@ -958,7 +959,10 @@ export class WebSocketServer {
         // Format: /api/auth/register-subclient/:shortId-pathname (e.g., /api/auth/register-subclient/x7m2-marketing)
         const subClientRegisterMatch = pathname.match(/^\/api\/auth\/register-subclient\/(.+)$/);
         if (subClientRegisterMatch && req.method === "POST") {
-          return handleSubClientRegister(req, subClientRegisterMatch[1]);
+          const matchedPath = subClientRegisterMatch[1];
+          if (matchedPath) {
+            return handleSubClientRegister(req, matchedPath);
+          }
         }
 
         if (pathname === "/api/auth/login" && req.method === "POST") {

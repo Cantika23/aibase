@@ -146,7 +146,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
   try {
     // Get conversation ID and project ID from query params
     const url = new URL(req.url);
-    let convId = url.searchParams.get('convId');
+    let convId = url.searchParams.get('convId') ?? '';
     const projectId = url.searchParams.get('projectId');
 
     if (!projectId) {
@@ -209,7 +209,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       }, 'Processing file');
 
       // Broadcast: Starting to process file
-      broadcastStatus(wsServer, convId, 'processing', `Uploading ${file.name}...`);
+      broadcastStatus(wsServer, convId!, 'processing', `Uploading ${file.name}...`);
 
       // Convert File to Buffer
       const arrayBuffer = await file.arrayBuffer();
@@ -219,14 +219,14 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       let thumbnailUrl: string | undefined;
       const isImage = isImageFile(file.name, file.type);
       if (isImage) {
-        broadcastStatus(wsServer, convId, 'processing', `Generating thumbnail for ${file.name}...`);
+        broadcastStatus(wsServer, convId!, 'processing', `Generating thumbnail for ${file.name}...`);
         thumbnailUrl = await generateThumbnail(buffer, file.name, projectId) || undefined;
       }
 
       // Save file with scope and thumbnail URL
-      broadcastStatus(wsServer, convId, 'processing', `Saving ${file.name}...`);
+      broadcastStatus(wsServer, convId!, 'processing', `Saving ${file.name}...`);
       const storedFile = await fileStorage.saveFile(
-        convId,
+        convId!,
         file.name,
         buffer,
         file.type,
@@ -250,10 +250,10 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       await ensureExtensionsLoaded(projectId);
 
       // Broadcast: Analyzing file
-      broadcastStatus(wsServer, convId, 'processing', `Analyzing ${file.name}...`);
+      broadcastStatus(wsServer, convId!, 'processing', `Analyzing ${file.name}...`);
 
       const hookResult = await extensionHookRegistry.executeHook('afterFileUpload', {
-        convId,
+        convId: convId!,
         projectId,
         fileName: storedFile.name,
         filePath,
@@ -291,7 +291,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       }
 
       // Broadcast: Upload and analysis complete
-      broadcastStatus(wsServer, convId, 'complete', `Successfully uploaded ${file.name}`);
+      broadcastStatus(wsServer, convId!, 'complete', `Successfully uploaded ${file.name}`);
 
       uploadedFiles.push({
         id: fileId,
@@ -312,7 +312,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
     // Auto-check logic: If total files < 10, automatically include new files in context
     try {
       const fileContextStorage = FileContextStorage.getInstance();
-      const allFiles = await fileStorage.listFiles(convId || '', projectId, tenantId);
+      const allFiles = await fileStorage.listFiles(convId || '', projectId!, tenantId);
 
       logger.info({ projectId, fileCount: allFiles.length }, '[UPLOAD-HANDLER] Total files in project');
 
@@ -376,7 +376,7 @@ export async function handleFileDownload(req: Request): Promise<Response> {
 
     const fileStorage = FileStorage.getInstance();
     const tenantId = project.tenant_id ?? 'default';
-    const fileBuffer = await fileStorage.getFile('', fileName, projectId, tenantId);
+    const fileBuffer = await fileStorage.getFile('', fileName, projectId!, tenantId);
 
     // Try to determine content type from extension
     const ext = fileName.split('.').pop()?.toLowerCase();

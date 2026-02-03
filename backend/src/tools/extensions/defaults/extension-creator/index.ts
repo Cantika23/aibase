@@ -9,7 +9,7 @@
 // Export to make this file a module (fixes global augmentation TypeScript error)
 export {};
 
-import { createLogger } from '../../utils/logger';
+import { createLogger } from '../../../../utils/logger';
 
 const logger = createLogger('ExtensionCreator');
 

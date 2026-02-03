@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractTextFromPowerPoint, isPowerPointFile } from '../../../../utils/document-extractor';
 import { getProjectFilesDir } from '../../../../config/paths';
-import { createLogger } from '../../utils/logger';
+import { createLogger } from '../../../../utils/logger';
 
 const logger = createLogger('PowerPointExtension');
 
@@ -181,7 +181,8 @@ if (hookRegistry) {
       logger.info({ fileName: _context.fileName, fileType: _context.fileType }, 'Hook called for file');
 
       // Only process PowerPoint files
-      if (!_context.fileType.match(/(^application\/(vnd\.openxmlformats-officedocument\.presentationml\.presentation|vnd\.ms-powerpoint))|\.ppt|\.pptx)/i)) {
+      const pptPattern = /(^application\/vnd\.(openxmlformats-officedocument\.presentationml\.presentation|ms-powerpoint))|\.pptx?$/i;
+      if (!pptPattern.test(_context.fileType)) {
         logger.info('Skipping non-PowerPoint file');
         return;
       }

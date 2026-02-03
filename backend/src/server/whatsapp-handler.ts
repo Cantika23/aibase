@@ -472,16 +472,18 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     }
 
     // Ensure format is clean (digits only)
-    whatsappNumber = whatsappNumber.replace(/[^0-9]/g, '');
+    if (whatsappNumber) {
+      whatsappNumber = whatsappNumber.replace(/[^0-9]/g, '');
+    }
 
     // FIX: Remove device-specific suffix if present (e.g. "33" or "32" at end of phone number)
     // WhatsApp multi-device sometimes appends device ID to JID
-    // Indonesian numbers start with 62 and are usually 11-13 digits max. 
+    // Indonesian numbers start with 62 and are usually 11-13 digits max.
     // If it's longer than 13 digits and ends with common suffixes, trim it.
-    if (whatsappNumber.startsWith('62') && whatsappNumber.length > 13) {
+    if (whatsappNumber && whatsappNumber.startsWith('62') && whatsappNumber.length > 13) {
       // Check for common suffixes like 33, 2, 1 etc
       // Only trim if the result is still a valid length (10-13 digits)
-      
+
       // Try removing last 2 digits if it ends with known patterns
       if (whatsappNumber.endsWith('33') || whatsappNumber.endsWith('24') || whatsappNumber.endsWith('25')) {
         const trimmed = whatsappNumber.slice(0, -2);
@@ -500,7 +502,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       }
     }
 
-    const uid = `whatsapp_user_${whatsappNumber}`;
+    const uid = `whatsapp_user_${whatsappNumber ?? ''}`;
 
     // Get or create conversation for this WhatsApp contact
     const { ChatHistoryStorage } = await import("../storage/chat-history-storage");
@@ -513,7 +515,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
 
     // Look for existing conversation with this WhatsApp number in the ID
     for (const conv of conversations) {
-      if (conv.convId.includes(whatsappNumber)) {
+      if (whatsappNumber && conv.convId.includes(whatsappNumber)) {
         convId = conv.convId;
         break;
       }
@@ -558,11 +560,11 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
               if (subClientId) {
                 // Use sub-client's whatsapp folder
                 const { getSubClientWhatsAppDir } = await import("../config/paths");
-                whatsappFilesDir = path.join(getSubClientWhatsAppDir(projectId, subClientId, tenantId), whatsappNumber);
+                whatsappFilesDir = path.join(getSubClientWhatsAppDir(projectId, subClientId, tenantId), whatsappNumber ?? '');
               } else {
                 // Use project's whatsapp folder
                 const projectDir = getProjectDir(projectId, tenantId);
-                whatsappFilesDir = path.join(projectDir, "whatsapp", whatsappNumber);
+                whatsappFilesDir = path.join(projectDir, "whatsapp", whatsappNumber ?? '');
               }
               
               // Ensure directory exists
@@ -594,7 +596,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
                  await fs.writeFile(metaPath, JSON.stringify({
                    id: messageData.id,
                    timestamp: new Date().toISOString(),
-                   sender: whatsappNumber,
+                   sender: whatsappNumber ?? '',
                    caption: messageData.caption,
                    mimeType: messageData.mimeType,
                    originalUrl: messageData.fileUrl
@@ -698,7 +700,7 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       logger.info("[WhatsApp] Location handler: Sending instant response for location message");
       
       // Kirim respons langsung tanpa AI
-      sendWhatsAppMessage(projectId, whatsappNumber, { text: autoReply })
+      sendWhatsAppMessage(projectId, whatsappNumber ?? '', { text: autoReply })
         .then(() => logger.info("[WhatsApp] Location auto-reply sent successfully"))
         .catch((err) => logger.error({ err }, "[WhatsApp] Error sending location auto-reply"));
       
@@ -715,11 +717,11 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     }, "[WhatsApp] Processing message");
 
     // Process message through AI (async, don't block webhook response)
-    processWhatsAppMessageWithAI(projectId, convId, whatsappNumber, messageText, attachments, uid)
+    processWhatsAppMessageWithAI(projectId, convId, whatsappNumber ?? '', messageText, attachments, uid)
       .catch((error) => {
         logger.error({ error }, "[WhatsApp] Error processing message with AI");
         // Send error message to user
-        sendWhatsAppMessage(projectId, whatsappNumber, {
+        sendWhatsAppMessage(projectId, whatsappNumber ?? '', {
           text: "Sorry, I encountered an error processing your message. Please try again.",
         }).catch((err) => logger.error({ err }, "[WhatsApp] Error sending error message"));
       });

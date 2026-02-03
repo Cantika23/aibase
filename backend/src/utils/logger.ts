@@ -181,7 +181,7 @@ function getExecutableColor(executable: string): string {
     hash = ((hash << 5) - hash) + executable.charCodeAt(i);
     hash = hash & hash;
   }
-  return colors[Math.abs(hash) % colors.length];
+  return colors[Math.abs(hash) % colors.length] as string;
 }
 
 // Common identifier fields to extract into category display

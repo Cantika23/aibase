@@ -180,7 +180,9 @@ Example (multi-line):
       const truncated: any = {};
       for (let i = 0; i < Math.min(keys.length, maxObjectKeys); i++) {
         const key = keys[i];
-        truncated[key] = this.deepTruncate(value[key], maxStringLen, maxArrayItems, maxObjectKeys, depth + 1);
+        if (key) {
+          truncated[key] = this.deepTruncate(value[key], maxStringLen, maxArrayItems, maxObjectKeys, depth + 1);
+        }
       }
 
       if (keys.length > maxObjectKeys) {

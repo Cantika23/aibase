@@ -532,6 +532,10 @@ export class SubClientStorage {
     const shortId = match[1];
     const pathname = match[2];
 
+    if (!shortId || !pathname) {
+      return null;
+    }
+
     const stmt = this.db.prepare('SELECT * FROM sub_clients WHERE short_id = ? AND pathname = ?');
     const row = stmt.get(shortId, pathname) as any;
 

@@ -324,7 +324,7 @@ export class FileStorage {
     await fs.unlink(filePath);
 
     // Also delete metadata file if it exists
-    const metaPath = this.getMetaFilePath(convId, decodedFileName, projectId, tenantId);
+    const metaPath = this.getMetaFilePath(decodedFileName, projectId, tenantId);
     try {
       await fs.unlink(metaPath);
     } catch (error: any) {
@@ -367,7 +367,7 @@ export class FileStorage {
     await fs.rename(oldPath, newPath);
 
     // Also rename metadata file if it exists
-    const oldMetaPath = this.getMetaFilePath(convId, decodedOldName, projectId, tenantId);
+    const oldMetaPath = this.getMetaFilePath(decodedOldName, projectId, tenantId);
     const newMetaPath = this.getMetaFilePath(sanitizedNewName, projectId, tenantId);
 
     try {
@@ -393,11 +393,11 @@ export class FileStorage {
     const sanitizedName = path.basename(fileName);
     const decodedName = decodeURIComponent(sanitizedName);
 
-    const fromPath = path.join(this.getConvDir(fromConvId, projectId, tenantId), decodedName);
-    const toPath = path.join(this.getConvDir(toConvId, projectId, tenantId), decodedName);
+    const fromPath = path.join(this.getProjectDir(projectId, tenantId), decodedName);
+    const toPath = path.join(this.getProjectDir(projectId, tenantId), decodedName);
 
     // Ensure target directory exists
-    await this.ensureConvDir(toConvId, projectId, tenantId);
+    await this.ensureProjectDir(projectId, tenantId);
 
     // Check if source file exists
     try {

@@ -62,7 +62,7 @@ export async function handleFrontendLogs(req: Request): Promise<Response> {
     const logs = 'logs' in body ? body.logs : [body];
 
     for (const log of logs) {
-      processFrontendLog(log, session.userId);
+      processFrontendLog(log, session?.id ?? 0);
     }
 
     return Response.json({ success: true, received: logs.length });

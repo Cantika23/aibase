@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { extractTextFromPdf, isPdfFile } from '../../../../utils/document-extractor';
 import { getProjectFilesDir } from '../../../../config/paths';
-import { createLogger } from '../../utils/logger';
+import { createLogger } from '../../../../utils/logger';
 
 const logger = createLogger('PDFExtension');
 
@@ -287,7 +287,8 @@ if (hookRegistry) {
         // Calculate page count
         let pageCount = 0;
         const pdfjsLib = await import('pdfjs-dist');
-        const pdfjs = await pdfjsLib.getDocument(_context.filePath);
+        const loadingTask = pdfjsLib.getDocument(_context.filePath);
+        const pdfjs = await loadingTask.promise;
         pageCount = pdfjs.numPages;
         await pdfjs.destroy();
 
