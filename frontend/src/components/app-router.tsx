@@ -46,7 +46,7 @@ interface AppRouterProps {
 }
 
 export function AppRouter({ wsUrl }: AppRouterProps) {
-  const [appName, setAppName] = React.useState<string>("AI Base");
+  const [, setAppName] = React.useState<string>("AI Base");
   const [aimeowEnabled, setAimeowEnabled] = React.useState<boolean>(false);
 
   const { currentProject } = useProjectStore();
@@ -81,7 +81,7 @@ export function AppRouter({ wsUrl }: AppRouterProps) {
   const isLoginRoute = location.pathname === "/login";
   const isAdminSetupRoute = location.pathname === "/admin-setup";
   const shouldShowSetupRequired = needsSetup && !isAdminSetupRoute;
-  const isRootRoute = location.pathname === "/";
+  
 
   // Simple layout for Project Selector (header only)
   const showHeader = !isLoginRoute && !isAdminSetupRoute && user;

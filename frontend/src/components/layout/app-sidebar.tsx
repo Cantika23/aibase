@@ -147,8 +147,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <NavUser 
                 user={{
                     name: currentUser.username,
-                    email: currentUser.email,
-                    avatar: currentUser.avatar
+                    email: currentUser.email
                 }} 
                 onLogout={logout}
             />
