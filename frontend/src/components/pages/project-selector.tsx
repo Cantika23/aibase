@@ -15,7 +15,6 @@ import { ProjectRenameModal } from "@/components/project/project-rename-modal";
 import { Plus, Trash2, Pencil, Loader2, FolderOpen, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import type { Project } from "@/stores/project-store";
-import { cn } from "@/lib/utils";
 
 export function ProjectSelectorPage() {
   const navigate = useNavigate();
