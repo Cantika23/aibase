@@ -636,9 +636,8 @@ export function ExtensionsSettings() {
             variant="outline"
             size="sm"
             onClick={handleResetToDefaults}
-            disabled={isLoading}
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Reset
           </Button>
           <Button variant="outline" size="sm" onClick={openAddCategoryDialog}>
