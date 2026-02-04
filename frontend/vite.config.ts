@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
   const basePath = env.PUBLIC_BASE_PATH || process.env.PUBLIC_BASE_PATH || "";
   const appName = env.APP_NAME || process.env.APP_NAME || "AI-BASE";
 
+  // Support BACKEND_PORT env var for dynamic backend port allocation (dev.sh)
+  const backendPort = process.env.BACKEND_PORT || "5040";
+  const backendUrl = `http://localhost:${backendPort}`;
+
   // Normalize base path - ensure it starts with / and doesn't end with /
   const normalizedBasePath = basePath
     ? basePath.replace(/\/+$/, "").replace(/^([^/])/, "/$1")
@@ -51,10 +55,13 @@ export default defineConfig(({ mode }) => {
     },
     clearScreen: false,
     server: {
-      port: 5050,
+      // Support PORT env var for dynamic port allocation (dev.sh), fallback to 5050
+      port: parseInt(process.env.PORT || "5050", 10),
+      strictPort: false, // Allow Vite to find another port if specified is taken
       proxy: {
         [`${normalizedBasePath}/api`]: {
-          target: "http://localhost:5040", // 3678
+          // Use backendUrl with dynamic port for proxy
+          target: backendUrl,
           changeOrigin: true,
           secure: false,
           ws: true,

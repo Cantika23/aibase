@@ -251,8 +251,9 @@ export class WebSocketServer {
   constructor(options: ServerOptions = {}) {
     // Detect OS and set default port accordingly
     // Windows: 3678, Linux/Mac: 5040
+    // Support BACKEND_PORT env var for dynamic port allocation (dev.sh)
     const isWindows = process.platform === 'win32';
-    const defaultPort = isWindows ? 3678 : 5040;
+    const defaultPort = parseInt(process.env.BACKEND_PORT || (isWindows ? "3678" : "5040"), 10);
 
     this.options = {
       port: defaultPort,
