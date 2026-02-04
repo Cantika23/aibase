@@ -5,10 +5,8 @@
  * between WebSocket clients and LLM conversation systems.
  */
 
-// Load environment variables from .env file (suppress all output)
-process.env.DOTENV_SILENT = 'true';
-import { config } from 'dotenv';
-config();
+// Note: Bun automatically loads .env files
+// See: https://bun.sh/docs/cli#env-files
 
 // Export core classes
 export { WSServer } from "../ws/entry";

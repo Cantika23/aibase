@@ -256,6 +256,10 @@ async function startAimeow(backendPort: number): Promise<ProcessPromise | null> 
     log('Building AIMEOW...', 'blue')
     const buildProc = Bun.spawn(['go', 'build', '-ldflags=-s -w', `-o=${aimeowBinary}`, '.'], {
       cwd: aimeowDir,
+      env: {
+        ...process.env,
+        CGO_ENABLED: '1',
+      },
       stdout: 'inherit',
       stderr: 'inherit',
     })
