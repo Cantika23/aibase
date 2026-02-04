@@ -1,6 +1,6 @@
 import type { Contact } from "@/stores/admin-store";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MessageSquare, Clock } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 

@@ -766,29 +766,29 @@ export function ExtensionsSettings() {
                                   {extension.metadata.name}
                                 </h4>
                                 {extension.source === 'project' && (
-                                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded flex-shrink-0" title="Using project version (customizable)">
+                                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded shrink-0" title="Using project version (customizable)">
                                     Custom
                                   </span>
                                 )}
                                 {extension.source === 'default' && extension.hasProjectVersion && (
-                                  <span className="text-xs bg-muted px-2 py-0.5 rounded flex-shrink-0" title="Default version available, can customize">
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded shrink-0" title="Default version available, can customize">
                                     Default
                                   </span>
                                 )}
                                 {extension.source === 'default' && !extension.hasProjectVersion && (
-                                  <span className="text-xs bg-muted px-2 py-0.5 rounded flex-shrink-0" title="Default version (no project copy)">
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded shrink-0" title="Default version (no project copy)">
                                     Default
                                   </span>
                                 )}
                                 {!extension.metadata.enabled && (
-                                  <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded flex-shrink-0">
+                                  <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded shrink-0">
                                     Disabled
                                   </span>
                                 )}
                                 {extension.metadata.hasError && (
                                   <button
                                     onClick={() => handleToggleDebugLogs(extension.metadata.id)}
-                                    className="text-xs bg-destructive text-destructive px-2 py-0.5 rounded flex-shrink-0 hover:opacity-80 cursor-pointer"
+                                    className="text-xs bg-destructive text-destructive px-2 py-0.5 rounded shrink-0 hover:opacity-80 cursor-pointer"
                                     title={`Error: ${extension.metadata.lastError}`}
                                   >
                                     Error
@@ -797,7 +797,7 @@ export function ExtensionsSettings() {
                                 {extension.metadata.debug && (
                                   <button
                                     onClick={() => handleToggleDebugLogs(extension.metadata.id)}
-                                    className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded flex-shrink-0 hover:opacity-80 cursor-pointer"
+                                    className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded shrink-0 hover:opacity-80 cursor-pointer"
                                     title="Debug mode enabled"
                                   >
                                     Debug

@@ -35,7 +35,7 @@ export function UserManagementPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   
   // New: Tabs state
-  const [activeTab, setActiveTab] = useState("system-users");
+
 
   // Check if user has admin permissions
   const isAdmin = auth.user?.role === "admin";
@@ -140,7 +140,7 @@ export function UserManagementPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="system-users" className="flex-1 flex flex-col min-h-0" onValueChange={setActiveTab}>
+        <Tabs defaultValue="system-users" className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-center sm:justify-start mb-4">
             <TabsList>
               <TabsTrigger value="system-users">System Users</TabsTrigger>

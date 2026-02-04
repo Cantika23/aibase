@@ -48,7 +48,7 @@ export function ContextEditor() {
     content: '',
     onUpdate: ({ editor }) => {
        // Use markdown storage to get markdown content
-       const markdownContent = editor.storage.markdown.getMarkdown();
+       const markdownContent = (editor.storage as any).markdown.getMarkdown();
        setContent(markdownContent);
     },
     editorProps: {
