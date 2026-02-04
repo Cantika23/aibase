@@ -28,6 +28,84 @@ const logger = createLogger('Upload');
 const activeProcessingJobs = new Map<string, AbortController>();
 
 /**
+ * Track pending files per conversation
+ * Key: convId, Value: Set of file names still being processed
+ */
+const pendingFilesByConversation = new Map<string, Set<string>>();
+
+/**
+ * Resolvers for waiting on file processing
+ * Key: `${convId}:${fileName}`, Value: array of resolve functions
+ */
+const fileProcessingResolvers = new Map<string, Array<() => void>>();
+
+/**
+ * Check if a file is currently being processed
+ */
+export function isFileProcessing(convId: string, fileName: string): boolean {
+  const pendingFiles = pendingFilesByConversation.get(convId);
+  return pendingFiles ? pendingFiles.has(fileName) : false;
+}
+
+/**
+ * Wait for a specific file to finish processing
+ */
+export async function waitForFileProcessing(convId: string, fileName: string): Promise<void> {
+  if (!isFileProcessing(convId, fileName)) {
+    return; // File not being processed
+  }
+
+  const key = `${convId}:${fileName}`;
+  return new Promise((resolve) => {
+    const resolvers = fileProcessingResolvers.get(key) || [];
+    resolvers.push(resolve);
+    fileProcessingResolvers.set(key, resolvers);
+    logger.debug({ convId, fileName }, 'Added resolver waiting for file processing');
+  });
+}
+
+/**
+ * Mark a file as pending processing
+ */
+function markFilePending(convId: string, fileName: string): void {
+  const pendingFiles = pendingFilesByConversation.get(convId) || new Set();
+  pendingFiles.add(fileName);
+  pendingFilesByConversation.set(convId, pendingFiles);
+  logger.debug({ convId, fileName }, 'Marked file as pending');
+}
+
+/**
+ * Mark a file as processing complete and notify waiters
+ */
+function markFileComplete(convId: string, fileName: string): void {
+  const pendingFiles = pendingFilesByConversation.get(convId);
+  if (pendingFiles) {
+    pendingFiles.delete(fileName);
+    if (pendingFiles.size === 0) {
+      pendingFilesByConversation.delete(convId);
+    }
+    logger.debug({ convId, fileName }, 'Marked file as complete');
+  }
+
+  // Notify all waiters
+  const key = `${convId}:${fileName}`;
+  const resolvers = fileProcessingResolvers.get(key);
+  if (resolvers) {
+    resolvers.forEach(resolve => resolve());
+    fileProcessingResolvers.delete(key);
+    logger.debug({ convId, fileName, count: resolvers.length }, 'Notified waiters of file completion');
+  }
+}
+
+/**
+ * Get all pending files for a conversation
+ */
+export function getPendingFiles(convId: string): string[] {
+  const pendingFiles = pendingFilesByConversation.get(convId);
+  return pendingFiles ? Array.from(pendingFiles) : [];
+}
+
+/**
  * Ensure extensions are loaded for a project (for hooks to be registered)
  *
  * Note: We create a new ExtensionLoader instance each time to ensure hooks
@@ -198,6 +276,9 @@ async function processFileAsync(
   const { fileId, fileName, fileType, fileSize, convId, projectId, tenantId, scope, buffer, storedFileName } = fileInfo;
   const jobId = `process_${fileId}`;
   
+  // Mark file as pending processing
+  markFilePending(convId, storedFileName);
+  
   // Create abort controller for this job
   const abortController = new AbortController();
   activeProcessingJobs.set(jobId, abortController);
@@ -310,6 +391,8 @@ async function processFileAsync(
     broadcastStatus(wsServer, convId, 'error', `Failed to process ${fileName}`);
   } finally {
     activeProcessingJobs.delete(jobId);
+    // Mark file as complete and notify all waiters
+    markFileComplete(convId, storedFileName);
   }
 }
 

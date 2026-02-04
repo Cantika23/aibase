@@ -27,6 +27,7 @@ const logger = createLogger('WebSocketServer');
 import { FileStorage } from "../storage/file-storage";
 import { FileContextStorage } from "../storage/file-context-storage";
 import { ExtensionLoader } from "../tools/extensions/extension-loader";
+import { waitForFileProcessing, getPendingFiles } from "../server/upload-handler";
 
 const authService = AuthService.getInstance();
 
@@ -737,6 +738,22 @@ export class WSServer extends WSEventEmitter {
       let attachments: any[] | undefined = undefined;
       if (userData.fileIds && userData.fileIds.length > 0) {
         logger.info({ fileIds: userData.fileIds }, "[UserMessage] Processing message with file IDs");
+
+        // Wait for any pending file processing to complete before proceeding
+        const pendingFiles = getPendingFiles(connectionInfo.convId);
+        if (pendingFiles.length > 0) {
+          logger.info({ pendingFiles, count: pendingFiles.length }, "[UserMessage] Waiting for file processing to complete");
+          this.broadcastToConv(connectionInfo.convId, {
+            type: "status",
+            id: `status_${Date.now()}`,
+            data: { status: "processing", message: `Waiting for ${pendingFiles.length} file(s) to finish processing...` },
+            metadata: { timestamp: Date.now() },
+          });
+
+          // Wait for all pending files to complete
+          await Promise.all(pendingFiles.map(fileName => waitForFileProcessing(connectionInfo.convId, fileName)));
+          logger.info("[UserMessage] All pending file processing completed");
+        }
 
         // Fetch file metadata for attachments
         try {
