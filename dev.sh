@@ -189,8 +189,23 @@ check_and_install_dependencies() {
 
     echo "Checking $name dependencies..."
 
+    local needs_install=0
+
+    # Check if node_modules exists
     if [ ! -d "$dir/node_modules" ]; then
         warn "$name node_modules not found. Installing..."
+        needs_install=1
+    else
+        # Check if package.json has been modified more recently than node_modules
+        # This indicates new dependencies may have been added
+        if [ "$dir/package.json" -nt "$dir/node_modules" ] 2>/dev/null; then
+            warn "$name package.json is newer than node_modules. Updating dependencies..."
+            needs_install=1
+        fi
+    fi
+
+    # Install if needed
+    if [ $needs_install -eq 1 ]; then
         cd "$dir"
         bun install
         if [ $? -ne 0 ]; then
