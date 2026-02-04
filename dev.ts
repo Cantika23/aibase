@@ -123,6 +123,92 @@ BACKEND_PORT=${backendPort}
 }
 
 /**
+ * Get information about what's using a port
+ */
+async function getPortInfo(port: number): Promise<string | null> {
+  try {
+    // Try to get process info using lsof
+    const proc = Bun.spawn(['lsof', '-i', `:${port}`, '-t', '-P', '-n'], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+    })
+
+    const output = await new Response(proc.stdout).text()
+    await proc.exited
+
+    if (output.trim()) {
+      const pids = output.trim().split('\n').filter(Boolean)
+      const infos: string[] = []
+
+      for (const pid of pids) {
+        try {
+          // Get command name
+          const cmdProc = Bun.spawn(['ps', '-p', pid, '-o', 'comm='], {
+            stdout: 'pipe',
+            stderr: 'ignore',
+          })
+          const cmd = (await new Response(cmdProc.stdout).text()).trim()
+          await cmdProc.exited
+
+          // Get user
+          const userProc = Bun.spawn(['ps', '-p', pid, '-o', 'user='], {
+            stdout: 'pipe',
+            stderr: 'ignore',
+          })
+          const user = (await new Response(userProc.stdout).text()).trim()
+          await userProc.exited
+
+          infos.push(`PID ${pid} (${cmd}) by ${user}`)
+        } catch {
+          infos.push(`PID ${pid}`)
+        }
+      }
+
+      return infos.join(', ')
+    }
+  } catch {
+    // lsof not available or failed
+  }
+
+  return null
+}
+
+/**
+ * Check and display port usage before starting services
+ */
+async function checkPorts(): Promise<void> {
+  log('=== Checking Ports ===', 'blue')
+
+  const ports = [
+    { name: 'Backend (default)', port: DEFAULT_BACKEND_PORT },
+    { name: 'Frontend (default)', port: DEFAULT_FRONTEND_PORT },
+  ]
+
+  let foundInUse = false
+
+  for (const { name, port } of ports) {
+    if (await isPortInUse(port)) {
+      foundInUse = true
+      const info = await getPortInfo(port)
+      if (info) {
+        log(`  ${name} (${port}): IN USE by ${info}`, 'yellow')
+      } else {
+        log(`  ${name} (${port}): IN USE`, 'yellow')
+      }
+    } else {
+      log(`  ${name} (${port}): available`, 'green')
+    }
+  }
+
+  if (foundInUse) {
+    log('', 'reset')
+    warn('Some ports are already in use. Will find alternatives if needed.')
+  }
+
+  log('', 'reset')
+}
+
+/**
  * Initialize and validate port configuration
  */
 async function initializePorts(): Promise<number> {
@@ -133,7 +219,8 @@ async function initializePorts(): Promise<number> {
 
   if (saved.BACKEND_PORT) {
     if (await isPortInUse(saved.BACKEND_PORT)) {
-      warn(`Saved backend port ${saved.BACKEND_PORT} is in use, finding alternative...`)
+      const info = await getPortInfo(saved.BACKEND_PORT)
+      warn(`Saved backend port ${saved.BACKEND_PORT} is in use${info ? ` by ${info}` : ''}, finding alternative...`)
       backendPort = await findAvailablePort(PORT_RANGE_START, PORT_RANGE_END)
       success(`Found available backend port: ${backendPort}`)
     } else {
@@ -142,7 +229,8 @@ async function initializePorts(): Promise<number> {
     }
   } else {
     if (await isPortInUse(DEFAULT_BACKEND_PORT)) {
-      warn(`Default backend port ${DEFAULT_BACKEND_PORT} is in use`)
+      const info = await getPortInfo(DEFAULT_BACKEND_PORT)
+      warn(`Default backend port ${DEFAULT_BACKEND_PORT} is in use${info ? ` by ${info}` : ''}`)
       backendPort = await findAvailablePort(PORT_RANGE_START, PORT_RANGE_END)
       success(`Found available backend port: ${backendPort}`)
     } else {
@@ -407,8 +495,10 @@ async function main() {
   await checkDependencies(join(SCRIPT_DIR, 'backend'), 'Backend')
   await checkDependencies(join(SCRIPT_DIR, 'frontend'), 'Frontend')
 
+  // Check current port usage
+  await checkPorts()
+
   // Initialize ports
-  log('')
   const backendPort = await initializePorts()
   log('')
 
