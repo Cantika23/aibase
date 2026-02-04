@@ -135,6 +135,55 @@ export async function deleteFile(
 }
 
 /**
+ * Update file description and/or title
+ */
+export async function updateFileDescription(
+  projectId: string,
+  fileName: string,
+  updates: { description?: string; title?: string }
+): Promise<{ description?: string; title?: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/files/${projectId}/${fileName}/description`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updates),
+    }
+  );
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.error || "Failed to update file description");
+  }
+
+  return data.data;
+}
+
+/**
+ * Regenerate file description using extension hooks
+ */
+export async function regenerateFileDescription(
+  projectId: string,
+  fileName: string
+): Promise<{ description?: string; title?: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/files/${projectId}/${fileName}/regenerate`,
+    {
+      method: "POST",
+    }
+  );
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.error || "Failed to regenerate file description");
+  }
+
+  return data.data;
+}
+
+/**
  * Format file size to human readable format
  */
 export function formatFileSize(bytes: number): string {
