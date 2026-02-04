@@ -135,11 +135,48 @@ initialize_ports() {
     save_ports $BACKEND_PORT $FRONTEND_PORT
 }
 
+# Array to store background process PIDs
+PIDS=()
+
 # Function to kill background processes on exit
 cleanup() {
-    kill $(jobs -p) 2>/dev/null
-    wait 2>/dev/null
-    exit
+    echo ""
+    echo -e "${YELLOW}Shutting down services...${NC}"
+
+    # Kill all tracked background processes
+    for pid in "${PIDS[@]}"; do
+        if kill -0 $pid 2>/dev/null; then
+            # Try graceful shutdown first
+            kill $pid 2>/dev/null
+        fi
+    done
+
+    # Wait up to 5 seconds for processes to terminate gracefully
+    local count=0
+    while [ $count -lt 5 ]; do
+        local all_dead=1
+        for pid in "${PIDS[@]}"; do
+            if kill -0 $pid 2>/dev/null; then
+                all_dead=0
+                break
+            fi
+        done
+        if [ $all_dead -eq 1 ]; then
+            break
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+
+    # Force kill any remaining processes
+    for pid in "${PIDS[@]}"; do
+        if kill -0 $pid 2>/dev/null; then
+            kill -9 $pid 2>/dev/null
+        fi
+    done
+
+    success "All services stopped"
+    exit 0
 }
 
 # Trap SIGINT and SIGTERM to run cleanup
@@ -273,6 +310,7 @@ if [ "$AIMEOW" = "true" ]; then
     DATA_DIR=. \
     AIMEOW_LOG_CONFIG="$SCRIPT_DIR/logging.json" \
     "$AIMEOW_BINARY" 2>&1 &
+    PIDS+=($!)
 fi
 
 echo -e "${BLUE}=== Starting Services ===${NC}"
@@ -286,6 +324,7 @@ export BACKEND_PORT
 # Start backend with hot-reload
 cd "$SCRIPT_DIR"
 bun --watch --env-file=.env run backend/src/server/index.ts &
+PIDS+=($!)
 
 # Wait a moment for backend to start
 sleep 2
@@ -293,6 +332,15 @@ sleep 2
 # Start frontend with dynamic port and backend proxy
 cd "$SCRIPT_DIR/frontend"
 PORT=$FRONTEND_PORT BACKEND_PORT=$BACKEND_PORT bun run dev &
+PIDS+=($!)
+
+echo -e "${GREEN}✓ All services started${NC}"
+echo ""
+echo -e "${BLUE}Backend:${NC}  http://localhost:$BACKEND_PORT"
+echo -e "${BLUE}Frontend:${NC} http://localhost:$FRONTEND_PORT"
+echo ""
+echo -e "Press ${YELLOW}Ctrl+C${NC} to stop all services"
+echo ""
 
 # Wait for all background processes
 wait
