@@ -932,7 +932,7 @@ if (hookRegistry) {
       // Only process Excel files
       if (
         !_context.fileType.match(
-          /(^application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))|\.xls|\.xlsx$/,
+          /(^application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))|\.xls|\.xlsx$/i,
         )
       ) {
         logger.info("Skipping non-Excel file");

@@ -11,7 +11,7 @@
         "Auth": false,
         "Storage": false,
         "LLM": false,
-        "Extension": false,
+        "Extension": true,
         "Tools": false,
         "Handlers": false,
         "Middleware": false,
