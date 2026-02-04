@@ -233,7 +233,6 @@ log.Error("Connection failed", "error", err)
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync      # Beads workflow for session management and sync
    git push
    git status  # MUST show "up to date with origin"
    ```
