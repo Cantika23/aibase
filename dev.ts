@@ -51,13 +51,12 @@ function formatTimestamp(): string {
 }
 
 /**
- * Log a message following the backend logging format
- * Format: HH:MM:SS.mmm [DEV] [Category] Message
+ * Log a message following the backend logging format (without timestamp for dev script)
+ * Format: [DEV] [Category] Message
  */
 function log(category: string, message: string, categoryColor = colors.cyan) {
-  const time = formatTimestamp()
   const reset = colors.reset
-  console.log(`${time} ${colors.brightMagenta}[DEV]${reset} ${categoryColor}[${category}]${reset} ${message}`)
+  console.log(`${colors.brightMagenta}[DEV]${reset} ${categoryColor}[${category}]${reset} ${message}`)
 }
 
 function error(message: string): never {
