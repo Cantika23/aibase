@@ -38,8 +38,8 @@ success() {
 # Function to check if a port is in use
 is_port_in_use() {
     local port=$1
-    # Use multiple methods to check if port is in use
-    # Method 1: lsof (most reliable on macOS/Linux)
+
+    # Method 1: lsof (most reliable on macOS/Linux) - checks for LISTENing ports
     if command -v lsof >/dev/null 2>&1; then
         if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 || \
            lsof -Pi :$port -sTCP6:LISTEN -t >/dev/null 2>&1; then
@@ -47,21 +47,39 @@ is_port_in_use() {
         fi
     fi
 
-    # Method 2: netstat (fallback)
+    # Method 2: Try to actually connect (most accurate)
+    # This catches ports that are about to be used or are in TIME_WAIT state
+    if command -v nc >/dev/null 2>&1; then
+        if timeout 1 nc -z localhost $port 2>/dev/null; then
+            return 0  # Port is in use
+        fi
+    fi
+
+    # Method 3: netstat (fallback)
     if command -v netstat >/dev/null 2>&1; then
         if netstat -an -p tcp 2>/dev/null | grep -q "\.$port.*LISTEN"; then
             return 0  # Port is in use
         fi
     fi
 
-    # Method 3: Try to bind to the port (most accurate)
-    if command -v nc >/dev/null 2>&1; then
-        if nc -z localhost $port 2>/dev/null; then
-            return 0  # Port is in use
-        fi
-    fi
-
     return 1  # Port is available
+}
+
+# Function to wait for a port to become available (listening)
+wait_for_port() {
+    local port=$1
+    local max_wait=${2:-10}
+    local count=0
+
+    while [ $count -lt $max_wait ]; do
+        if is_port_in_use $port; then
+            return 0  # Port is now listening
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+
+    return 1  # Port never became available
 }
 
 # Function to find an available port
@@ -331,17 +349,20 @@ bun --watch --env-file=.env run backend/src/server/index.ts &
 BACKEND_PID=$!
 PIDS+=($BACKEND_PID)
 
-# Wait for backend to start and verify it's running
-sleep 2
+# Wait for backend to start and verify the port is actually listening
+echo "Waiting for backend to start on port $BACKEND_PORT..."
 
-# Check if backend process is still running (might have failed due to port in use)
-if ! kill -0 $BACKEND_PID 2>/dev/null; then
+if ! wait_for_port $BACKEND_PORT 5; then
     echo ""
-    warn "Backend failed to start on port $BACKEND_PORT (port might be in use)"
-
-    # Try to find an available port and restart
+    warn "Backend failed to start on port $BACKEND_PORT (port is in use)"
     warn "Attempting to find an alternative port..."
-    BACKEND_PORT=$(find_available_port $((PORT_RANGE_START + 1)) $PORT_RANGE_END)
+
+    # Kill the failed backend process
+    kill $BACKEND_PID 2>/dev/null
+    wait $BACKEND_PID 2>/dev/null
+
+    # Find an available port starting from the next one
+    BACKEND_PORT=$(find_available_port $((BACKEND_PORT + 1)) $PORT_RANGE_END)
 
     if [ $? -ne 0 ]; then
         error_exit "Could not find available port. Please manually stop the process using port $BACKEND_PORT:
@@ -366,15 +387,16 @@ EOF
     BACKEND_PID=$!
     PIDS+=($BACKEND_PID)
 
-    # Wait and verify again
-    sleep 2
-
-    if ! kill -0 $BACKEND_PID 2>/dev/null; then
+    # Wait and verify the new port is listening
+    if ! wait_for_port $BACKEND_PORT 5; then
+        echo ""
         error_exit "Backend failed to start on port $BACKEND_PORT as well.
 Please check what's using these ports and try again."
     fi
 
     success "Backend started successfully on port $BACKEND_PORT"
+else
+    success "Backend is listening on port $BACKEND_PORT"
 fi
 
 # Start frontend with dynamic port and backend proxy
