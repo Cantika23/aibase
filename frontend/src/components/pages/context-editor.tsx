@@ -2,20 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Save,
   RefreshCw,
-  Bold,
-  Italic,
-  Underline,
-  List,
-  Code,
   Maximize2,
   Minimize2
 } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import UnderlineExtension from '@tiptap/extension-underline';
-import { Markdown } from 'tiptap-markdown';
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
@@ -26,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 
 const API_URL = buildApiUrl("");
 
@@ -38,25 +30,6 @@ export function ContextEditor() {
   const [zenMode, setZenMode] = useState(false);
 
   const { currentProject } = useProjectStore();
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      UnderlineExtension,
-      Markdown,
-    ],
-    content: '',
-    onUpdate: ({ editor }) => {
-       // Use markdown storage to get markdown content
-       const markdownContent = (editor.storage as any).markdown.getMarkdown();
-       setContent(markdownContent);
-    },
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-8 sm:p-12',
-      },
-    },
-  });
 
   // Load Context
   const loadContext = async () => {
@@ -76,11 +49,6 @@ export function ContextEditor() {
 
       if (!data.success) throw new Error(data.error || "Failed to load context");
 
-      // Set content in Tiptap
-      if (editor) {
-        editor.commands.setContent(data.data.content);
-      }
-      
       setContent(data.data.content);
       setOriginalContent(data.data.content);
     } catch (err) {
@@ -91,30 +59,13 @@ export function ContextEditor() {
     }
   };
 
-  // Sync editor content when it changes externally (e.g. on load)
-  useEffect(() => {
-     if (editor && content === originalContent && !editor.isFocused) {
-        // Only set if content matches original (fresh load) or simple sync
-        // But better is to trust loadContext to set it initially.
-        // This effect might cause cursor jumps if we sync on every keystroke.
-        // So we only rely on loadContext setting it initially.
-     }
-  }, [editor, originalContent]); // simplified
-
   // Initial Load
   useEffect(() => {
     loadContext();
   }, [currentProject?.id]);
-  
-  // Re-sync editor if editor instance was not ready during load
-  useEffect(() => {
-     if (editor && originalContent && editor.isEmpty) {
-        editor.commands.setContent(originalContent);
-     }
-  }, [editor, originalContent]);
 
   // Save Context
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (newContent: string) => {
     if (!currentProject) return;
 
     setIsSaving(true);
@@ -122,38 +73,32 @@ export function ContextEditor() {
       const response = await fetch(`${API_URL}/api/context`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, projectId: currentProject.id }),
+        body: JSON.stringify({ content: newContent, projectId: currentProject.id }),
       });
 
       const data = await response.json();
       if (!data.success) throw new Error(data.error || "Failed to save context");
 
-      setOriginalContent(content);
-      toast.success("Saved successfully");
+      setOriginalContent(newContent);
     } catch (err) {
-      toast.error("Failed to save");
+      throw err;
     } finally {
       setIsSaving(false);
     }
-  }, [currentProject, content]);
+  }, [currentProject]);
 
   const hasChanges = content !== originalContent;
 
-  // Keyboard Shortcuts (Standard Tiptap handles most, just Save)
+  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        if (hasChanges) handleSave();
-      }
       if (e.key === "Escape" && zenMode) {
          setZenMode(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [zenMode, hasChanges, handleSave]);
-
+  }, [zenMode]);
 
   if (error) {
     return (
@@ -166,10 +111,6 @@ export function ContextEditor() {
         </div>
       </div>
     );
-  }
-
-  if (!editor) {
-      return null;
   }
 
   return (
@@ -225,7 +166,7 @@ export function ContextEditor() {
             <Button
               variant={hasChanges ? "default" : "secondary"}
               size="sm"
-              onClick={handleSave}
+              onClick={() => handleSave(content)}
               disabled={!hasChanges || isLoading}
               className="gap-2 min-w-[80px]"
             >
@@ -236,7 +177,7 @@ export function ContextEditor() {
         </div>
 
         {/* Editor Wrapper */}
-        <div className="flex-1 overflow-hidden relative flex flex-col">
+        <div className="flex-1 overflow-hidden relative flex flex-col p-4">
           
           {/* Zen Mode Exit */}
           {zenMode && (
@@ -250,89 +191,13 @@ export function ContextEditor() {
              </Button>
           )}
 
-          {/* Unified Toolbar - Tiptap Controls */}
-          <div className="h-12 border-b flex items-center justify-between px-4 bg-background/50 backdrop-blur-sm z-20 shrink-0">
-             <div className="flex items-center gap-1">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button 
-                            variant={editor.isActive('bold') ? "secondary" : "ghost"} 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            onClick={() => editor.chain().focus().toggleBold().run()}
-                        >
-                            <Bold className="h-4 w-4" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Bold</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button 
-                            variant={editor.isActive('italic') ? "secondary" : "ghost"} 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            onClick={() => editor.chain().focus().toggleItalic().run()}
-                        >
-                            <Italic className="h-4 w-4" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Italic</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button 
-                            variant={editor.isActive('underline') ? "secondary" : "ghost"}
-                            size="icon" 
-                            className="h-8 w-8" 
-                            onClick={() => editor.chain().focus().toggleUnderline().run()}
-                        >
-                            <Underline className="h-4 w-4" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Underline</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button 
-                            variant={editor.isActive('code') ? "secondary" : "ghost"} 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            onClick={() => editor.chain().focus().toggleCode().run()}
-                        >
-                            <Code className="h-4 w-4" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Inline Code</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button 
-                            variant={editor.isActive('bulletList') ? "secondary" : "ghost"} 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            onClick={() => editor.chain().focus().toggleBulletList().run()}
-                        >
-                            <List className="h-4 w-4" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>List</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-             </div>
-             
-             {/* Note: Preview button removed as Tiptap is WYSIWYG */}
-          </div>
-
-          <div className="flex-1 flex overflow-hidden">
-             {/* Content Area */}
-             <div className="flex-1 overflow-y-auto min-h-0 bg-background" onClick={() => editor.chain().focus().run()}>
-                 <div className="max-w-4xl mx-auto h-full">
-                    <EditorContent editor={editor} className="h-full" />
-                 </div>
-             </div>
-          </div>
+          <MarkdownEditor
+            initialContent={originalContent}
+            onSave={handleSave}
+            saveLabel="Save"
+            className="h-full border-0 shadow-none"
+            minHeight="calc(100vh - 200px)"
+          />
         </div>
       </div>
     </div>
