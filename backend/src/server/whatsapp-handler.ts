@@ -25,6 +25,40 @@ const processedMessages = new Map<string, number>();
 const MESSAGE_DEDUP_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
 const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // Cleanup every 10 minutes
 
+/**
+ * Generate a simple hash from string for deduplication fallback
+ * Uses a basic DJB2 hash algorithm
+ */
+function generateHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i); // hash * 33 + character
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/**
+ * Generate deduplication key from message data
+ * Priority: messageData.id > hash(from + text + timestamp)
+ */
+function generateDedupKey(messageData: any): { key: string; source: string } {
+  // Priority 1: Use message ID if available
+  if (messageData?.id) {
+    return { key: `id_${messageData.id}`, source: 'message_id' };
+  }
+
+  // Priority 2: Use hash of message content + sender + timestamp as fallback
+  const from = messageData?.from || messageData?.rawChat || messageData?.rawSender || 'unknown';
+  const text = messageData?.text || messageData?.caption || '';
+  const timestamp = messageData?.timestamp || Date.now();
+  const content = `${from}|${text}|${timestamp}`;
+
+  return {
+    key: `hash_${generateHash(content)}`,
+    source: 'content_hash'
+  };
+}
+
 // Periodic cleanup of old entries from deduplication cache
 setInterval(() => {
   const now = Date.now();
@@ -342,26 +376,43 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     }
 
     // MESSAGE DEDUPLICATION: Check if this message has already been processed
-    // This prevents duplicate AI responses when aimeow sends multiple webhook calls for the same message
-    const messageId = messageData?.id;
-    if (messageId) {
-      const existingTimestamp = processedMessages.get(messageId);
-      if (existingTimestamp) {
-        const age = Date.now() - existingTimestamp;
-        if (age < MESSAGE_DEDUP_TTL_MS) {
-          logger.info({ messageId, age: `${age}ms` }, '[WhatsApp] Ignoring duplicate webhook (message already processed)');
-          return Response.json({ success: true, ignored: true, reason: 'duplicate-message' });
-        } else {
-          // Old entry expired, remove it
-          processedMessages.delete(messageId);
-        }
+    // This prevents duplicate AI responses when aimeow sends duplicate webhooks
+    const { key: dedupKey, source: dedupSource } = generateDedupKey(messageData);
+    const existingTimestamp = processedMessages.get(dedupKey);
+
+    if (existingTimestamp) {
+      const age = Date.now() - existingTimestamp;
+      if (age < MESSAGE_DEDUP_TTL_MS) {
+        logger.info({
+          dedupKey,
+          dedupSource,
+          age: `${age}ms`,
+          messageId: messageData?.id,
+          from: messageData?.from
+        }, '[WhatsApp] ❌ Duplicate webhook blocked - message already processed');
+        return Response.json({
+          success: true,
+          ignored: true,
+          reason: 'duplicate-message',
+          dedupKey,
+          dedupSource
+        });
+      } else {
+        // Old entry expired, remove it
+        processedMessages.delete(dedupKey);
+        logger.info({ dedupKey, age }, '[WhatsApp] ⏰ Dedup key expired, allowing re-processing');
       }
-      // Mark this message as processed
-      processedMessages.set(messageId, Date.now());
-      logger.debug({ messageId }, '[WhatsApp] Tracking message ID for deduplication');
-    } else {
-      logger.warn({ messageData }, '[WhatsApp] Warning: Message missing ID field, cannot deduplicate');
     }
+
+    // Mark this message as processed IMMEDIATELY to prevent race conditions
+    processedMessages.set(dedupKey, Date.now());
+    logger.info({
+      dedupKey,
+      dedupSource,
+      messageId: messageData?.id,
+      from: messageData?.from,
+      cacheSize: processedMessages.size
+    }, '[WhatsApp] ✅ Tracking message for deduplication');
 
     // The clientId could be a projectId or a subClientId
     // Check if it's a sub-client first
