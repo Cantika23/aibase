@@ -54,6 +54,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { useConversationStore } from "@/stores/conversation-store";
 import {
   AlertCircle,
+  AlertTriangle,
   Download,
   Edit3,
   ExternalLink,
@@ -74,7 +75,6 @@ import {
   Loader2,
   Sparkles,
   FileEdit,
-  RefreshCw,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -154,7 +154,7 @@ export function FilesManagerPage() {
 
   // Description editing state
   const [editingDescriptionFile, setEditingDescriptionFile] = useState<FileInfo | null>(null);
-  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [_isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -774,8 +774,11 @@ export function FilesManagerPage() {
                                 >
                                   {getFileIconComponent(file.name)}
                                   <div className="flex flex-col">
-                                    <span className="font-medium">
+                                    <span className="font-medium flex items-center gap-1">
                                       {file.title || file.name}
+                                      {file.processingError && (
+                                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                                      )}
                                     </span>
                                     {file.title && file.title !== file.name && (
                                       <span className="text-xs text-muted-foreground">
@@ -968,8 +971,11 @@ export function FilesManagerPage() {
 
                             {/* File Info */}
                             <div className="text-center w-full">
-                              <p className="font-medium truncate w-full text-sm">
+                              <p className="font-medium truncate w-full text-sm flex items-center justify-center gap-1">
                                 {file.title || file.name}
+                                {file.processingError && (
+                                  <AlertTriangle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+                                )}
                               </p>
                               {file.title && file.title !== file.name && (
                                 <p className="text-xs text-muted-foreground truncate w-full">

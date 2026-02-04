@@ -19,6 +19,7 @@ export interface FileInfo {
   scope?: string;
   description?: string;
   title?: string;
+  processingError?: string;
 }
 
 /**

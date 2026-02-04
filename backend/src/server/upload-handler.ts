@@ -163,6 +163,7 @@ export interface UploadedFileInfo {
   scope: FileScope;
   description?: string;
   title?: string;
+  processingError?: string;
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -351,11 +352,12 @@ async function processFileAsync(
           logger.info({ fileTitle }, '[UPLOAD-HANDLER] Extension hook generated title');
         }
         
-        // Update file metadata with description and title
+        // Update file metadata with description and title, clear any previous error
         try {
           await fileStorage.updateFileMeta('', storedFileName, projectId, tenantId, {
             description: fileDescription,
-            title: fileTitle
+            title: fileTitle,
+            processingError: undefined // Clear any previous error on success
           });
           logger.info({ fileTitle }, '[UPLOAD-HANDLER] File metadata updated with description and title');
           
@@ -379,7 +381,31 @@ async function processFileAsync(
         logger.info('[UPLOAD-HANDLER] Extension hook: No description generated');
       }
     } catch (hookError) {
+      const errorMessage = hookError instanceof Error ? hookError.message : String(hookError);
       logger.error({ error: hookError, fileName }, '[UPLOAD-HANDLER] Extension hook execution failed');
+      
+      // Save processing error to file metadata
+      try {
+        await fileStorage.updateFileMeta('', storedFileName, projectId, tenantId, {
+          processingError: errorMessage
+        });
+        logger.info({ fileName, error: errorMessage }, '[UPLOAD-HANDLER] Saved processing error to file metadata');
+        
+        // Broadcast error update
+        broadcastFileUpdate(wsServer, convId, {
+          id: fileId,
+          name: storedFileName,
+          size: fileSize,
+          type: fileType,
+          url: `/api/files/${projectId}/${storedFileName}`,
+          thumbnailUrl,
+          uploadedAt: Date.now(),
+          scope,
+          processingError: errorMessage,
+        }, 'description');
+      } catch (updateError) {
+        logger.error({ error: updateError }, '[UPLOAD-HANDLER] Failed to save processing error to metadata');
+      }
     }
     
     // Step 3: Broadcast completion

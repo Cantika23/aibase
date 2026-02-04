@@ -14,6 +14,7 @@ import {
   fetchProjectFiles,
   formatFileSize,
   renameFile,
+  regenerateFileDescription,
   type FileInfo,
 } from "@/lib/files-api";
 import { formatRelativeTime } from "@/lib/time-utils";
@@ -29,6 +30,8 @@ import {
   Trash2,
   Loader2,
   FileIcon,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -59,6 +62,7 @@ export function FileDetailPage() {
   const [deletingFile, setDeletingFile] = useState<FileInfo | null>(null);
   const [renamingFile, setRenamingFile] = useState<FileInfo | null>(null);
   const [newFileName, setNewFileName] = useState("");
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -239,6 +243,41 @@ export function FileDetailPage() {
     navigate(`/projects/${projectId}/chat`);
   };
 
+  const handleRegenerate = async () => {
+    if (!currentFile || !projectId) return;
+
+    setIsRegenerating(true);
+    try {
+      const result = await regenerateFileDescription(projectId, currentFile.name);
+      toast.success("File analysis completed");
+      
+      // Reload files to get updated metadata
+      await loadFiles(projectId);
+      
+      // Update current file with new data
+      if (result.description) {
+        setCurrentFile(prev => prev ? {
+          ...prev,
+          description: result.description,
+          title: result.title,
+          processingError: undefined,
+        } : null);
+      }
+    } catch (error) {
+      log.error("Error regenerating file description", { error: String(error) });
+      toast.error("Failed to analyze file", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+      
+      // Reload to get the error state
+      if (projectId) {
+        await loadFiles(projectId);
+      }
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   const getFileTypeCategory = (fileName: string): string => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
     const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
@@ -406,14 +445,100 @@ export function FileDetailPage() {
                 </div>
               </div>
 
+              {/* Processing Error */}
+              {currentFile.processingError && (
+                <div className="border border-destructive/50 rounded-lg p-4 bg-destructive/10">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-sm font-medium mb-1 text-destructive">
+                        Analysis Failed
+                      </h2>
+                      <p className="text-sm text-destructive/80 mb-3">
+                        {currentFile.processingError}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRegenerate}
+                        disabled={isRegenerating}
+                        className="border-destructive/50 hover:bg-destructive/20"
+                      >
+                        {isRegenerating ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Retry Analysis
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Description/Meta markdown section */}
               {currentFile.description && (
                 <div className="border rounded-lg p-4 bg-muted/30">
-                  <h2 className="text-sm font-medium mb-2 text-muted-foreground uppercase tracking-wide">
-                    Metadata
-                  </h2>
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Metadata
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRegenerate}
+                      disabled={isRegenerating}
+                      className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                    >
+                      {isRegenerating ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                      <span className="ml-1 text-xs">Refresh</span>
+                    </Button>
+                  </div>
                   <div className="prose prose-sm max-w-none dark:prose-invert">
                     <MarkdownRenderer>{currentFile.description}</MarkdownRenderer>
+                  </div>
+                </div>
+              )}
+
+              {/* No metadata yet and no error - show analyze button for supported types */}
+              {!currentFile.description && !currentFile.processingError && (
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        No Metadata
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        File analysis not performed yet
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRegenerate}
+                      disabled={isRegenerating}
+                    >
+                      {isRegenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Analyze File
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               )}
