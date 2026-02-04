@@ -17,30 +17,56 @@ const DEFAULT_FRONTEND_PORT = 5173
 const PORT_RANGE_START = 5041
 const PORT_RANGE_END = 5100
 
-// ANSI colors
+// ANSI colors matching backend logging
 const colors = {
+  black: '\x1b[0;30m',
   red: '\x1b[0;31m',
   green: '\x1b[0;32m',
-  yellow: '\x1b[1;33m',
+  yellow: '\x1b[0;33m',
   blue: '\x1b[0;34m',
+  magenta: '\x1b[0;35m',
+  cyan: '\x1b[0;36m',
+  white: '\x1b[0;37m',
+  brightBlack: '\x1b[1;30m',
+  brightRed: '\x1b[1;31m',
+  brightGreen: '\x1b[1;32m',
+  brightYellow: '\x1b[1;33m',
+  brightBlue: '\x1b[1;34m',
+  brightMagenta: '\x1b[1;35m',
+  brightCyan: '\x1b[1;36m',
+  brightWhite: '\x1b[1;37m',
   reset: '\x1b[0m',
 }
 
-function log(message: string, color: keyof typeof colors = 'reset') {
-  console.log(`${colors[color]}${message}${colors.reset}`)
+/**
+ * Format timestamp to match backend logging (HH:MM:SS.mmm)
+ */
+function formatTimestamp(): string {
+  const now = new Date()
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  const seconds = String(now.getSeconds()).padStart(2, '0')
+  const millis = String(now.getMilliseconds()).padStart(3, '0')
+  return `${hours}:${minutes}:${seconds}.${millis}`
+}
+
+/**
+ * Log a message following the backend logging format
+ * Format: HH:MM:SS.mmm [DEV] [Category] Message
+ */
+function log(category: string, message: string, categoryColor = colors.cyan) {
+  const time = formatTimestamp()
+  const reset = colors.reset
+  console.log(`${time} ${colors.brightMagenta}[DEV]${reset} ${categoryColor}[${category}]${reset} ${message}`)
 }
 
 function error(message: string): never {
-  log(`ERROR: ${message}`, 'red')
+  log('Error', message, colors.red)
   process.exit(1)
 }
 
 function warn(message: string) {
-  log(`WARNING: ${message}`, 'yellow')
-}
-
-function success(message: string) {
-  log(message, 'green')
+  log('Warning', message, colors.yellow)
 }
 
 /**
@@ -249,7 +275,9 @@ async function getProcessInfo(pidsStr: string): Promise<string> {
  * Check and display port usage before starting services
  */
 async function checkPorts(): Promise<void> {
-  log('=== Checking Ports ===', 'blue')
+  console.log('')  // blank line for separation
+  log('Ports', 'Checking default ports...')
+  console.log('')
 
   const ports = [
     { name: 'Backend (default)', port: DEFAULT_BACKEND_PORT },
@@ -260,23 +288,23 @@ async function checkPorts(): Promise<void> {
     if (await isPortInUse(port)) {
       const info = await getPortInfo(port)
       if (info) {
-        log(`  ${name} (${port}): in use by ${info}`, 'yellow')
+        console.log(`  ${name} (${port}): in use by ${info}`)
       } else {
-        log(`  ${name} (${port}): in use`, 'yellow')
+        console.log(`  ${name} (${port}): in use`)
       }
     } else {
-      log(`  ${name} (${port}): available`, 'green')
+      console.log(`  ${name} (${port}): available`)
     }
   }
 
-  log('', 'reset')
+  console.log('')
 }
 
 /**
  * Initialize and validate port configuration
  */
 async function initializePorts(): Promise<{ backend: number; frontend: number }> {
-  log('=== Port Allocation ===', 'blue')
+  log('Ports', 'Allocating ports...')
 
   const saved = loadSavedPorts()
   let backendPort: number
@@ -286,7 +314,7 @@ async function initializePorts(): Promise<{ backend: number; frontend: number }>
   if (saved.BACKEND_PORT) {
     if (await isPortInUse(saved.BACKEND_PORT)) {
       const info = await getPortInfo(saved.BACKEND_PORT)
-      log(`  Backend port ${saved.BACKEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
+      console.log(`  Backend port ${saved.BACKEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`)
       backendPort = await findAvailablePort(PORT_RANGE_START, PORT_RANGE_END)
     } else {
       backendPort = saved.BACKEND_PORT
@@ -294,7 +322,7 @@ async function initializePorts(): Promise<{ backend: number; frontend: number }>
   } else {
     if (await isPortInUse(DEFAULT_BACKEND_PORT)) {
       const info = await getPortInfo(DEFAULT_BACKEND_PORT)
-      log(`  Backend port ${DEFAULT_BACKEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
+      console.log(`  Backend port ${DEFAULT_BACKEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`)
       backendPort = await findAvailablePort(PORT_RANGE_START, PORT_RANGE_END)
     } else {
       backendPort = DEFAULT_BACKEND_PORT
@@ -305,7 +333,7 @@ async function initializePorts(): Promise<{ backend: number; frontend: number }>
   if (saved.FRONTEND_PORT) {
     if (await isPortInUse(saved.FRONTEND_PORT)) {
       const info = await getPortInfo(saved.FRONTEND_PORT)
-      log(`  Frontend port ${saved.FRONTEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
+      console.log(`  Frontend port ${saved.FRONTEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`)
       frontendPort = await findAvailablePort(DEFAULT_FRONTEND_PORT + 1, DEFAULT_FRONTEND_PORT + 100)
     } else {
       frontendPort = saved.FRONTEND_PORT
@@ -313,7 +341,7 @@ async function initializePorts(): Promise<{ backend: number; frontend: number }>
   } else {
     if (await isPortInUse(DEFAULT_FRONTEND_PORT)) {
       const info = await getPortInfo(DEFAULT_FRONTEND_PORT)
-      log(`  Frontend port ${DEFAULT_FRONTEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
+      console.log(`  Frontend port ${DEFAULT_FRONTEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`)
       frontendPort = await findAvailablePort(DEFAULT_FRONTEND_PORT + 1, DEFAULT_FRONTEND_PORT + 100)
     } else {
       frontendPort = DEFAULT_FRONTEND_PORT
@@ -321,9 +349,9 @@ async function initializePorts(): Promise<{ backend: number; frontend: number }>
   }
 
   savePorts(backendPort, frontendPort)
-  log(`  Backend:  ${backendPort}`, 'green')
-  log(`  Frontend: ${frontendPort}`, 'green')
-  log('', 'reset')
+  console.log(`  Backend:  ${backendPort}`)
+  console.log(`  Frontend: ${frontendPort}`)
+  console.log('')
 
   return { backend: backendPort, frontend: frontendPort }
 }
@@ -361,14 +389,14 @@ function loadEnv() {
 Please configure these variables in your .env file.`)
   }
 
-  success('Environment variables validated')
+  log('Env', 'Environment variables validated', colors.green)
 }
 
 /**
  * Check and install dependencies if needed
  */
 async function checkDependencies(dir: string, name: string) {
-  log(`Checking ${name} dependencies...`)
+  log('Deps', `Checking ${name} dependencies...`)
 
   const nodeModules = join(dir, 'node_modules')
   const packageJson = join(dir, 'package.json')
@@ -376,14 +404,14 @@ async function checkDependencies(dir: string, name: string) {
   let needsInstall = false
 
   if (!existsSync(nodeModules)) {
-    log(`${name} node_modules not found, installing...`, 'reset')
+    log('Deps', `${name} node_modules not found, installing...`)
     needsInstall = true
   } else if (existsSync(packageJson)) {
     // Check if package.json is newer than node_modules
     const pkgStat = await Bun.file(packageJson).stat()
     const nmStat = await Bun.file(nodeModules).stat()
     if (pkgStat.mtime > nmStat.mtime) {
-      log(`${name} dependencies outdated, updating...`, 'reset')
+      log('Deps', `${name} dependencies outdated, updating...`)
       needsInstall = true
     }
   }
@@ -398,9 +426,9 @@ async function checkDependencies(dir: string, name: string) {
     if (exitCode !== 0) {
       error(`Failed to install ${name} dependencies`)
     }
-    success(`${name} dependencies installed`)
+    log('Deps', `${name} dependencies installed`, colors.green)
   } else {
-    success(`${name} dependencies OK`)
+    log('Deps', `${name} dependencies OK`, colors.green)
   }
 }
 
@@ -420,7 +448,7 @@ async function startAimeow(backendPort: number): Promise<ProcessPromise | null> 
     : join(aimeowDir, 'aimeow.linux')
 
   if (!existsSync(aimeowBinary)) {
-    warn('AIMEOW binary not found, skipping WhatsApp service')
+    log('AIMEOW', 'Binary not found, skipping WhatsApp service', colors.yellow)
     return null
   }
 
@@ -430,7 +458,7 @@ async function startAimeow(backendPort: number): Promise<ProcessPromise | null> 
     (existsSync(mainGo) && (await Bun.file(mainGo).stat()).mtime > (await Bun.file(aimeowBinary).stat()).mtime)
 
   if (needsBuild) {
-    log('Building AIMEOW...', 'blue')
+    log('AIMEOW', 'Building...')
     const buildProc = Bun.spawn(['go', 'build', '-ldflags=-s -w', `-o=${aimeowBinary}`, '.'], {
       cwd: aimeowDir,
       env: {
@@ -442,7 +470,7 @@ async function startAimeow(backendPort: number): Promise<ProcessPromise | null> 
     })
     const exitCode = await buildProc.exited
     if (exitCode !== 0) {
-      warn('Failed to build AIMEOW, skipping WhatsApp service')
+      log('AIMEOW', 'Failed to build, skipping WhatsApp service', colors.yellow)
       return null
     }
   }
@@ -452,7 +480,7 @@ async function startAimeow(backendPort: number): Promise<ProcessPromise | null> 
   await $`mkdir -p ${join(aimeowDataDir, 'files')}`
 
   // Start AIMEOW
-  log('Starting AIMEOW service...', 'blue')
+  log('AIMEOW', 'Starting service...')
   const proc = Bun.spawn([aimeowBinary], {
     cwd: aimeowDataDir,
     env: {
@@ -488,7 +516,7 @@ async function waitForPort(port: number, maxWait = 5000): Promise<boolean> {
  * Start backend with port retry logic
  */
 async function startBackend(backendPort: number): Promise<{ proc: typeof Bun.spawn, port: number }> {
-  log('Waiting for backend to start on port ' + backendPort + '...')
+  console.log(`Waiting for backend to start on port ${backendPort}...`)
 
   const proc = Bun.spawn(
     ['bun', '--watch', '--env-file=.env', 'run', 'backend/src/server/index.ts'],
@@ -505,9 +533,9 @@ async function startBackend(backendPort: number): Promise<{ proc: typeof Bun.spa
 
   // Wait for backend to start
   if (!(await waitForPort(backendPort, 5000))) {
-    log('', 'reset')
-    warn(`Backend failed to start on port ${backendPort} (port is in use)`)
-    warn('Attempting to find an alternative port...')
+    console.log('')
+    log('Backend', `Port ${backendPort} in use, finding alternative...`, colors.yellow)
+    console.log('Attempting to find an alternative port...')
 
     // Kill the failed backend process
     proc.kill()
@@ -515,7 +543,7 @@ async function startBackend(backendPort: number): Promise<{ proc: typeof Bun.spa
 
     // Find an available port
     const newPort = await findAvailablePort(backendPort + 1, PORT_RANGE_END)
-    success(`Retrying with port ${newPort}...`)
+    log('Backend', `Retrying with port ${newPort}...`, colors.green)
 
     // Update ports file
     savePorts(newPort)
@@ -540,11 +568,11 @@ async function startBackend(backendPort: number): Promise<{ proc: typeof Bun.spa
 Please check what's using these ports and try again.`)
     }
 
-    success(`Backend started successfully on port ${newPort}`)
+    log('Backend', `Started successfully on port ${newPort}`, colors.green)
     return { proc: newProc, port: newPort }
   }
 
-  success(`Backend is listening on port ${backendPort}`)
+  log('Backend', `Listening on port ${backendPort}`, colors.green)
   return { proc, port: backendPort }
 }
 
@@ -556,15 +584,15 @@ async function main() {
 
   // Setup cleanup handler
   const cleanup = async () => {
-    log('', 'reset')
-    log('Shutting down services...', 'yellow')
+    console.log('')
+    log('Shutdown', 'Shutting down services...', colors.yellow)
 
     for (const proc of processes) {
       proc.kill()
       await proc.exited
     }
 
-    success('All services stopped')
+    log('Shutdown', 'All services stopped', colors.green)
     process.exit(0)
   }
 
@@ -583,7 +611,6 @@ async function main() {
 
   // Initialize ports
   const { backend: backendPort, frontend: frontendPort } = await initializePorts()
-  log('')
 
   // Start AIMEOW if enabled
   const aimeowProc = await startAimeow(backendPort)
@@ -592,10 +619,11 @@ async function main() {
   }
 
   // Start services
-  log('=== Starting Services ===', 'blue')
-  success(`Backend will run on port ${backendPort}`)
-  success(`Frontend will run on port ${frontendPort}`)
-  log('')
+  console.log('')
+  log('Services', 'Starting services...')
+  console.log(`  Backend:  port ${backendPort}`)
+  console.log(`  Frontend: port ${frontendPort}`)
+  console.log('')
 
   // Start backend with hot-reload
   const { proc: backendProc, port: finalBackendPort } = await startBackend(backendPort)
@@ -614,13 +642,13 @@ async function main() {
   })
   processes.push(frontendProc)
 
-  success('✓ All services started')
-  log('')
-  log(`Backend:  http://localhost:${finalBackendPort}`, 'blue')
-  log(`Frontend: http://localhost:${frontendPort}`, 'blue')
-  log('')
-  log('Press Ctrl+C to stop all services')
-  log('')
+  log('Services', 'All services started', colors.green)
+  console.log('')
+  console.log(`  Backend:  http://localhost:${finalBackendPort}`)
+  console.log(`  Frontend: http://localhost:${frontendPort}`)
+  console.log('')
+  console.log('Press Ctrl+C to stop all services')
+  console.log('')
 
   // Wait for all processes
   await Promise.all(processes.map(p => p.exited))
