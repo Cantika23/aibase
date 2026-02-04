@@ -50,7 +50,7 @@ export function MarkdownEditor({
 }: MarkdownEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [content, setContent] = useState(initialContent);
+  const [content, setContent] = useState(initialContent || placeholder || "");
 
   const editor = useEditor({
     extensions: [
@@ -67,6 +67,7 @@ export function MarkdownEditor({
       attributes: {
         class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none p-4',
         style: `min-height: ${minHeight}`,
+        placeholder: placeholder,
       },
     },
   });
