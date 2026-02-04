@@ -465,7 +465,7 @@ export class FileStorage {
     fileName: string,
     projectId: string,
     tenantId: number | string,
-    updates: { description?: string; title?: string }
+    updates: { description?: string; title?: string; thumbnailUrl?: string }
   ): Promise<void> {
     // Load existing metadata
     const existingMeta = await this.loadFileMeta(convId, fileName, projectId, tenantId);
