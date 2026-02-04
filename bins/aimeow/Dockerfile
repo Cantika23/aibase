@@ -29,7 +29,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o aimeow .
 FROM alpine:latest
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates sqlite curl
+RUN apk --no-cache add ca-certificates sqlite curl lsof
 
 # Create non-root user
 RUN addgroup -g 1001 -S appgroup && \

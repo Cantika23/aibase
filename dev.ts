@@ -126,7 +126,7 @@ BACKEND_PORT=${backendPort}
  * Get information about what's using a port
  */
 async function getPortInfo(port: number): Promise<string | null> {
-  // Method 1: Try lsof
+  // Method 1: Try lsof (most reliable, installed in Dockerfiles)
   try {
     const proc = Bun.spawn(['lsof', '-i', `:${port}`, '-t', '-P', '-n'], {
       stdout: 'pipe',
@@ -140,7 +140,7 @@ async function getPortInfo(port: number): Promise<string | null> {
       return await getProcessInfo(output.trim())
     }
   } catch {
-    // lsof not available, try other methods
+    // lsof not available, try fallback methods
   }
 
   // Method 2: Try fuser (commonly available)
@@ -160,41 +160,6 @@ async function getPortInfo(port: number): Promise<string | null> {
     }
   } catch {
     // fuser not available
-  }
-
-  // Method 3: Try ss on Linux
-  try {
-    const proc = Bun.spawn(['ss', '-tlnp', `sport = :${port}`], {
-      stdout: 'pipe',
-      stderr: 'ignore',
-    })
-
-    const output = await new Response(proc.stdout).text()
-    await proc.exited
-
-    // ss output format: ... pid=<pid>,...  or ... users:(("cmd",pid=<pid>,...) ...
-    const pidMatch = output.match(/pid=(\d+)|"(\w+)",pid=(\d+)/)
-    if (pidMatch) {
-      const pid = pidMatch[1] || pidMatch[3]
-      const cmd = pidMatch[2] || ''
-      if (pid) {
-        const procInfo = cmd ? `PID ${pid} (${cmd})` : `PID ${pid}`
-        // Try to get user
-        try {
-          const userProc = Bun.spawn(['ps', '-p', pid, '-o', 'user='], {
-            stdout: 'pipe',
-            stderr: 'ignore',
-          })
-          const user = (await new Response(userProc.stdout).text()).trim()
-          await userProc.exited
-          return `${procInfo} by ${user}`
-        } catch {
-          return procInfo
-        }
-      }
-    }
-  } catch {
-    // ss not available
   }
 
   return null
