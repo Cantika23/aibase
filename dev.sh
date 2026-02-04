@@ -290,9 +290,9 @@ bun --watch --env-file=.env run backend/src/server/index.ts &
 # Wait a moment for backend to start
 sleep 2
 
-# Start frontend with dynamic port
+# Start frontend with dynamic port and backend proxy
 cd "$SCRIPT_DIR/frontend"
-PORT=$FRONTEND_PORT bun run dev &
+PORT=$FRONTEND_PORT BACKEND_PORT=$BACKEND_PORT bun run dev &
 
 # Wait for all background processes
 wait
