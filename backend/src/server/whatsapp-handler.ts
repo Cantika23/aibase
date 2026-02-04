@@ -13,6 +13,7 @@ import { ScriptRuntime } from "../tools/extensions/script-runtime";
 import { ExtensionLoader } from "../tools/extensions/extension-loader";
 import { getBuiltinTools } from "../tools";
 import { createLogger } from "../utils/logger";
+import { loadContext, expandTemplate } from "./context-handler";
 
 const logger = createLogger('WhatsAppHandler');
 
@@ -1215,115 +1216,82 @@ async function processWhatsAppMessageWithAI(
 
     // Create conversation instance with custom hooks for script progress and tool results
     logger.info("[WhatsApp] Creating conversation instance...");
+    // Load dynamic context
+    let systemPrompt = "";
+    try {
+      const contextTemplate = await loadContext(projectId);
+      systemPrompt = await expandTemplate(contextTemplate);
+    } catch (err) {
+      logger.error({ err }, "[WhatsApp] Failed to load dynamic context, using fallback");
+      systemPrompt = `You are a helpful AI assistant on WhatsApp.`;
+    }
+
+    // Track if we have already sent a status notification to the user
+    let toolNotificationSent = false;
+
     const conversation = await Conversation.create({
       projectId,
       tenantId,
       convId,
       urlParams: { CURRENT_UID: uid },
       tools, // <-- Register tools so AI can call script, todo, memory
-      systemPrompt: `You are a helpful AI assistant on WhatsApp. 
-      
-CRITICAL: YOU HAVE ACCESS TO REAL-TIME EXTERNAL TOOLS.
-When asked about current events, weather, stock prices, or specific data, YOU MUST USE THE 'script' TOOL.
-DO NOT refuse to answer. DO NOT say you cannot access the internet.
-DO NOT say "According to my last update". USE THE TOOLS.
-
-Available Extensions in 'script' tool:
-- search.web(query): Search the internet for real-time information
-- search.image(query): Search for images
-- excel.query(sql): Query CSV/Excel files
-- chart.show(options): Generate charts
-- image.extract(options): Analyze images
-
-Example: To check weather, call script with:
-await search.web("cuaca hari ini di madiun");
-
-Always answer in the same language as the user (Indonesian/English).`,
+      systemPrompt,
       hooks: {
         tools: {
           before: async (toolCallId: string, toolName: string, args: any) => {
-            // 1. Handle Script Tool Progress (The "Thinking..." equivalent)
-            // Check if this is a script tool progress update
-            // The script tool injects __status and __result via the broadcast function
+            // 1. Handle Script Tool Progress
+            // Only send if we haven't sent a notification yet
             if (toolName === "script" && args.__status === "progress" && args.__result) {
               const progressMessage = args.__result.message;
-              logger.info({ progressMessage }, "[WhatsApp] Script progress");
-
-              // Check if we already sent this exact notification
-              const notificationKey = `progress:${progressMessage}`;
-              if (sentNotifications.has(notificationKey)) {
-                console.log("[WhatsApp] Skipping duplicate progress notification:", progressMessage);
-                return;
-              }
-              sentNotifications.add(notificationKey);
-
-              // Send progress update to WhatsApp
-              try {
-                await sendWhatsAppMessage(projectId, whatsappNumber, {
-                  text: `⏳ ${progressMessage}`,
-                }, true); // keep typing
-              } catch (err) {
-                logger.error({ err }, "[WhatsApp] Failed to send progress message");
-                // Don't throw - progress messages are optional
+              
+              if (!toolNotificationSent) {
+                 // Lock immediately to prevent race conditions
+                 toolNotificationSent = true;
+                 try {
+                    await sendWhatsAppMessage(projectId, whatsappNumber, {
+                      text: `⏳ ${progressMessage}`,
+                    }, true);
+                 } catch (err) {
+                    logger.error({ err }, "[WhatsApp] Failed to send progress message");
+                 }
               }
               return;
             }
 
-            // 2. Handle Initial Tool Call (The "Green Box" equivalent)
-            // When AI calls a tool, notify user immediately
-            let notificationText = "";
-            if (toolName === "script") {
-              // Extract purpose from script args if available
-              const purpose = args.purpose || "Executing custom script...";
-              notificationText = `⏳ ${purpose}`;
-            } else if (toolName === "search") {
-              notificationText = `🔍 Searching for: ${args.query || "data"}...`;
+            // 2. Handle Initial Tool Call
+            // Only send if we haven't sent a notification yet
+            if (!toolNotificationSent) {
+                let notificationText = "";
+                if (toolName === "script") {
+                  const purpose = args.purpose || "Executing custom script...";
+                  notificationText = `⏳ ${purpose}`;
+                } else if (toolName === "search") {
+                  notificationText = `🔍 Searching for: ${args.query || "data"}...`;
+                } else {
+                  notificationText = `🔧 Using tool: ${toolName}...`;
+                }
+
+                // Lock immediately to prevent race conditions
+                toolNotificationSent = true;
+
+                logger.info({ toolName, notificationText }, "[WhatsApp] Tool started (Notification sent)");
+                try {
+                  await sendWhatsAppMessage(projectId, whatsappNumber, { text: notificationText }, true);
+                } catch (err) {
+                  logger.error({ err }, "[WhatsApp] Failed to send tool start notification");
+                }
             } else {
-              notificationText = `🔧 Using tool: ${toolName}...`;
-            }
-
-            // Check if we already sent this exact notification
-            const notificationKey = `tool:${notificationText}`;
-            if (sentNotifications.has(notificationKey)) {
-              logger.debug({ notificationText }, "[WhatsApp] Skipping duplicate tool notification");
-              return;
-            }
-            sentNotifications.add(notificationKey);
-
-            logger.info({ toolName, notificationText }, "[WhatsApp] Tool started");
-            try {
-              await sendWhatsAppMessage(projectId, whatsappNumber, { text: notificationText }, true); // keep typing
-            } catch (err) {
-              logger.error({ err }, "[WhatsApp] Failed to send tool start notification");
+              logger.info({ toolName }, "[WhatsApp] Tool started (Notification suppressed)");
             }
           },
           after: async (toolCallId: string, toolName: string, args: any, result: any) => {
             logger.info({ toolName, result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Tool executed");
             
-            // Store tool result for later use
+            // Store tool result for later use if needed (debugging or fallback)
             toolResults.push({ toolName, result });
             
-            // For script tool, immediately send result to user
-            // This ensures user gets data even if AI follow-up is empty
-            if (toolName === "script" && result && !toolResultSent) {
-              logger.info("[WhatsApp] Formatting script tool result for WhatsApp...");
-              const formattedResult = formatToolResultForWhatsApp(toolName, args, result);
-              logger.info({ formattedResult: formattedResult ? formattedResult.substring(0, 200) + "..." : "NULL" }, "[WhatsApp] Formatted result");
-              if (formattedResult) {
-                logger.info("[WhatsApp] Sending tool result directly to user");
-                try {
-                  await sendWhatsAppMessage(projectId, whatsappNumber, {
-                    text: formattedResult,
-                  });
-                  toolResultSent = true;
-                  logger.info("[WhatsApp] Tool result sent successfully");
-                } catch (err) {
-                  logger.error({ err }, "[WhatsApp] Failed to send tool result");
-                }
-              } else {
-                logger.warn("[WhatsApp] formatToolResultForWhatsApp returned null, not sending");
-              }
-            }
+            // Do NOT send tool results directly to user anymore.
+            // The AI will incorporate the result into the final answer.
           },
         },
       },
