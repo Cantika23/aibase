@@ -124,7 +124,6 @@ BACKEND_PORT=${backendPort}
 FRONTEND_PORT=${frontendPort}
 `
   writeFileSync(PORTS_FILE, content)
-  success(`Port configuration saved to ${PORTS_FILE}`)
 }
 
 /**
@@ -257,25 +256,17 @@ async function checkPorts(): Promise<void> {
     { name: 'Frontend (default)', port: DEFAULT_FRONTEND_PORT },
   ]
 
-  let foundInUse = false
-
   for (const { name, port } of ports) {
     if (await isPortInUse(port)) {
-      foundInUse = true
       const info = await getPortInfo(port)
       if (info) {
-        log(`  ${name} (${port}): IN USE by ${info}`, 'yellow')
+        log(`  ${name} (${port}): in use by ${info}`, 'yellow')
       } else {
-        log(`  ${name} (${port}): IN USE`, 'yellow')
+        log(`  ${name} (${port}): in use`, 'yellow')
       }
     } else {
       log(`  ${name} (${port}): available`, 'green')
     }
-  }
-
-  if (foundInUse) {
-    log('', 'reset')
-    warn('Some ports are already in use. Will find alternatives if needed.')
   }
 
   log('', 'reset')
@@ -295,22 +286,18 @@ async function initializePorts(): Promise<{ backend: number; frontend: number }>
   if (saved.BACKEND_PORT) {
     if (await isPortInUse(saved.BACKEND_PORT)) {
       const info = await getPortInfo(saved.BACKEND_PORT)
-      warn(`Saved backend port ${saved.BACKEND_PORT} is in use${info ? ` by ${info}` : ''}, finding alternative...`)
+      log(`  Backend port ${saved.BACKEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
       backendPort = await findAvailablePort(PORT_RANGE_START, PORT_RANGE_END)
-      success(`Found available backend port: ${backendPort}`)
     } else {
-      success(`Using saved backend port: ${saved.BACKEND_PORT}`)
       backendPort = saved.BACKEND_PORT
     }
   } else {
     if (await isPortInUse(DEFAULT_BACKEND_PORT)) {
       const info = await getPortInfo(DEFAULT_BACKEND_PORT)
-      warn(`Default backend port ${DEFAULT_BACKEND_PORT} is in use${info ? ` by ${info}` : ''}`)
+      log(`  Backend port ${DEFAULT_BACKEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
       backendPort = await findAvailablePort(PORT_RANGE_START, PORT_RANGE_END)
-      success(`Found available backend port: ${backendPort}`)
     } else {
       backendPort = DEFAULT_BACKEND_PORT
-      success(`Using default backend port: ${backendPort}`)
     }
   }
 
@@ -318,26 +305,25 @@ async function initializePorts(): Promise<{ backend: number; frontend: number }>
   if (saved.FRONTEND_PORT) {
     if (await isPortInUse(saved.FRONTEND_PORT)) {
       const info = await getPortInfo(saved.FRONTEND_PORT)
-      warn(`Saved frontend port ${saved.FRONTEND_PORT} is in use${info ? ` by ${info}` : ''}, finding alternative...`)
+      log(`  Frontend port ${saved.FRONTEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
       frontendPort = await findAvailablePort(DEFAULT_FRONTEND_PORT + 1, DEFAULT_FRONTEND_PORT + 100)
-      success(`Found available frontend port: ${frontendPort}`)
     } else {
-      success(`Using saved frontend port: ${saved.FRONTEND_PORT}`)
       frontendPort = saved.FRONTEND_PORT
     }
   } else {
     if (await isPortInUse(DEFAULT_FRONTEND_PORT)) {
       const info = await getPortInfo(DEFAULT_FRONTEND_PORT)
-      warn(`Default frontend port ${DEFAULT_FRONTEND_PORT} is in use${info ? ` by ${info}` : ''}`)
+      log(`  Frontend port ${DEFAULT_FRONTEND_PORT} in use${info ? ` (${info})` : ''}, using alternative...`, 'reset')
       frontendPort = await findAvailablePort(DEFAULT_FRONTEND_PORT + 1, DEFAULT_FRONTEND_PORT + 100)
-      success(`Found available frontend port: ${frontendPort}`)
     } else {
       frontendPort = DEFAULT_FRONTEND_PORT
-      success(`Using default frontend port: ${frontendPort}`)
     }
   }
 
   savePorts(backendPort, frontendPort)
+  log(`  Backend:  ${backendPort}`, 'green')
+  log(`  Frontend: ${frontendPort}`, 'green')
+  log('', 'reset')
 
   return { backend: backendPort, frontend: frontendPort }
 }
@@ -390,14 +376,14 @@ async function checkDependencies(dir: string, name: string) {
   let needsInstall = false
 
   if (!existsSync(nodeModules)) {
-    warn(`${name} node_modules not found. Installing...`)
+    log(`${name} node_modules not found, installing...`, 'reset')
     needsInstall = true
   } else if (existsSync(packageJson)) {
     // Check if package.json is newer than node_modules
     const pkgStat = await Bun.file(packageJson).stat()
     const nmStat = await Bun.file(nodeModules).stat()
     if (pkgStat.mtime > nmStat.mtime) {
-      warn(`${name} package.json is newer than node_modules. Updating dependencies...`)
+      log(`${name} dependencies outdated, updating...`, 'reset')
       needsInstall = true
     }
   }
