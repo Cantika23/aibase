@@ -126,8 +126,8 @@ BACKEND_PORT=${backendPort}
  * Get information about what's using a port
  */
 async function getPortInfo(port: number): Promise<string | null> {
+  // Method 1: Try lsof
   try {
-    // Try to get process info using lsof
     const proc = Bun.spawn(['lsof', '-i', `:${port}`, '-t', '-P', '-n'], {
       stdout: 'pipe',
       stderr: 'ignore',
@@ -137,40 +137,143 @@ async function getPortInfo(port: number): Promise<string | null> {
     await proc.exited
 
     if (output.trim()) {
-      const pids = output.trim().split('\n').filter(Boolean)
-      const infos: string[] = []
+      return await getProcessInfo(output.trim())
+    }
+  } catch {
+    // lsof not available, try other methods
+  }
 
-      for (const pid of pids) {
+  // Method 2: Try fuser (commonly available)
+  try {
+    const proc = Bun.spawn(['fuser', `${port}/tcp`, '-n', 'tcp'], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+    })
+
+    const output = await new Response(proc.stdout).text()
+    await proc.exited
+
+    // fuser returns: <port>/tcp: <pid>
+    const match = output.match(/:(\d+)/)
+    if (match) {
+      return await getProcessInfo(match[1])
+    }
+  } catch {
+    // fuser not available
+  }
+
+  // Method 3: Try ss on Linux
+  try {
+    const proc = Bun.spawn(['ss', '-tlnp', `sport = :${port}`], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+    })
+
+    const output = await new Response(proc.stdout).text()
+    await proc.exited
+
+    // ss output format: ... pid=<pid>,...  or ... users:(("cmd",pid=<pid>,...) ...
+    const pidMatch = output.match(/pid=(\d+)|"(\w+)",pid=(\d+)/)
+    if (pidMatch) {
+      const pid = pidMatch[1] || pidMatch[3]
+      const cmd = pidMatch[2] || ''
+      if (pid) {
+        const procInfo = cmd ? `PID ${pid} (${cmd})` : `PID ${pid}`
+        // Try to get user
         try {
-          // Get command name
-          const cmdProc = Bun.spawn(['ps', '-p', pid, '-o', 'comm='], {
-            stdout: 'pipe',
-            stderr: 'ignore',
-          })
-          const cmd = (await new Response(cmdProc.stdout).text()).trim()
-          await cmdProc.exited
-
-          // Get user
           const userProc = Bun.spawn(['ps', '-p', pid, '-o', 'user='], {
             stdout: 'pipe',
             stderr: 'ignore',
           })
           const user = (await new Response(userProc.stdout).text()).trim()
           await userProc.exited
-
-          infos.push(`PID ${pid} (${cmd}) by ${user}`)
+          return `${procInfo} by ${user}`
         } catch {
-          infos.push(`PID ${pid}`)
+          return procInfo
         }
       }
-
-      return infos.join(', ')
     }
   } catch {
-    // lsof not available or failed
+    // ss not available
   }
 
   return null
+}
+
+/**
+ * Get process info from PID(s)
+ */
+async function getProcessInfo(pidsStr: string): Promise<string> {
+  const pids = pidsStr.trim().split('\n').filter(Boolean)
+  const infos: string[] = []
+
+  for (const pid of pids) {
+    try {
+      // Try to read from /proc on Linux
+      const cmdlinePath = `/proc/${pid}/cmdline`
+      const statusPath = `/proc/${pid}/status`
+
+      let cmd = ''
+      let user = ''
+
+      try {
+        const cmdlineFile = Bun.file(cmdlinePath)
+        if (cmdlineFile.exists) {
+          const cmdline = await cmdlineFile.text()
+          // cmdline has null-byte separated args, take first
+          const args = cmdline.split('\0').filter(Boolean)
+          cmd = args[0]?.split('/').pop() || 'unknown'
+        }
+      } catch {
+        // /proc not available (non-Linux), use ps
+      }
+
+      try {
+        const statusFile = Bun.file(statusPath)
+        if (statusFile.exists) {
+          const status = await statusFile.text()
+          const uidMatch = status.match(/Uid:\s*(\d+)/)
+          if (uidMatch) {
+            // Try to get username from UID
+            try {
+              const userProc = Bun.spawn(['getent', 'passwd', uidMatch[1]], {
+                stdout: 'pipe',
+                stderr: 'ignore',
+              })
+              const passwdEntry = (await new Response(userProc.stdout).text()).trim()
+              await userProc.exited
+              user = passwdEntry.split(':')[0] || uidMatch[1]
+            } catch {
+              user = uidMatch[1]
+            }
+          }
+        }
+      } catch {
+        // /proc not available
+      }
+
+      // Fallback to ps if we didn't get info from /proc
+      if (!cmd || !user) {
+        const psProc = Bun.spawn(['ps', '-p', pid, '-o', 'comm,user='], {
+          stdout: 'pipe',
+          stderr: 'ignore',
+        })
+        const psOutput = (await new Response(psProc.stdout).text()).trim()
+        await psProc.exited
+        const parts = psOutput.split(/\s+/)
+        if (parts.length >= 2) {
+          cmd = cmd || parts[0]
+          user = user || parts[1]
+        }
+      }
+
+      infos.push(`PID ${pid}${cmd ? ` (${cmd})` : ''}${user ? ` by ${user}` : ''}`)
+    } catch {
+      infos.push(`PID ${pid}`)
+    }
+  }
+
+  return infos.join(', ')
 }
 
 /**
