@@ -19,6 +19,27 @@ const logger = createLogger('WhatsAppHandler');
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || "http://localhost:7031/api/v1";
 
+// Message deduplication cache: messageId -> timestamp
+// Prevents processing the same message multiple times when aimeow sends duplicate webhooks
+const processedMessages = new Map<string, number>();
+const MESSAGE_DEDUP_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
+const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // Cleanup every 10 minutes
+
+// Periodic cleanup of old entries from deduplication cache
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [msgId, timestamp] of processedMessages.entries()) {
+    if (now - timestamp > MESSAGE_DEDUP_TTL_MS) {
+      processedMessages.delete(msgId);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    logger.info({ cleaned, totalRemaining: processedMessages.size }, '[WhatsApp] Cleaned up expired message IDs from deduplication cache');
+  }
+}, CLEANUP_INTERVAL_MS);
+
 // Import notification functions for WebSocket broadcasts
 let notifyWhatsAppStatus: (projectId: string, status: any) => void = () => { };
 let notifyWhatsAppQRCode: (projectId: string, qrCode: string) => void = () => { };
@@ -318,6 +339,28 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
     if (messageData?.fromMe) {
       logger.info("[WhatsApp] Ignoring self-message fromMe=true");
       return Response.json({ success: true, ignored: true });
+    }
+
+    // MESSAGE DEDUPLICATION: Check if this message has already been processed
+    // This prevents duplicate AI responses when aimeow sends multiple webhook calls for the same message
+    const messageId = messageData?.id;
+    if (messageId) {
+      const existingTimestamp = processedMessages.get(messageId);
+      if (existingTimestamp) {
+        const age = Date.now() - existingTimestamp;
+        if (age < MESSAGE_DEDUP_TTL_MS) {
+          logger.info({ messageId, age: `${age}ms` }, '[WhatsApp] Ignoring duplicate webhook (message already processed)');
+          return Response.json({ success: true, ignored: true, reason: 'duplicate-message' });
+        } else {
+          // Old entry expired, remove it
+          processedMessages.delete(messageId);
+        }
+      }
+      // Mark this message as processed
+      processedMessages.set(messageId, Date.now());
+      logger.debug({ messageId }, '[WhatsApp] Tracking message ID for deduplication');
+    } else {
+      logger.warn({ messageData }, '[WhatsApp] Warning: Message missing ID field, cannot deduplicate');
     }
 
     // The clientId could be a projectId or a subClientId
