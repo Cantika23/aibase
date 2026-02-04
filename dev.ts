@@ -47,20 +47,26 @@ function success(message: string) {
  * Check if a port is in use by attempting to connect to it
  */
 async function isPortInUse(port: number): Promise<boolean> {
+  // Try to connect to the port
+  const conn = Bun.connect({
+    hostname: 'localhost',
+    port,
+    socket: {
+      data(socket, data) {},
+      open(socket) {
+        socket.end()
+      },
+      close() {},
+    },
+    timeout: 100,
+  })
+
+  // If connection succeeds, port is in use
   try {
-    using server = Bun.serve({
-      port,
-      fetch: () => new Response('OK'),
-      reusePort: true,
-    })
-    // If we got here, port was available
-    server.stop()
-    return false
-  } catch (e: any) {
-    if (e?.code === 'EADDRINUSE') {
-      return true
-    }
-    // Some other error, assume port is available
+    await conn
+    return true
+  } catch {
+    // Connection failed, port is available
     return false
   }
 }
