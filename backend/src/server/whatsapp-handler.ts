@@ -777,6 +777,23 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
         break;
     }
 
+    // === IGNORE PLACEHOLDER MESSAGES ===
+    // aimeow sometimes sends duplicate webhooks: one with actual content,
+    // and another with type="other" and placeholder text like "Sent a message"
+    // We ignore these placeholder messages to prevent duplicate AI responses
+    if (messageData.type === "other" && messageText === "Sent a message" && attachments.length === 0) {
+      logger.info({
+        type: messageData.type,
+        messageId: messageData.id,
+        from: messageData.from
+      }, '[WhatsApp] Ignoring placeholder message (duplicate webhook from aimeow)');
+      return Response.json({
+        success: true,
+        ignored: true,
+        reason: 'placeholder-message'
+      });
+    }
+
     // === HANDLER KHUSUS UNTUK LOCATION MESSAGE ===
     // Respons instan tanpa AI untuk menghindari timeout dan rate limit
     if (messageData.type === "location" || messageData.type === "live_location") {
