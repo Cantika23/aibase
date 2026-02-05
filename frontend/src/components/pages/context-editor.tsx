@@ -4,13 +4,19 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
-  Info
+  Info,
+  Bold,
+  Italic,
+  Underline,
+  Code,
+  List,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
+import { Markdown } from 'tiptap-markdown';
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
@@ -21,8 +27,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { MarkdownEditor } from "@/components/ui/markdown-editor";
-import { ContextVariablesLegend } from "@/components/pages/context-variables-legend";
 
 const API_URL = buildApiUrl("");
 
@@ -55,7 +59,7 @@ export function ContextEditor() {
       }) as any, // Type assertion for Markdown
     ],
     content: '',
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor }: { editor: any }) => {
       // Use markdown storage to get markdown content
       const markdownContent = (editor.storage as any).markdown?.getMarkdown?.() || editor.getHTML();
       setContent(markdownContent);
