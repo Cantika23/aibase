@@ -43,14 +43,18 @@ import {
   renameFile,
   getFileContext,
   setFileInContext,
+  updateFileDescription,
+  regenerateFileDescription,
   type FileInfo,
   type FileContextMapping,
 } from "@/lib/files-api";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { uploadFilesWithProgress, type UploadProgress } from "@/lib/file-upload";
 import { useChatStore } from "@/stores/chat-store";
 import { useConversationStore } from "@/stores/conversation-store";
 import {
   AlertCircle,
+  AlertTriangle,
   Download,
   Edit3,
   ExternalLink,
@@ -70,6 +74,7 @@ import {
   Upload,
   Loader2,
   Sparkles,
+  FileEdit,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -146,6 +151,10 @@ export function FilesManagerPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Description editing state
+  const [editingDescriptionFile, setEditingDescriptionFile] = useState<FileInfo | null>(null);
+  const [_isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -244,6 +253,45 @@ export function FilesManagerPage() {
     } finally {
       setRenamingFile(null);
       setNewFileName("");
+    }
+  };
+
+  const handleEditDescription = (file: FileInfo) => {
+    setEditingDescriptionFile(file);
+  };
+
+  const handleSaveDescription = async (content: string): Promise<void> => {
+    if (!editingDescriptionFile || !projectId) return;
+
+    try {
+      await updateFileDescription(projectId, editingDescriptionFile.name, {
+        description: content,
+      });
+      toast.success("Description saved");
+      loadFiles(projectId);
+      setEditingDescriptionFile(null);
+    } catch (error) {
+      log.error("Error saving description", { error: String(error) });
+      toast.error("Failed to save description");
+      throw error;
+    }
+  };
+
+  const handleRegenerateDescription = async (): Promise<string> => {
+    if (!editingDescriptionFile || !projectId) throw new Error("No file selected");
+
+    setIsRegenerating(true);
+    try {
+      const result = await regenerateFileDescription(projectId, editingDescriptionFile.name);
+      toast.success("Description regenerated");
+      loadFiles(projectId);
+      return result.description || "";
+    } catch (error) {
+      log.error("Error regenerating description", { error: String(error) });
+      toast.error("Failed to regenerate description");
+      throw error;
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -726,8 +774,11 @@ export function FilesManagerPage() {
                                 >
                                   {getFileIconComponent(file.name)}
                                   <div className="flex flex-col">
-                                    <span className="font-medium">
+                                    <span className="font-medium flex items-center gap-1">
                                       {file.title || file.name}
+                                      {file.processingError && (
+                                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                                      )}
                                     </span>
                                     {file.title && file.title !== file.name && (
                                       <span className="text-xs text-muted-foreground">
@@ -773,6 +824,12 @@ export function FilesManagerPage() {
                                       Download
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => handleEditDescription(file)}
+                                    >
+                                      <FileEdit className="h-4 w-4 mr-2" />
+                                      Edit Description
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() => handleRenameFile(file)}
                                     >
@@ -914,8 +971,11 @@ export function FilesManagerPage() {
 
                             {/* File Info */}
                             <div className="text-center w-full">
-                              <p className="font-medium truncate w-full text-sm">
+                              <p className="font-medium truncate w-full text-sm flex items-center justify-center gap-1">
                                 {file.title || file.name}
+                                {file.processingError && (
+                                  <AlertTriangle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+                                )}
                               </p>
                               {file.title && file.title !== file.name && (
                                 <p className="text-xs text-muted-foreground truncate w-full">
@@ -968,6 +1028,15 @@ export function FilesManagerPage() {
                                   Download
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditDescription(file);
+                                  }}
+                                >
+                                  <FileEdit className="h-4 w-4 mr-2" />
+                                  Edit Description
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1119,6 +1188,36 @@ export function FilesManagerPage() {
                 Rename
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Description Edit Dialog */}
+        <Dialog
+          open={!!editingDescriptionFile}
+          onOpenChange={(open) => !open && setEditingDescriptionFile(null)}
+        >
+          <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileEdit className="h-5 w-5" />
+                Edit Description
+              </DialogTitle>
+              <DialogDescription>
+                {editingDescriptionFile?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 min-h-[400px] py-4">
+              <MarkdownEditor
+                initialContent={editingDescriptionFile?.description || ""}
+                onSave={handleSaveDescription}
+                onCancel={() => setEditingDescriptionFile(null)}
+                onRegenerate={handleRegenerateDescription}
+                showRegenerate={true}
+                saveLabel="Save"
+                placeholder="Enter file description..."
+                minHeight="350px"
+              />
+            </div>
           </DialogContent>
         </Dialog>
 

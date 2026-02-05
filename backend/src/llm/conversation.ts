@@ -104,6 +104,15 @@ export interface ToolHooks {
   ) => void | Promise<void>;
 
   /**
+   * Called when tool sends progress update
+   */
+  progress?: (
+    toolCallId: string,
+    toolName: string,
+    data: any
+  ) => void | Promise<void>;
+
+  /**
    * Called after executing a tool successfully
    */
   after?: (
@@ -756,13 +765,21 @@ export class Conversation {
             (type: "tool_call" | "tool_result", data: any) => {
               // Call hook with full data including status
               if (type === "tool_call") {
-                // For tool_call type, pass the data through the before hook
-                // The hook implementation in ws/entry.ts will broadcast with status
-                this.hooks.tools?.before?.(
-                  data.toolCallId,
-                  data.toolName,
-                  { ...data.args, __status: data.status, __result: data.result }
-                );
+                // Check if this is a progress update
+                if (data.status === "progress") {
+                  this.hooks.tools?.progress?.(
+                    data.toolCallId,
+                    data.toolName,
+                    data.result
+                  );
+                } else {
+                  // For other tool_call types, pass the data through the before hook
+                  this.hooks.tools?.before?.(
+                    data.toolCallId,
+                    data.toolName,
+                    { ...data.args, __status: data.status, __result: data.result }
+                  );
+                }
               } else {
                 this.hooks.tools?.after?.(
                   data.toolCallId,

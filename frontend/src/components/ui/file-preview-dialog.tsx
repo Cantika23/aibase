@@ -209,9 +209,19 @@ export function FilePreviewDialog({
                     className="max-w-full max-h-[70vh] object-contain rounded-lg"
                   />
                 </div>
-              ) : fileCategory === 'code' || fileCategory === 'document' ? (
+              ) : ext === 'pdf' ? (
+                <iframe
+                  src={currentFile.url}
+                  className="w-full h-[70vh] rounded-lg border"
+                  title={currentFile.name}
+                />
+              ) : fileCategory === 'code' ? (
                 <pre className="text-sm bg-background rounded-lg p-4 overflow-auto max-h-[60vh]">
                   <code>{fileContent || '(No content to display)'}</code>
+                </pre>
+              ) : fileCategory === 'document' ? (
+                <pre className="text-sm bg-background rounded-lg p-4 overflow-auto max-h-[60vh]">
+                  <code>{fileContent || '(Document content preview not available)'}</code>
                 </pre>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full space-y-4">

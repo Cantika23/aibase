@@ -4,7 +4,7 @@
   "description": "Display interactive charts in the frontend (bar, line, pie, area, etc.)",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "visualization-tools",
+  "category": "visualization",
   "enabled": true,
   "isDefault": true,
   "createdAt": 0,

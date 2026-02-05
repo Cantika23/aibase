@@ -54,7 +54,7 @@ export function MainChatMobile(props: MainChatProps) {
   return (
     <div className={cn("flex flex-col h-screen-mobile", className)}>
       {/* Mobile Header - compact with action buttons */}
-      <div className="h-[60px] flex items-center justify-between px-4 border-b flex-shrink-0 bg-background">
+      <div className="h-[60px] flex items-center justify-between px-4 border-b shrink-0 bg-background">
         <div className="flex items-center gap-2">
           {!isEmbedMode && (
             <Button
@@ -99,15 +99,15 @@ export function MainChatMobile(props: MainChatProps) {
 
       {/* Mobile Error Alert - full width */}
       {error && (
-        <Alert className="mx-0 border-red-200 bg-red-50 flex-shrink-0 rounded-none">
-          <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+        <Alert className="mx-0 border-red-200 bg-red-50 shrink-0 rounded-none">
+          <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
           <AlertDescription className="text-red-800 text-sm">{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Mobile Compaction Status */}
       {messages.length > 0 && (
-        <div className="px-4 mt-2 flex-shrink-0">
+        <div className="px-4 mt-2 shrink-0">
           <CompactionStatus wsClient={wsClient} />
         </div>
       )}

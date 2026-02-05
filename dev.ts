@@ -392,6 +392,110 @@ Please configure these variables in your .env file.`)
 }
 
 /**
+ * Check if prek is installed, install if not
+ */
+async function checkPrek(): Promise<boolean> {
+  log('Prek', 'Checking prek installation...')
+
+  try {
+    // Check if prek is available
+    const proc = Bun.spawn(['which', 'prek'], {
+      stdout: 'ignore',
+      stderr: 'ignore',
+    })
+    const exitCode = await proc.exited
+
+    if (exitCode === 0) {
+      log('Prek', 'prek is installed', colors.green)
+      return true
+    }
+  } catch {
+    // prek not found
+  }
+
+  log('Prek', 'prek not found, attempting to install...', colors.yellow)
+
+  // Try to install prek using different methods
+  const installMethods = [
+    { cmd: ['bun', 'add', '-g', 'prek'], name: 'bun' },
+    { cmd: ['npm', 'install', '-g', '@j178/prek'], name: 'npm' },
+    { cmd: ['cargo', 'install', '--locked', 'prek'], name: 'cargo' },
+  ]
+
+  for (const method of installMethods) {
+    try {
+      const checkCmd = Bun.spawn(['which', method.cmd[0]], {
+        stdout: 'ignore',
+        stderr: 'ignore',
+      })
+      if ((await checkCmd.exited) !== 0) {
+        continue // Command not available
+      }
+
+      log('Prek', `Installing prek via ${method.name}...`)
+      const proc = Bun.spawn(method.cmd, {
+        stdout: 'inherit',
+        stderr: 'inherit',
+      })
+      const exitCode = await proc.exited
+
+      if (exitCode === 0) {
+        log('Prek', 'prek installed successfully', colors.green)
+        return true
+      }
+    } catch {
+      // Try next method
+    }
+  }
+
+  warn('Failed to auto-install prek. Please install it manually:')
+  console.log('  - uv tool install prek')
+  console.log('  - pip install prek')
+  console.log('  - cargo install --locked prek')
+  console.log('  See: https://github.com/j178/prek#installation')
+  console.log('')
+
+  return false
+}
+
+/**
+ * Run TypeScript type check on a directory
+ */
+async function runTypeCheck(dir: string, name: string): Promise<boolean> {
+  log('TypeCheck', `Checking ${name} types...`)
+
+  const tsConfigPath = join(dir, 'tsconfig.json')
+
+  if (!existsSync(tsConfigPath)) {
+    warn(`No tsconfig.json found in ${dir}, skipping type check`)
+    return true
+  }
+
+  // Use tsc --noEmit for type checking only
+  const proc = Bun.spawn(['bun', 'run', 'tsc', '--noEmit'], {
+    cwd: dir,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+
+  const stdout = await new Response(proc.stdout).text()
+  const stderr = await new Response(proc.stderr).text()
+  const exitCode = await proc.exited
+
+  if (exitCode !== 0) {
+    console.log('')
+    log('TypeCheck', `${name} type check failed`, colors.red)
+    if (stdout) console.log(stdout)
+    if (stderr) console.error(stderr)
+    console.log('')
+    return false
+  }
+
+  log('TypeCheck', `${name} types OK`, colors.green)
+  return true
+}
+
+/**
  * Check and install dependencies if needed
  */
 async function checkDependencies(dir: string, name: string) {
@@ -601,9 +705,20 @@ async function main() {
   // Load and validate environment
   loadEnv()
 
+  // Check prek installation (optional, non-blocking)
+  await checkPrek()
+
   // Check dependencies
   await checkDependencies(join(SCRIPT_DIR, 'backend'), 'Backend')
   await checkDependencies(join(SCRIPT_DIR, 'frontend'), 'Frontend')
+
+  // Run type checking
+  const backendTypesOk = await runTypeCheck(join(SCRIPT_DIR, 'backend'), 'Backend')
+  const frontendTypesOk = await runTypeCheck(join(SCRIPT_DIR, 'frontend'), 'Frontend')
+
+  if (!backendTypesOk || !frontendTypesOk) {
+    error('Type checking failed. Please fix the errors above before continuing.')
+  }
 
   // Check current port usage
   await checkPorts()

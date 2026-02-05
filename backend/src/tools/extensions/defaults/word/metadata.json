@@ -4,7 +4,7 @@
   "description": "Extract text content from Word documents (.docx)",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "document-tools",
+  "category": "documents",
   "enabled": false,
   "isDefault": true,
   "createdAt": 0,

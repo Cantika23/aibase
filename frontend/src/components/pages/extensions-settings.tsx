@@ -67,6 +67,7 @@ export function ExtensionsSettings() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Category management state
@@ -119,9 +120,13 @@ export function ExtensionsSettings() {
 
   // Load data
   const loadData = useCallback(async () => {
-    if (!currentProject) return;
-
     setIsLoading(true);
+
+    if (!currentProject) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const [extData, catData] = await Promise.all([
         getExtensions(currentProject.id),
@@ -169,7 +174,7 @@ export function ExtensionsSettings() {
     if (currentProject) {
       loadData();
     }
-  }, [currentProject, loadData]);
+  }, [currentProject]); // Remove loadData to prevent infinite loop
 
   // Handle toggle extension
   const handleToggle = async (extensionId: string) => {
@@ -439,6 +444,7 @@ export function ExtensionsSettings() {
   const confirmResetExtensions = async () => {
     if (!currentProject) return;
 
+    setIsResetting(true);
     try {
       const defaults = await resetExtensionsToDefaults(currentProject.id);
       setExtensions(defaults);
@@ -450,6 +456,7 @@ export function ExtensionsSettings() {
       );
     } finally {
       setResetExtensionsDialog(false);
+      setIsResetting(false);
     }
   };
 
@@ -636,9 +643,8 @@ export function ExtensionsSettings() {
             variant="outline"
             size="sm"
             onClick={handleResetToDefaults}
-            disabled={isLoading}
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className={`w-4 h-4 mr-2 ${isResetting ? 'animate-spin' : ''}`} />
             Reset
           </Button>
           <Button variant="outline" size="sm" onClick={openAddCategoryDialog}>
@@ -766,29 +772,29 @@ export function ExtensionsSettings() {
                                   {extension.metadata.name}
                                 </h4>
                                 {extension.source === 'project' && (
-                                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded flex-shrink-0" title="Using project version (customizable)">
+                                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded shrink-0" title="Using project version (customizable)">
                                     Custom
                                   </span>
                                 )}
                                 {extension.source === 'default' && extension.hasProjectVersion && (
-                                  <span className="text-xs bg-muted px-2 py-0.5 rounded flex-shrink-0" title="Default version available, can customize">
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded shrink-0" title="Default version available, can customize">
                                     Default
                                   </span>
                                 )}
                                 {extension.source === 'default' && !extension.hasProjectVersion && (
-                                  <span className="text-xs bg-muted px-2 py-0.5 rounded flex-shrink-0" title="Default version (no project copy)">
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded shrink-0" title="Default version (no project copy)">
                                     Default
                                   </span>
                                 )}
                                 {!extension.metadata.enabled && (
-                                  <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded flex-shrink-0">
+                                  <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded shrink-0">
                                     Disabled
                                   </span>
                                 )}
                                 {extension.metadata.hasError && (
                                   <button
                                     onClick={() => handleToggleDebugLogs(extension.metadata.id)}
-                                    className="text-xs bg-destructive text-destructive px-2 py-0.5 rounded flex-shrink-0 hover:opacity-80 cursor-pointer"
+                                    className="text-xs bg-destructive text-destructive px-2 py-0.5 rounded shrink-0 hover:opacity-80 cursor-pointer"
                                     title={`Error: ${extension.metadata.lastError}`}
                                   >
                                     Error
@@ -797,7 +803,7 @@ export function ExtensionsSettings() {
                                 {extension.metadata.debug && (
                                   <button
                                     onClick={() => handleToggleDebugLogs(extension.metadata.id)}
-                                    className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded flex-shrink-0 hover:opacity-80 cursor-pointer"
+                                    className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded shrink-0 hover:opacity-80 cursor-pointer"
                                     title="Debug mode enabled"
                                   >
                                     Debug

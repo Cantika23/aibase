@@ -46,7 +46,8 @@ export type MessageType =
   | "todo_update"
   | "conversation_title_update"
   | "notification"
-  | "file_context_update";
+  | "file_context_update"
+  | "file_update";
 
 export interface UserMessageData {
   text: string;

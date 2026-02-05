@@ -31,6 +31,7 @@ export type MessageType =
   | 'tool_result'
   | 'todo_update'
   | 'file_context_update'
+  | 'file_update'
   | 'error'
   | 'control_response'
   | 'pong'

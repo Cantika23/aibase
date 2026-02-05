@@ -9,7 +9,7 @@ const logger = createLogger("Context");
 /**
  * Load tool examples from tool definition files
  */
-async function loadToolExamples(): Promise<string> {
+export async function loadToolExamples(): Promise<string> {
   try {
     // Import context functions from tool definition files
     const scriptTool = await import("../tools/definition/script-tool");
@@ -45,7 +45,7 @@ async function loadToolExamples(): Promise<string> {
 /**
  * Expand template placeholders (for UI display)
  */
-async function expandTemplate(template: string): Promise<string> {
+export async function expandTemplate(template: string): Promise<string> {
   let expanded = template;
 
   // Replace tool context placeholder
@@ -93,7 +93,7 @@ const DEFAULT_TEMPLATE = `# AI Assistant Context
 /**
  * Load context template from file
  */
-async function loadContext(projectId: string): Promise<string> {
+export async function loadContext(projectId: string): Promise<string> {
   try {
     const contextPath = await getContextFilePath(projectId);
     const content = await readFile(contextPath, "utf-8");

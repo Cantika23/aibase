@@ -4,7 +4,7 @@
   "description": "Execute distributed SQL queries via Trino",
   "author": "AIBase",
   "version": "1.0.0",
-  "category": "database-tools",
+  "category": "database",
   "enabled": false,
   "isDefault": false,
   "createdAt": 0,
