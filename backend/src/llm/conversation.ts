@@ -479,41 +479,108 @@ export class Conversation {
       await this.hooks.message?.before?.(message, this._history);
       await this.hooks.message?.start?.();
 
-      // Add attachment information to message content so AI knows about files
-      let messageContent = message;
+      // Build message content with vision support for images
+      let userMessage: ChatCompletionMessageParam & { _attachments?: any[]; _originalMessage?: string };
+
       if (attachments && attachments.length > 0) {
-        // Build detailed attachment info with descriptions
-        const attachmentDetails = attachments.map((a: any) => {
-          let detail = `- **${a.name}** (${(a.size / 1024).toFixed(2)} KB)`;
-          if (a.description) {
-            // Include more of the description (500 chars instead of 200) for better context
-            detail += `\n  - ${a.description}`;
+        // Separate image and non-image attachments
+        const imageAttachments = attachments.filter((a: any) =>
+          a.type?.startsWith('image/')
+        );
+        const nonImageAttachments = attachments.filter((a: any) =>
+          !a.type?.startsWith('image/')
+        );
+
+        if (imageAttachments.length > 0) {
+          // Use multi-part content format for images (OpenAI Vision API)
+          const contentParts: any[] = [];
+
+          // Add text part (user's message + non-image attachment info if any)
+          let textContent = message || '';
+
+          // Add non-image attachment descriptions if present
+          if (nonImageAttachments.length > 0) {
+            const nonImageDetails = nonImageAttachments.map((a: any) => {
+              let detail = `- **${a.name}** (${(a.size / 1024).toFixed(2)} KB)`;
+              if (a.description) {
+                detail += `\n  - ${a.description}`;
+              }
+              return detail;
+            }).join('\n');
+
+            textContent += `\n\n**Attached Files:**\n${nonImageDetails}`;
           }
-          return detail;
-        }).join('\n');
 
-        const attachmentInfo = attachments.length === 1
-          ? `\n\n[File already analyzed and ready for your questions. You can use the information above to answer questions about this file.]`
-          : `\n\n[Files already analyzed and ready for your questions. You can use the information above to answer questions about these files.]`;
+          // If no text message, provide a default prompt for images
+          if (!textContent.trim()) {
+            textContent = imageAttachments.length === 1
+              ? "What can you tell me about this image?"
+              : "What can you tell me about these images?";
+          }
 
-        // If message is empty, use a default message
-        if (!messageContent || messageContent.trim() === "") {
-          messageContent = `I've uploaded ${attachments.length} file${attachments.length > 1 ? 's' : ''}. ${attachmentDetails}${attachmentInfo}`;
-          logger.debug({ messageContent }, "Empty message with attachments, using default message");
+          contentParts.push({ type: "text", text: textContent });
+
+          // Add image parts with proper URLs
+          for (const img of imageAttachments) {
+            // Build absolute URL for the image
+            // The URL should be accessible from wherever the AI model is running
+            const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+            const imageUrl = `${baseUrl}${img.url}`;
+
+            logger.info({ imageUrl, imageName: img.name }, '[Vision] Adding image to message');
+
+            contentParts.push({
+              type: "image_url",
+              image_url: {
+                url: imageUrl,
+                detail: "high" // Request high-detail analysis
+              }
+            });
+          }
+
+          userMessage = {
+            role: "user",
+            content: contentParts,
+            _attachments: attachments
+          };
+
+          logger.info({
+            imageCount: imageAttachments.length,
+            nonImageCount: nonImageAttachments.length,
+            contentPartsCount: contentParts.length
+          }, '[Vision] Created multi-part message with images');
         } else {
-          // Append attachment info to existing message
-          messageContent = messageContent + `\n\n${attachmentDetails}${attachmentInfo}`;
-          logger.debug("Appended attachment info to message");
+          // No images, use text-based format for non-image attachments
+          // Build file context for AI without adding visible text to user message
+          const attachmentDetails = attachments.map((a: any) => {
+            let detail = `File: ${a.name}`;
+            if (a.description) {
+              detail += `\n${a.description}`;
+            }
+            return detail;
+          }).join('\n\n');
+
+          // For AI: combine user message with file context
+          // For UI: only show user's original message
+          const aiMessageContent = message && message.trim()
+            ? `${message}\n\n${attachmentDetails}`
+            : attachmentDetails;
+
+          userMessage = {
+            role: "user",
+            content: aiMessageContent,
+            _attachments: attachments,
+            _originalMessage: message || '' // Store original user message for clean UI display
+          };
         }
+      } else {
+        // No attachments, simple text message
+        userMessage = {
+          role: "user",
+          content: message
+        };
       }
 
-      // Add user message to history
-      // Store the enhanced content (with attachment template) for the LLM
-      const userMessage: ChatCompletionMessageParam & { _attachments?: any[] } = {
-        role: "user",
-        content: messageContent,
-        ...(attachments && attachments.length > 0 && { _attachments: attachments }),
-      };
       this.addMessage(userMessage);
 
       // Stream the continuation (handles tool calls recursively)

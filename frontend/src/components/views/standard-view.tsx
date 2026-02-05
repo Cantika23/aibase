@@ -1,6 +1,6 @@
 import type { Contact } from "@/stores/admin-store";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MessageSquare, Clock } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
@@ -52,15 +52,15 @@ export function StandardView({ contact, onBack, history = [] }: StandardViewProp
       {/* Content Area */}
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {messages.map((msg) => (
-             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`px-4 py-2 rounded-lg max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
-                </div>
-             </div>
+          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`px-4 py-2 rounded-lg max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+              <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+            </div>
+          </div>
         ))}
-         <div className="flex justify-center text-xs text-muted-foreground pt-4">
-            <Clock className="size-3 mr-1" /> End of history
-         </div>
+        <div className="flex justify-center text-xs text-muted-foreground pt-4">
+          <Clock className="size-3 mr-1" /> End of history
+        </div>
       </div>
     </div>
   );

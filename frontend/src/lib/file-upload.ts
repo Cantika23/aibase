@@ -14,6 +14,8 @@ export interface UploadedFile {
   type: string;
   url: string;
   uploadedAt: number;
+  title?: string;
+  description?: string;
 }
 
 export interface UploadProgress {

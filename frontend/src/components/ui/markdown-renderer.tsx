@@ -30,51 +30,51 @@ const HighlightedPre = async ({
   language,
   className,
 }: HighlightedPreProps) => {
-    const { codeToTokens, bundledLanguages } = await import("shiki")
+  const { codeToTokens, bundledLanguages } = await import("shiki")
 
-    if (!(language in bundledLanguages)) {
-      return <pre className={className}>{children}</pre>
-    }
-
-    const { tokens } = await codeToTokens(children, {
-      lang: language as keyof typeof bundledLanguages,
-      defaultColor: false,
-      themes: {
-        light: "github-light",
-        dark: "github-dark",
-      },
-    })
-
-    return (
-      <pre className={className}>
-        <code className="font-mono whitespace-pre-wrap">
-          {tokens.map((line, lineIndex) => (
-            <React.Fragment key={lineIndex}>
-              <span>
-                {line.map((token, tokenIndex) => {
-                  const style =
-                    typeof token.htmlStyle === "string"
-                      ? undefined
-                      : token.htmlStyle
-
-                  return (
-                    <span
-                      key={tokenIndex}
-                      className="text-shiki-light bg-shiki-light-bg dark:text-shiki-dark dark:bg-shiki-dark-bg"
-                      style={style}
-                    >
-                      {token.content}
-                    </span>
-                  )
-                })}
-              </span>
-              {lineIndex !== tokens.length - 1 && "\n"}
-            </React.Fragment>
-          ))}
-        </code>
-      </pre>
-    )
+  if (!(language in bundledLanguages)) {
+    return <pre className={className}>{children}</pre>
   }
+
+  const { tokens } = await codeToTokens(children, {
+    lang: language as keyof typeof bundledLanguages,
+    defaultColor: false,
+    themes: {
+      light: "github-light",
+      dark: "github-dark",
+    },
+  })
+
+  return (
+    <pre className={className}>
+      <code className="font-mono whitespace-pre-wrap">
+        {tokens.map((line, lineIndex) => (
+          <React.Fragment key={lineIndex}>
+            <span>
+              {line.map((token, tokenIndex) => {
+                const style =
+                  typeof token.htmlStyle === "string"
+                    ? undefined
+                    : token.htmlStyle
+
+                return (
+                  <span
+                    key={tokenIndex}
+                    className="text-shiki-light bg-shiki-light-bg dark:text-shiki-dark dark:bg-shiki-dark-bg"
+                    style={style}
+                  >
+                    {token.content}
+                  </span>
+                )
+              })}
+            </span>
+            {lineIndex !== tokens.length - 1 && "\n"}
+          </React.Fragment>
+        ))}
+      </code>
+    </pre>
+  )
+}
 
 interface CodeBlockProps {
   children: React.ReactNode
@@ -191,9 +191,13 @@ const COMPONENTS = {
   ol: withClass("ol", "list-decimal space-y-2 pl-6"),
   ul: withClass("ul", "list-disc space-y-2 pl-6"),
   li: withClass("li", "my-1.5"),
-  table: withClass(
-    "table",
-    "w-full border-collapse overflow-y-auto rounded-md border border-foreground/20"
+  table: ({ node, ...props }: any) => (
+    <div className="overflow-x-auto w-full my-4">
+      <table
+        className="w-full border-collapse rounded-md border border-foreground/20"
+        {...props}
+      />
+    </div>
   ),
   th: withClass(
     "th",

@@ -33,9 +33,9 @@ export function UserManagementPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // New: Tabs state
-  const [activeTab, setActiveTab] = useState("system-users");
+
 
   // Check if user has admin permissions
   const isAdmin = auth.user?.role === "admin";
@@ -140,7 +140,7 @@ export function UserManagementPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="system-users" className="flex-1 flex flex-col min-h-0" onValueChange={setActiveTab}>
+        <Tabs defaultValue="system-users" className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-center sm:justify-start mb-4">
             <TabsList>
               <TabsTrigger value="system-users">System Users</TabsTrigger>
@@ -154,7 +154,7 @@ export function UserManagementPage() {
               onImpersonateUser={handleImpersonateUser}
             />
           </TabsContent>
-          
+
           <TabsContent value="contacts" className="flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
             <ContactsList onViewDetails={handleViewContact} />
           </TabsContent>

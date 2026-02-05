@@ -747,8 +747,13 @@ export class WSServer extends WSEventEmitter {
           const tenantId = project?.tenant_id ?? 'default';
           const allFiles = await fileStorage.listFiles(connectionInfo.convId, connectionInfo.projectId, tenantId);
 
-          // Format all files as attachments (fileIds are just for logging/verification)
-          attachments = allFiles.map(file => {
+          // Filter to only include recently uploaded files (last 5 minutes)
+          // This prevents old files from being included when user uploads new files
+          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+          const recentFiles = allFiles.filter(file => file.uploadedAt > fiveMinutesAgo);
+
+          // Format recent files as attachments
+          attachments = recentFiles.map(file => {
             logger.info({ fileName: file.name, hasDescription: !!file.description }, '[UserMessage] File description status');
             return {
               id: `file_${file.uploadedAt}_${Math.random().toString(36).slice(2, 11)}`,
@@ -763,7 +768,12 @@ export class WSServer extends WSEventEmitter {
             };
           });
 
-          logger.info({ attachmentCount: attachments.length, urls: attachments.map((a: any) => a.url) }, "[UserMessage] Fetched attachment metadata");
+          logger.info({
+            totalFiles: allFiles.length,
+            recentFiles: recentFiles.length,
+            attachmentCount: attachments.length,
+            urls: attachments.map((a: any) => a.url)
+          }, "[UserMessage] Fetched attachment metadata (filtered by timestamp)");
         } catch (error) {
           logger.error({ error }, "[UserMessage] Error fetching file metadata");
           // Continue without attachments if fetch fails
@@ -916,12 +926,14 @@ export class WSServer extends WSEventEmitter {
         { messageCount: historyWithIds.length }, '[Backend Complete] History message count'
       );
       logger.info(
-        { messages: historyWithIds.map((m: any) => ({
-          role: m.role,
-          id: m.id,
-          contentLength:
-            typeof m.content === "string" ? m.content.length : "N/A",
-        })) }, '[Backend Complete] History messages'
+        {
+          messages: historyWithIds.map((m: any) => ({
+            role: m.role,
+            id: m.id,
+            contentLength:
+              typeof m.content === "string" ? m.content.length : "N/A",
+          }))
+        }, '[Backend Complete] History messages'
       );
       this.messagePersistence.setClientHistory(
         connectionInfo.convId,
