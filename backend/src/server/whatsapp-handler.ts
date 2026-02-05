@@ -930,14 +930,27 @@ async function executeWhatsAppScript(
     const extensions = await extensionLoader.loadExtensions(projectId);
     logger.info({ extensions: Object.keys(extensions).join(", ") || "none" }, "[WhatsApp] Loaded extensions");
 
+    // Track all progress message promises
+    const progressPromises: Promise<void>[] = [];
+
     // Create a broadcast function that sends progress to WhatsApp
     // Send progress immediately when received
     const broadcast = (type: "tool_call" | "tool_result", data: any) => {
       if (type === "tool_call" && data.status === "progress" && data.result?.message) {
         logger.info({ message: data.result.message }, "[WhatsApp] Script progress - sending immediately");
-        // Send immediately without await - fire and forget
-        sendWhatsAppMessage(projectId, whatsappNumber, { text: `⏳ ${data.result.message}` }, true)
-          .catch((err) => logger.error({ err }, "[WhatsApp] Error sending progress"));
+
+        // Send progress message (fire and forget, but track promise)
+        const progressPromise = (async () => {
+          try {
+            // Send progress message WITHOUT affecting typing indicator
+            await sendWhatsAppMessageRaw(projectId, whatsappNumber, { text: `⏳ ${data.result.message}` });
+            logger.info("[WhatsApp] Progress message sent");
+          } catch (err) {
+            logger.error({ err }, "[WhatsApp] Error sending progress");
+          }
+        })();
+
+        progressPromises.push(progressPromise);
       }
     };
 
@@ -963,6 +976,10 @@ async function executeWhatsAppScript(
     ]);
 
     logger.info({ result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Script execution result");
+
+    // Wait for all progress messages to be sent
+    await Promise.all(progressPromises);
+    logger.info("[WhatsApp] All progress messages sent");
 
     // Format result for WhatsApp
     if (result === undefined || result === null) {
@@ -1579,16 +1596,16 @@ async function stopWhatsAppTyping(projectId: string, phone: string): Promise<voi
 }
 
 /**
- * Send WhatsApp message
+ * Send WhatsApp message without handling typing indicator
+ * Used for progress messages where typing is managed separately
  */
-async function sendWhatsAppMessage(
+async function sendWhatsAppMessageRaw(
   projectId: string,
   phone: string,
-  message: { text?: string; imageUrl?: string; location?: { lat: number; lng: number } },
-  keepTyping: boolean = false
+  message: { text?: string; imageUrl?: string; location?: { lat: number; lng: number } }
 ): Promise<void> {
   try {
-    logger.info({ phone, message: message.text?.substring(0, 50) + "..." }, "[WhatsApp] Sending to WhatsApp");
+    logger.info({ phone, message: message.text?.substring(0, 50) + "..." }, "[WhatsApp] Sending to WhatsApp (raw)");
     const response = await fetch(`${WHATSAPP_API_URL}/clients/${projectId}/send-message`, {
       method: "POST",
       headers: {
@@ -1597,7 +1614,6 @@ async function sendWhatsAppMessage(
       body: JSON.stringify({
         phone,
         message: message.text,
-        // Add support for other message types as needed
       }),
     });
 
@@ -1607,21 +1623,7 @@ async function sendWhatsAppMessage(
       throw new Error("Failed to send WhatsApp message");
     }
 
-    logger.info({ phone, keepTyping }, "[WhatsApp] Message sent successfully");
-
-    // Handle typing indicator after message sent
-    if (!keepTyping) {
-      // For completion messages: stop typing after 1 second
-      logger.info("[WhatsApp] Completion message sent, stopping typing in 1s...");
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      await stopWhatsAppTyping(projectId, phone);
-      logger.info("[WhatsApp] Typing indicator stopped");
-    } else {
-      // For progress messages: restart typing indicator
-      logger.info("[WhatsApp] Progress message sent, restarting typing indicator...");
-      await startWhatsAppTyping(projectId, phone);
-      logger.info("[WhatsApp] Typing indicator restarted");
-    }
+    logger.info({ phone }, "[WhatsApp] Message sent successfully (raw)");
   } catch (error) {
     logger.error({ url: `${WHATSAPP_API_URL}/clients/${projectId}/send-message` }, "[WhatsApp] Error sending message to URL");
     logger.error({ error }, "[WhatsApp] Error details");
@@ -1633,6 +1635,30 @@ async function sendWhatsAppMessage(
     }
     throw error;
   }
+}
+
+/**
+ * Send WhatsApp message with typing indicator management
+ * For final completion messages: stops typing after 3 seconds (to ensure message is delivered)
+ */
+async function sendWhatsAppMessage(
+  projectId: string,
+  phone: string,
+  message: { text?: string; imageUrl?: string; location?: { lat: number; lng: number } },
+  keepTyping: boolean = false
+): Promise<void> {
+  // Send the message
+  await sendWhatsAppMessageRaw(projectId, phone, message);
+
+  // Handle typing indicator after message sent
+  if (!keepTyping) {
+    // For completion messages: stop typing after 3 seconds (ensure message delivered to user)
+    logger.info("[WhatsApp] Completion message sent, stopping typing in 3s...");
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    await stopWhatsAppTyping(projectId, phone);
+    logger.info("[WhatsApp] Typing indicator stopped");
+  }
+  // For keepTyping=true (progress), typing is restarted by the caller
 }
 
 /**
