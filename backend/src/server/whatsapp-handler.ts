@@ -1347,6 +1347,9 @@ async function processWhatsAppMessageWithAI(
       systemPrompt = `You are a helpful AI assistant on WhatsApp.`;
     }
 
+    // Track all progress message promises
+    const progressPromises: Promise<void>[] = [];
+
     const conversation = await Conversation.create({
       projectId,
       tenantId,
@@ -1363,6 +1366,23 @@ async function processWhatsAppMessageWithAI(
 
             // Still track progress to prevent duplicates, but don't send
             toolNotificationSent = true;
+          },
+          progress: async (toolCallId: string, toolName: string, data: any) => {
+            // Send progress updates to WhatsApp user
+            if (toolName === "script" && data?.message) {
+              logger.info({ message: data.message }, "[WhatsApp] Script progress - sending immediately");
+
+              const progressPromise = (async () => {
+                try {
+                  await sendWhatsAppMessageRaw(projectId, whatsappNumber, { text: `⏳ ${data.message}` });
+                  logger.info("[WhatsApp] Progress message sent");
+                } catch (err) {
+                  logger.error({ err }, "[WhatsApp] Error sending progress");
+                }
+              })();
+
+              progressPromises.push(progressPromise);
+            }
           },
           after: async (toolCallId: string, toolName: string, args: any, result: any) => {
             logger.info({ toolName, result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Tool executed");
@@ -1426,6 +1446,10 @@ async function processWhatsAppMessageWithAI(
       logger.error({ error }, "[WhatsApp] Error or Timeout during AI processing");
       // Continue to save history so we don't lose the user's message
     }
+
+    // Wait for all progress messages to be sent
+    await Promise.all(progressPromises);
+    logger.info("[WhatsApp] All progress messages sent");
 
     // Save conversation history (Filter out system prompt)
     const history = (conversation as any)._history || [];
