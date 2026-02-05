@@ -5,7 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Quick Start
+
 The start binary automatically manages runtime, dependencies, and services:
+
 ```bash
 # macOS
 ./start.macos
@@ -18,6 +20,7 @@ start.win.exe
 ```
 
 The binary handles:
+
 - Bun runtime management
 - Qdrant vector database (ports 6333/6334)
 - Dependency installation
@@ -25,6 +28,7 @@ The binary handles:
 - Service startup on port 5040
 
 ### Development Mode (Hot-Reload)
+
 ```bash
 # Terminal 1: Backend
 cd backend && bun run src/server/index.ts
@@ -37,6 +41,7 @@ cd frontend && bun run dev
 ```
 
 ### Frontend Commands
+
 ```bash
 cd frontend
 bun run dev      # Start Vite dev server
@@ -46,6 +51,7 @@ bun run preview  # Preview production build
 ```
 
 ### Backend Commands
+
 ```bash
 cd backend
 bun run src/server/index.ts  # Start backend server
@@ -53,6 +59,7 @@ bun run start                # Alias for above
 ```
 
 ### Database & User Management
+
 ```bash
 # Create root user (first-time setup)
 bun run backend/src/scripts/create-root-user.ts <email> <username> <password>
@@ -64,6 +71,7 @@ bun run backend/src/scripts/create-root-user.ts admin@example.com admin MySecure
 ## Architecture Overview
 
 ### High-Level Structure
+
 AIBase is a multi-tenant AI conversation system with real-time WebSocket communication, vector storage, and extensible tool system.
 
 ```
@@ -90,6 +98,7 @@ aibase/
 ### Core Architectural Patterns
 
 #### 1. WebSocket Communication (Bidirectional Streaming)
+
 - **Backend**: `WSServer` class in `backend/src/ws/entry.ts` manages connections
 - **Frontend**: `WSClient` in `frontend/src/lib/ws/` handles real-time communication
 - **Message Types**: `user_message`, `control`, `llm_chunk`, `llm_complete`, `tool_call`, `tool_result`
@@ -97,12 +106,14 @@ aibase/
 - **Streaming manager**: Accumulates chunks for new connections joining active streams
 
 #### 2. Conversation Management
+
 - **`Conversation` class**: `backend/src/llm/conversation.ts` wraps OpenAI API
 - **History persistence**: Auto-saved to `data/{projectId}/{convId}/chat.jsonl`
 - **Compaction**: Automatic token-saving when history exceeds limits
 - **Title generation**: AI-generated after first user-assistant exchange
 
 #### 3. Multi-Tenant Architecture
+
 - **Tenants**: `TenantStorage` stores organizations (domain, logo)
 - **Users**: Belong to tenants, role-based access (admin, user)
 - **Projects**: Scoped to tenants, isolated conversation spaces
@@ -110,7 +121,9 @@ aibase/
 - **Embed mode**: Public projects with token-based access, optional uid identification
 
 #### 4. Tool System
+
 LLM can call functions during conversation:
+
 - **FileTool**: File upload/download in conversation context
 - **TodoTool**: Task list management
 - **ScriptTool**: Execute queries (PostgreSQL, ClickHouse, DuckDB, Trino, web search)
@@ -120,7 +133,9 @@ LLM can call functions during conversation:
 Tool hooks broadcast execution status to all connected clients.
 
 #### 5. Frontend State Management (Zustand)
+
 Stores in `frontend/src/stores/`:
+
 - `useChatStore`: Messages, WebSocket, streaming state
 - `useUIStore`: Dialogs, highlights, interaction state
 - `useFileStore`: File attachments, upload progress
@@ -131,6 +146,7 @@ Stores in `frontend/src/stores/`:
 - `useAdminStore`: User/tenant management (admin only)
 
 #### 6. Data Persistence
+
 - **SQLite**: Users, sessions, tenants, projects (`data/users.db`)
 - **JSONL**: Conversation history (`data/{projectId}/{convId}/chat.jsonl`)
 - **JSON**: Conversation metadata (`data/{projectId}/{convId}/info.json`)
@@ -140,7 +156,9 @@ Stores in `frontend/src/stores/`:
 ### Important Conventions
 
 #### Environment Configuration
+
 Required `.env` variables (see `.env.example`):
+
 - `OPENAI_API_KEY`: LLM provider credential
 - `OPENAI_BASE_URL`: API endpoint (e.g., OpenRouter, Z.AI)
 - `OPENAI_MODEL`: Model identifier
@@ -149,12 +167,15 @@ Required `.env` variables (see `.env.example`):
 - `APP_NAME`: Browser tab title
 
 #### Routing & Base Path
+
 - **Frontend**: React Router with dynamic base path from `PUBLIC_BASE_PATH`
 - **Backend**: Strips base path via `stripBasePath()` before route matching
 - **WebSocket**: Base path automatically prepended to `/api/ws`
 
 #### Page Layout Standards
+
 All pages must follow layout patterns to prevent navigation overlap (see `frontend/src/lib/layout-constants.ts`):
+
 - Navigation offset: `60px` top padding (mobile)
 - Horizontal padding: `16px` mobile, `24px` desktop
 - Use `.h-screen-mobile` for full viewport height
@@ -170,11 +191,13 @@ All pages must follow layout patterns to prevent navigation overlap (see `fronte
   ```
 
 #### Message IDs
+
 - User messages: `user_{timestamp}_{random}`
 - Assistant messages: `assistant_{timestamp}_{random}`
 - Used for streaming synchronization and tool call association
 
 #### Error Handling
+
 - Frontend: Error states in stores, user-friendly toasts
 - Backend: Error messages broadcast via WebSocket, proper HTTP status codes
 - Abort handling: Graceful cleanup, partial response persistence
@@ -190,16 +213,19 @@ All pages must follow layout patterns to prevent navigation overlap (see `fronte
 
 - **Frontend lint**: `cd frontend && bun run lint`
 - **Frontend build**: `cd frontend && bun run build` (includes TypeScript check)
+- **Backend check**: `cd backend && bun x tsc` (TypeScript check)
 - No automated tests currently - manual testing required
 
 ## Key Dependencies
 
 ### Backend
+
 - `bun`: Runtime, SQLite, WebSocket server
 - `openai`: LLM API client
 - `pino`: Logging
 
 ### Frontend
+
 - `react`: UI framework
 - `vite`: Build tool
 - `zustand`: State management

@@ -299,7 +299,7 @@ async function processFileAsync(
     if (isImage) {
       broadcastStatus(wsServer, convId, 'processing', `Generating thumbnail for ${fileName}...`);
       try {
-        thumbnailUrl = await generateThumbnail(buffer, fileName, projectId) || undefined;
+        thumbnailUrl = await generateThumbnail(buffer, fileName, projectId, convId) || undefined;
         
         // Update metadata with thumbnail URL
         if (thumbnailUrl) {
@@ -440,7 +440,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
   try {
     // Get conversation ID and project ID from query params
     const url = new URL(req.url);
-    const convId = url.searchParams.get('convId') ?? '';
+    let convId = url.searchParams.get('convId') ?? '';
     const projectId = url.searchParams.get('projectId');
 
     // Log request details for debugging
