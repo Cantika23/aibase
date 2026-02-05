@@ -52,7 +52,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     if (!currentProject) {
       initializeProject();
     }
-  }, []);
+  }, [currentProject, initializeProject]);
 
   // Generate the URL for the current project
   const getUrl = React.useCallback((path: string) => {
@@ -60,7 +60,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return `/projects/${currentProject.id}/${path}`;
   }, [currentProject?.id]);
 
-  // Build Menu Data - memoized to prevent unnecessary re-renders
+  // Build Menu Data
   const platformItems = React.useMemo(() => [
     {
       title: "Chat Interface",
@@ -122,10 +122,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Check if sub-clients are enabled for current project
   const subClientsEnabled = currentProject?.sub_clients_enabled ?? false;
 
-  // Management items - admin only - re-computed when project changes
+  // Management items - admin only
   const managementItems = React.useMemo(() => {
     if (!isAdmin) return [];
     
+    // Explicitly typed items array
     const items = [];
     
     if (aimeowEnabled) {
@@ -150,7 +151,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       },
     ];
 
-    // Only show Management when sub-clients are enabled
     if (subClientsEnabled) {
       subClientItems.unshift({
         title: "Management",
@@ -171,21 +171,40 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+    <Sidebar collapsible="icon" className="border-r border-border bg-sidebar" {...props}>
+      <SidebarHeader className="border-b border-border/50 p-4">
         <TeamSwitcher 
             appName={appName} 
             currentProjectName={currentProject?.name || "Select Project"} 
             logoUrl={logoUrl}
         />
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain label="Platform" items={platformItems} />
-        {(workspaceItems.length > 0) && <NavMain label="Workspace" items={workspaceItems} />}
-        {(managementItems.length > 0) && <NavMain label="Management" items={managementItems} />}
-        {(developerItems.length > 0) && <NavMain label="Developer" items={developerItems} />}
+      
+      <SidebarContent className="gap-6 px-3 py-4">
+        <div className="space-y-1">
+             <NavMain label="Platform" items={platformItems} />
+        </div>
+        
+        {(workspaceItems.length > 0) && (
+             <div className="space-y-1">
+                <NavMain label="Workspace" items={workspaceItems} />
+             </div>
+        )}
+        
+        {(managementItems.length > 0) && (
+            <div className="space-y-1">
+                <NavMain label="Management" items={managementItems} />
+            </div>
+        )}
+        
+        {(developerItems.length > 0) && (
+             <div className="space-y-1">
+                <NavMain label="Developer" items={developerItems} />
+             </div>
+        )}
       </SidebarContent>
-      <SidebarFooter>
+
+      <SidebarFooter className="border-t border-border/50 p-4">
         {currentUser && (
             <NavUser 
                 user={{

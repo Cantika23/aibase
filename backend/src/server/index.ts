@@ -106,6 +106,8 @@ import {
   handleDeleteFile,
   handleRenameFile,
   handleMoveFile,
+  handleUpdateFileDescription,
+  handleRegenerateFileDescription,
 } from "./files-handler";
 import {
   handleGetFileContext,
@@ -447,6 +449,20 @@ export class WebSocketServer {
         if (fileRenameMatch && req.method === "PATCH") {
           const [, projectId, fileName] = fileRenameMatch;
           return handleRenameFile(req, projectId!, fileName!);
+        }
+
+        // Handle file description update (PATCH /api/files/{projectId}/{fileName}/description)
+        const fileDescriptionMatch = pathname.match(/^\/api\/files\/([^\/]+)\/([^\/]+)\/description$/);
+        if (fileDescriptionMatch && req.method === "PATCH") {
+          const [, projectId, fileName] = fileDescriptionMatch;
+          return handleUpdateFileDescription(req, projectId!, fileName!);
+        }
+
+        // Handle file description regeneration (POST /api/files/{projectId}/{fileName}/regenerate)
+        const fileRegenerateMatch = pathname.match(/^\/api\/files\/([^\/]+)\/([^\/]+)\/regenerate$/);
+        if (fileRegenerateMatch && req.method === "POST") {
+          const [, projectId, fileName] = fileRegenerateMatch;
+          return handleRegenerateFileDescription(req, projectId!, fileName!);
         }
 
         // Handle file move (POST /api/files/move)

@@ -22,6 +22,7 @@ export interface StoredFile {
   thumbnailUrl?: string;
   description?: string;
   title?: string;
+  processingError?: string;
 }
 
 export class FileStorage {
@@ -91,11 +92,11 @@ export class FileStorage {
     fileName: string,
     projectId: string,
     tenantId: number | string,
-    meta: { scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string; title?: string }
+    meta: { scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string; title?: string; processingError?: string }
   ): Promise<void> {
     const metaPath = this.getMetaFilePath(fileName, projectId, tenantId);
 
-    // Build frontmatter (metadata only, description goes in body, title goes in frontmatter)
+    // Build frontmatter (metadata only, description goes in body, other fields go in frontmatter)
     const frontmatter = Object.entries(meta)
       .filter(([key, value]) => key !== 'description' && value !== undefined)
       .map(([key, value]) => {
@@ -122,7 +123,7 @@ export class FileStorage {
     fileName: string,
     projectId: string,
     tenantId: number | string
-  ): Promise<{ scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string; title?: string }> {
+  ): Promise<{ scope: FileScope; uploadedAt?: number; size?: number; type?: string; thumbnailUrl?: string; description?: string; title?: string; processingError?: string }> {
     const metaPath = this.getMetaFilePath(fileName, projectId, tenantId);
 
     try {
@@ -286,6 +287,7 @@ export class FileStorage {
             thumbnailUrl: meta.thumbnailUrl,
             description: meta.description,
             title: meta.title,
+            processingError: meta.processingError,
           });
         }
       }
@@ -465,7 +467,7 @@ export class FileStorage {
     fileName: string,
     projectId: string,
     tenantId: number | string,
-    updates: { description?: string; title?: string }
+    updates: { description?: string; title?: string; thumbnailUrl?: string; processingError?: string }
   ): Promise<void> {
     // Load existing metadata
     const existingMeta = await this.loadFileMeta(convId, fileName, projectId, tenantId);

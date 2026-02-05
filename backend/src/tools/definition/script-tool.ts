@@ -72,15 +72,24 @@ CRITICAL - Multi-line Code Format:
 - ✗ WRONG: NEVER write "line1;\\nline2;" - this will cause syntax errors!
 - Think of it like writing code in a text editor, not escaping for display
 
+IMPORTANT - Keep User Informed:
+- ALWAYS call progress(message) at the START of any data processing operation
+- Use descriptive messages: progress("Querying product database..."), progress("Calculating totals...")
+- This is ESPECIALLY important for: database queries, file operations, API calls, data aggregation
+- Users WILL see these messages in real-time - it improves UX significantly
+
 Available built-in functions: fetch, progress, memory, todo, peek, peekInfo.
 Project extensions are also available (see extension context for details).
 
-Example (single line):
-  return await fetch('https://api.example.com').then(r => r.json());
+Example (simple query with progress):
+  progress("Finding most expensive product...");
+  const result = await table.query(\`SELECT * FROM products ORDER BY price DESC LIMIT 1\`);
+  return result;
 
-Example (multi-line):
+Example (multi-line with progress updates):
   progress("Starting batch operation...");
   await memory({ action: 'set', category: 'cache', key: 'timestamp', value: Date.now() });
+  progress("Processing data...");
   const stored = memory.read('cache', 'timestamp');
   return { processedAt: stored };
 `,

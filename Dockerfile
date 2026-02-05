@@ -104,6 +104,10 @@ RUN chmod +x ./start.linux
 # Expose backend port and WhatsApp API port
 EXPOSE 5040 7031
 
+# Health check for Coolify / container orchestration
+# Returns 200 OK if server and storage are healthy
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD curl -f http://localhost:5040/health || exit 1
+
 # Set environment to production (can be overridden)
 ENV NODE_ENV=production
 
