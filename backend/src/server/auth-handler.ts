@@ -326,6 +326,90 @@ export async function handleChangePassword(req: Request): Promise<Response> {
 }
 
 /**
+ * PUT /api/auth/profile
+ * Update user profile (username and email)
+ */
+export async function handleUpdateProfile(req: Request): Promise<Response> {
+  try {
+    const token = extractToken(req);
+
+    if (!token) {
+      return Response.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const user = await authService.getUserByToken(token);
+    if (!user) {
+      return Response.json(
+        { error: "Invalid session" },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json() as { email?: unknown; username?: unknown };
+
+    if (!body.email && !body.username) {
+      return Response.json(
+        { error: "At least one field (email or username) is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format if provided
+    if (body.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.email as string)) {
+        return Response.json(
+          { error: "Invalid email format" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate username if provided
+    if (body.username) {
+      const username = body.username as string;
+      if (username.length < 3) {
+        return Response.json(
+          { error: "Username must be at least 3 characters long" },
+          { status: 400 }
+        );
+      }
+      if (username.length > 50) {
+        return Response.json(
+          { error: "Username must be less than 50 characters" },
+          { status: 400 }
+        );
+      }
+      const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+      if (!usernameRegex.test(username)) {
+        return Response.json(
+          { error: "Username can only contain letters, numbers, underscores, and hyphens" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updatedUser = await authService.updateUserProfile(user.id, {
+      email: body.email as string | undefined,
+      username: body.username as string | undefined,
+    });
+
+    logger.info({ userId: user.id, username: updatedUser.username }, "Profile updated successfully");
+
+    return Response.json({ user: updatedUser });
+  } catch (error: any) {
+    logger.error({ error }, "Update profile error");
+    return Response.json(
+      { error: error.message || "Failed to update profile" },
+      { status: 400 }
+    );
+  }
+}
+
+/**
  * POST /api/admin/users
  * Create a new user (admin/root only)
  */

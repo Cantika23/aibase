@@ -43,6 +43,7 @@ export interface AuthStore {
   logout: () => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+  updateProfile: (data: { email?: string; username?: string }) => Promise<boolean>;
   checkSetup: () => Promise<boolean>;
   stopImpersonating: () => void;
 }
@@ -274,6 +275,53 @@ export const useAuthStore = create<AuthStore>()(
           console.error("[Auth] Change password error:", error);
           set({
             error: error.message || "Failed to change password",
+            isLoading: false,
+          });
+          return false;
+        }
+      },
+
+      updateProfile: async (data: { email?: string; username?: string }) => {
+        const { token } = get();
+
+        if (!token) {
+          set({ error: "Not authenticated" });
+          return false;
+        }
+
+        set({ isLoading: true, error: null });
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
+            credentials: "include",
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to update profile");
+          }
+
+          const result = await response.json();
+
+          // Update user state with new data
+          set({
+            user: result.user,
+            isLoading: false,
+            error: null,
+          });
+
+          console.log("[Auth] Profile updated successfully");
+          return true;
+        } catch (error: any) {
+          console.error("[Auth] Update profile error:", error);
+          set({
+            error: error.message || "Failed to update profile",
             isLoading: false,
           });
           return false;

@@ -42,6 +42,7 @@ export function useAuth() {
     login: store.login,
     logout: store.logout,
     changePassword: store.changePassword,
+    updateProfile: store.updateProfile,
     fetchCurrentUser: store.fetchCurrentUser,
   };
 }
