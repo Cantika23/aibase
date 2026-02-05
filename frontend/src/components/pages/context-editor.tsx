@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import UnderlineExtension from '@tiptap/extension-underline';
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
@@ -33,6 +36,24 @@ export function ContextEditor() {
   const [showVariables, setShowVariables] = useState(false);
 
   const { currentProject } = useProjectStore();
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      UnderlineExtension,
+    ],
+    content: '',
+    onUpdate: ({ editor }: { editor: any }) => {
+      // Use HTML content
+      const htmlContent = editor.getHTML();
+      setContent(htmlContent);
+    },
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-8 sm:p-12',
+      },
+    },
+  } as any);
 
   // Load Context
   const loadContext = async () => {

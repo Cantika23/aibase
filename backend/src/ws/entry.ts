@@ -646,11 +646,22 @@ export class WSServer extends WSEventEmitter {
         break;
 
       case "ping":
+        // Mark connection as alive when we receive a ping from client
+        if (connectionInfo) {
+          connectionInfo.isAlive = true;
+        }
         this.sendToWebSocket(ws, {
           type: "pong",
           id: message.id,
           metadata: { timestamp: Date.now() },
         });
+        break;
+
+      case "pong":
+        // Mark connection as alive when we receive a pong from client
+        if (connectionInfo) {
+          connectionInfo.isAlive = true;
+        }
         break;
 
       default:

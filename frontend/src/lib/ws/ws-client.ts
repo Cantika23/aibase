@@ -471,16 +471,25 @@ export class WSClient extends WSEventEmitter {
           this.setConvId(message.data.convId);
           logger.websocket.debug("Accepted server conversation ID", { convId: message.data.convId });
         } else if (message.data?.convId) {
-          logger.websocket.debug("Ignoring server conversation ID, keeping existing", { 
-            serverConvId: message.data.convId 
+          logger.websocket.debug("Ignoring server conversation ID, keeping existing", {
+            serverConvId: message.data.convId
           });
         }
 
         this.emit("status", message.data);
         break;
 
+      case "ping":
+        // Server heartbeat - respond with pong
+        this.send({
+          type: "pong",
+          id: message.id,
+          metadata: { timestamp: Date.now() },
+        });
+        break;
+
       case "pong":
-        // Heartbeat response
+        // Heartbeat response from server
         break;
 
       case "todo_update":
