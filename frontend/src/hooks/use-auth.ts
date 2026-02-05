@@ -3,18 +3,32 @@
  * Provides easy access to auth state and actions
  */
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 
 export function useAuth() {
   const store = useAuthStore();
+  const [isMounted, setIsMounted] = useState(false);
+  const hasFetchedRef = useRef(false);
 
-  // Fetch current user on mount if we have a token
+  // Track mount state to prevent updates after unmount
   useEffect(() => {
-    if (store.token && !store.user) {
-      store.fetchCurrentUser();
-    }
+    setIsMounted(true);
+    return () => {
+      setIsMounted(false);
+    };
   }, []);
+
+  // Fetch current user on mount if we have a token and user is not loaded
+  useEffect(() => {
+    if (isMounted && store.token && !store.user && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      console.log("[useAuth] Fetching current user...");
+      store.fetchCurrentUser().catch((error) => {
+        console.error("[useAuth] Failed to fetch current user:", error);
+      });
+    }
+  }, [isMounted, store.token, store.user]);
 
   return {
     // State
