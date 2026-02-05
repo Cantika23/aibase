@@ -15,7 +15,6 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
-import { Markdown } from 'tiptap-markdown';
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
@@ -43,13 +42,12 @@ export function ContextEditor() {
     extensions: [
       StarterKit,
       UnderlineExtension,
-      Markdown,
     ],
     content: '',
     onUpdate: ({ editor }) => {
-       // Use markdown storage to get markdown content
-       const markdownContent = editor.storage.markdown.getMarkdown();
-       setContent(markdownContent);
+       // Get HTML content
+       const htmlContent = editor.getHTML();
+       setContent(htmlContent);
     },
     editorProps: {
       attributes: {

@@ -120,6 +120,7 @@ import {
   handleLogout,
   handleGetCurrentUser,
   handleChangePassword,
+  handleUpdateProfile,
   handleAdminCreateUser,
   handleAdminGetUsers,
   handleAdminDeleteUser,
@@ -980,6 +981,10 @@ export class WebSocketServer {
 
         if (pathname === "/api/auth/change-password" && req.method === "POST") {
           return handleChangePassword(req);
+        }
+
+        if (pathname === "/api/auth/profile" && req.method === "PUT") {
+          return handleUpdateProfile(req);
         }
 
         // Admin API endpoints

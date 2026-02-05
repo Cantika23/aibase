@@ -258,6 +258,54 @@ export class AuthService {
   }
 
   /**
+   * Update user profile (email and username)
+   */
+  async updateUserProfile(
+    userId: number,
+    data: { email?: string; username?: string }
+  ): Promise<Omit<User, 'password_hash'>> {
+    const user = this.userStorage.getById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const updates: Partial<User> = {};
+
+    // Check email uniqueness if provided
+    if (data.email && data.email !== user.email) {
+      const existingUser = this.userStorage.getByEmail(data.email);
+      if (existingUser && existingUser.id !== userId) {
+        throw new Error('Email already exists');
+      }
+      updates.email = data.email;
+    }
+
+    // Check username uniqueness if provided
+    if (data.username && data.username !== user.username) {
+      const existingUser = this.userStorage.getByUsername(data.username);
+      if (existingUser && existingUser.id !== userId) {
+        throw new Error('Username already exists');
+      }
+      updates.username = data.username;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      // No changes needed, return current user
+      const { password_hash: _, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    }
+
+    // Update user
+    const updatedUser = await this.userStorage.update(userId, updates);
+    if (!updatedUser) {
+      throw new Error('Failed to update user');
+    }
+
+    const { password_hash: _, ...userWithoutPassword } = updatedUser;
+    return userWithoutPassword;
+  }
+
+  /**
    * Delete a user account
    */
   async deleteAccount(userId: number, password: string): Promise<boolean> {
