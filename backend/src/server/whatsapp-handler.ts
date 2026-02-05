@@ -1310,6 +1310,7 @@ async function processWhatsAppMessageWithAI(
     // Track tool execution results to send if AI response is empty
     const toolResults: Array<{ toolName: string; result: any }> = [];
     let toolResultSent = false;
+    let toolNotificationSent = false;
 
     // Load built-in tools for this conversation (includes script tool with extensions)
     const tools = getBuiltinTools(convId, projectId, tenantId, uid);
