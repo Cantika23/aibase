@@ -9,9 +9,24 @@
 // Export to make this file a module (fixes global augmentation TypeScript error)
 export {};
 
-import { createLogger } from '../../../../utils/logger';
+// Type definition for injected utilities
+interface ExtensionUtils {
+  generateTitle: (options: {
+    systemPrompt?: string;
+    content: string;
+    label?: string;
+    timeoutMs?: number;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  }) => Promise<string | undefined>;
+  createLogger: (name: string) => any;
+}
 
-const logger = createLogger('ExtensionCreator');
+declare const utils: ExtensionUtils;
+
+// Get logger from injected utilities
+const logger = utils.createLogger('ExtensionCreator');
 
 // Type definitions
 interface CreateOptions {

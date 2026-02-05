@@ -178,7 +178,7 @@ export function ConversationHistoryPage() {
     >
       <div className="px-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex size-9 rounded-full bg-primary/10 items-center justify-center flex-shrink-0">
+          <div className="flex size-9 rounded-full bg-primary/10 items-center justify-center shrink-0">
             <MessageSquare className="size-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
@@ -278,7 +278,7 @@ export function ConversationHistoryPage() {
       </Dialog>
 
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 flex h-14 items-center justify-between px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="sticky top-0 z-20 flex h-14 items-center justify-between px-6 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
           <div className="flex items-center gap-2">
@@ -319,7 +319,7 @@ export function ConversationHistoryPage() {
               if (groupConvs.length === 0) return null;
               return (
                 <div key={groupName} className="space-y-3">
-                  <h3 className="text-sm font-medium text-muted-foreground sticky top-[5.5rem] bg-background/95 backdrop-blur py-2 z-10 w-fit px-2 rounded-md">
+                  <h3 className="text-sm font-medium text-muted-foreground sticky top-22 bg-background/95 backdrop-blur py-2 z-10 w-fit px-2 rounded-md">
                     {groupName}
                   </h3>
                   <div className="grid gap-2">

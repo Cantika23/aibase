@@ -1585,6 +1585,104 @@ export function useWebSocketHandlers({
       setFileInContext(data.fileId, data.included);
     };
 
+    const handleFileUpdate = (data: { 
+      file: { 
+        id: string; 
+        name: string; 
+        thumbnailUrl?: string; 
+        description?: string; 
+        title?: string;
+        [key: string]: any;
+      }; 
+      updateType: 'thumbnail' | 'description' | 'complete';
+    }) => {
+      // Update file metadata when async processing completes on backend
+      log.debug("[File Update] Received file update", { 
+        fileId: data.file?.id, 
+        fileName: data.file?.name,
+        updateType: data.updateType,
+        hasThumbnail: !!data.file?.thumbnailUrl,
+        hasDescription: !!data.file?.description,
+        hasTitle: !!data.file?.title,
+      });
+
+      const { uploadingMessageId, updateMessage, messages } = useChatStore.getState();
+      
+      // Find the message with this file attachment
+      // First check the currently uploading message, then search all messages
+      let targetMessageId: string | null = null;
+      
+      if (uploadingMessageId) {
+        const uploadingMsg = messages.find(m => m.id === uploadingMessageId);
+        const hasFile = uploadingMsg?.attachments?.some(a => a.name === data.file.name || a.id === data.file.id);
+        if (hasFile) {
+          targetMessageId = uploadingMessageId;
+        }
+      }
+      
+      // If not found in uploading message, search all messages
+      if (!targetMessageId) {
+        for (const msg of messages) {
+          if (msg.attachments?.some(a => a.name === data.file.name || a.id === data.file.id)) {
+            targetMessageId = msg.id;
+            break;
+          }
+        }
+      }
+
+      if (targetMessageId) {
+        const targetMessage = messages.find(m => m.id === targetMessageId);
+        if (targetMessage?.attachments) {
+          updateMessage(targetMessageId, {
+            attachments: targetMessage.attachments.map(attachment => {
+              // Match by name or id
+              if (attachment.name === data.file.name || attachment.id === data.file.id) {
+                return {
+                  ...attachment,
+                  // Update thumbnail if provided
+                  ...(data.file.thumbnailUrl && { thumbnailUrl: data.file.thumbnailUrl }),
+                  // Update description if provided
+                  ...(data.file.description && { description: data.file.description }),
+                  // Update title if provided
+                  ...(data.file.title && { title: data.file.title }),
+                  // Clear processing status on complete
+                  ...(data.updateType === 'complete' && { processingStatus: undefined, timeElapsed: undefined }),
+                };
+              }
+              return attachment;
+            }),
+          });
+          log.debug("[File Update] Updated file attachment in message", { 
+            messageId: targetMessageId,
+            fileName: data.file.name,
+            updateType: data.updateType,
+          });
+        }
+      } else {
+        log.debug("[File Update] Could not find message with file attachment", { 
+          fileName: data.file.name,
+          fileId: data.file.id 
+        });
+      }
+
+      // Also update the file store if the file is listed there
+      const { files, setFiles } = useFileStore.getState();
+      if (files && files.some(f => f.name === data.file.name)) {
+        setFiles(prevFiles => 
+          prevFiles?.map(f => 
+            f.name === data.file.name 
+              ? { 
+                  ...f, 
+                  ...(data.file.thumbnailUrl && { thumbnailUrl: data.file.thumbnailUrl }),
+                  ...(data.file.description && { description: data.file.description }),
+                  ...(data.file.title && { title: data.file.title }),
+                }
+              : f
+          ) ?? null
+        );
+      }
+    };
+
     // Register event listeners
     wsClient.on("connected", handleConnected);
     wsClient.on("disconnected", handleDisconnected);
@@ -1599,6 +1697,7 @@ export function useWebSocketHandlers({
     wsClient.on("tool_result", handleToolResult);
     wsClient.on("todo_update", handleTodoUpdate);
     wsClient.on("file_context_update", handleFileContextUpdate);
+    wsClient.on("file_update", handleFileUpdate);
     wsClient.on("conversation_title_update", handleConversationTitleUpdate);
     wsClient.on("auth_failed", handleAuthFailed);
 
@@ -1650,6 +1749,7 @@ export function useWebSocketHandlers({
       wsClient.off("tool_result", handleToolResult);
       wsClient.off("todo_update", handleTodoUpdate);
       wsClient.off("file_context_update", handleFileContextUpdate);
+      wsClient.off("file_update", handleFileUpdate);
       wsClient.off("conversation_title_update", handleConversationTitleUpdate);
       wsClient.off("auth_failed", handleAuthFailed);
     };

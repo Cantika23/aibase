@@ -179,9 +179,9 @@ export function MainChat({
   }, []);
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
-      {/* Top bar - fixed height and sticky */}
-      <div className="sticky top-0 z-20 h-12 md:h-14 flex items-center justify-between px-4 md:px-6 border-b shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className={`flex flex-col h-full bg-background text-foreground ${className}`}>
+      {/* Header */}
+      <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-2">
           {!isEmbedMode && (
              <SidebarTrigger />
@@ -189,7 +189,7 @@ export function MainChat({
           {!isEmbedMode && messages.length > 0 && (
             <PageActionButton
               icon={Plus}
-              label="New"
+              label="New Chat"
               onClick={handleNewConversation}
               variant="outline"
               size="sm"
@@ -204,39 +204,41 @@ export function MainChat({
 
       {/* Error Alert */}
       {error && (
-        <Alert className="mx-4 md:mx-auto mt-2 md:w-[650px] border-red-200 bg-red-50 flex-shrink-0">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">{error}</AlertDescription>
+        <Alert variant="destructive" className="mx-6 mt-4 flex w-auto items-start gap-2 border-destructive/50 bg-destructive/10 text-destructive dark:border-destructive dark:bg-destructive/20 md:mx-auto md:max-w-3xl">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Compaction Status */}
       {messages.length > 0 && (
-        <div className="mx-4 mt-2 flex-shrink-0">
+        <div className="mx-6 mt-2 flex-shrink-0 md:mx-auto md:max-w-3xl">
           <CompactionStatus wsClient={wsClient} />
         </div>
       )}
 
-      {/* Chat - fills remaining space */}
-      <div className="flex-1 min-h-0 relative">
+      {/* Chat Area */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {(todos?.items?.length > 0 || isLoading) && (
-          <div className="absolute left-2 top-2 z-10">
+          <div className="absolute left-4 top-4 z-10 w-80">
             <TodoPanel todos={todos} isVisible={isTodoPanelVisible} />
           </div>
         )}
 
-        <Chat
-          messages={messages}
-          input={input}
-          handleInputChange={handleInputChange}
-          handleSubmit={handleSubmit}
-          isGenerating={isLoading}
-          isHistoryLoading={isHistoryLoading}
-          stop={abort}
-          setMessages={setMessages}
-          className="h-full"
-          welcomeMessage={welcomeMessage}
-        />
+        <div className="flex-1 overflow-hidden">
+             <Chat
+              messages={messages}
+              input={input}
+              handleInputChange={handleInputChange}
+              handleSubmit={handleSubmit}
+              isGenerating={isLoading}
+              isHistoryLoading={isHistoryLoading}
+              stop={abort}
+              setMessages={setMessages}
+              className="h-full"
+              welcomeMessage={welcomeMessage}
+            />
+        </div>
       </div>
     </div>
   );

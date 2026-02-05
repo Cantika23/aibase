@@ -33,6 +33,9 @@ export function UserManagementPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // New: Tabs state
+
 
   // Check if user has admin permissions
   const isAdmin = auth.user?.role === "admin";

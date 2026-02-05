@@ -54,16 +54,17 @@ export async function handleGetExtensions(req: Request, projectId: string): Prom
       const projectMap = new Map(projectExtensions.map(p => [p.metadata.id, p]));
 
       // Transform to include source status
+      // Use project extension data if available (includes toggled enabled state)
       extensions = defaultExtensions.map(ext => {
-        const hasProjectVersion = projectMap.has(ext.metadata.id);
+        const projectExt = projectMap.get(ext.metadata.id);
         return {
-          ...ext,
+          ...(projectExt || ext),
           metadata: {
-            ...ext.metadata,
-            isDefault: !hasProjectVersion,
+            ...(projectExt ? projectExt.metadata : ext.metadata),
+            isDefault: !projectExt,
           },
-          source: hasProjectVersion ? 'project' : 'default',
-          hasProjectVersion,
+          source: projectExt ? 'project' : 'default',
+          hasProjectVersion: !!projectExt,
           hasDefaultVersion: true,
         };
       });

@@ -500,6 +500,10 @@ export class WSClient extends WSEventEmitter {
         this.emit("file_context_update", message.data);
         break;
 
+      case "file_update":
+        this.emit("file_update", message.data);
+        break;
+
       case "conversation_title_update":
         this.emit("conversation_title_update", message.data);
         break;

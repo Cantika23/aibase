@@ -6,9 +6,6 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
-import { createLogger } from "../../../../utils/logger";
-
-const logger = createLogger("ExcelExtension");
 
 // Type definition for injected utilities
 interface ExtensionUtils {
@@ -21,9 +18,13 @@ interface ExtensionUtils {
     temperature?: number;
     maxTokens?: number;
   }) => Promise<string | undefined>;
+  createLogger: (name: string) => any;
 }
 
 declare const utils: ExtensionUtils;
+
+// Get logger from injected utilities
+const logger = utils.createLogger("ExcelExtension");
 
 // Dynamically import all dependencies to avoid esbuild transpilation issues
 let documentExtractorModule: any = null;
@@ -351,11 +352,16 @@ function generateDescription(
 ): string {
   const lines: string[] = [];
 
-  // Use title if available, otherwise use filename
-  const displayName = title ? `"${title}" (${fileName})` : fileName;
+  // Use title if available, otherwise use filename (don't show filename when title exists)
+  const displayName = title ? title : fileName;
   const codeIdentifier = fileName; // Always use filename for code examples (fileId)
 
-  lines.push(`## Excel File: ${displayName}`);
+  // Show only the title if available, without "Excel File:" prefix
+  if (title) {
+    lines.push(`## ${displayName}`);
+  } else {
+    lines.push(`## Excel File: ${displayName}`);
+  }
   lines.push(`**Total Sheets:** ${structure.totalSheets}`);
   lines.push(`**Total Rows:** ${structure.totalRows.toLocaleString()}`);
   lines.push("");
@@ -429,6 +435,11 @@ const context = () => {
 ### Excel Extension
 
 Extract and query Excel spreadsheets using DuckDB. Auto-extracts structure for Excel files on upload.
+
+**IMPORTANT: Progress Message Format**
+When generating progress messages for file operations, ALWAYS use the file title (from the file description) instead of the filename. The file description shows the title prominently at the top (e.g., \`## Product Catalog\`).
+- ✓ CORRECT: \`progress("Calculating total products from Product Catalog");\`
+- ✗ WRONG: \`progress("Calculating total products from Product.xlsx");\`
 
 **Available Functions:**
 
@@ -515,8 +526,10 @@ await excel.listFiles();
 
 **Examples:**
 
-1. **Get Excel file structure:**
+1. **Get Excel file structure (with proper progress message):**
 \`\`\`typescript
+// Use the file title from the description, NOT the filename
+progress("Getting structure from Product Catalog...");
 const result = await excel.summarize({
   fileId: 'Product.xlsx',
   includeStructure: true
@@ -529,6 +542,8 @@ return {
 
 2. **Query Excel file with SQL (recommended with fileId):**
 \`\`\`typescript
+// Use the file title in progress messages
+progress("Calculating total products from Product Catalog...");
 const data = await excel.query({
   fileId: 'Product.xlsx',  // Resolves to full path automatically
   query: \`SELECT * FROM read_xlsx('Product.xlsx',
@@ -552,6 +567,8 @@ return {
 
 4. **Aggregate data with SQL:**
 \`\`\`typescript
+// Use the file title from description, not filename
+progress("Analyzing sales data from Q4 Sales Report...");
 const summary = await excel.query({
   fileId: 'sales.xlsx',
   query: \`SELECT
@@ -932,7 +949,7 @@ if (hookRegistry) {
       // Only process Excel files
       if (
         !_context.fileType.match(
-          /(^application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))|\.xls|\.xlsx$/,
+          /(^application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))|\.xls|\.xlsx$/i,
         )
       ) {
         logger.info("Skipping non-Excel file");

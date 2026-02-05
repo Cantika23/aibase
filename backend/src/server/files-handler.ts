@@ -6,6 +6,9 @@ import { FileStorage, type FileScope } from "../storage/file-storage";
 import { ProjectStorage } from "../storage/project-storage";
 import { ChatHistoryStorage } from "../storage/chat-history-storage";
 import { createLogger } from "../utils/logger";
+import { extensionHookRegistry } from "../tools/extensions/extension-hooks";
+import { ExtensionLoader } from "../tools/extensions/extension-loader";
+import { getProjectFilesDir } from "../config/paths";
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -25,6 +28,7 @@ export interface FileWithConversation {
   scope: FileScope;
   description?: string;
   title?: string;
+  processingError?: string;
 }
 
 /**
@@ -71,6 +75,7 @@ export async function handleGetProjectFiles(req: Request): Promise<Response> {
       scope: file.scope,
       description: file.description,
       title: file.title,
+      processingError: file.processingError,
     }));
 
     // Sort by upload date (most recent first)
@@ -137,6 +142,7 @@ export async function handleGetConversationFiles(
       scope: file.scope,
       description: file.description,
       title: file.title,
+      processingError: file.processingError,
     }));
 
     return Response.json({
@@ -296,6 +302,192 @@ export async function handleDeleteFile(
       {
         success: false,
         error: error instanceof Error ? error.message : "Failed to delete file",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle PATCH /api/files/:projectId/:fileName/description - Update file description
+ */
+export async function handleUpdateFileDescription(
+  req: Request,
+  projectId: string,
+  fileName: string
+): Promise<Response> {
+  try {
+    const body = await req.json() as { description?: string; title?: string };
+    const { description, title } = body;
+
+    if (description === undefined && title === undefined) {
+      return Response.json(
+        {
+          success: false,
+          error: "description or title is required in request body",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Get project to retrieve tenant_id
+    const project = projectStorage.getById(projectId);
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+    const tenantId = project.tenant_id ?? 'default';
+
+    // Update file metadata
+    await fileStorage.updateFileMeta('', fileName, projectId, tenantId, {
+      ...(description !== undefined && { description }),
+      ...(title !== undefined && { title }),
+    });
+
+    return Response.json({
+      success: true,
+      message: "File description updated successfully",
+      data: { description, title },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error updating file description");
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update file description",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/files/:projectId/:fileName/regenerate - Regenerate file description
+ */
+export async function handleRegenerateFileDescription(
+  req: Request,
+  projectId: string,
+  fileName: string
+): Promise<Response> {
+  let tenantId: string | number = 'default';
+
+  try {
+    // Get project to retrieve tenant_id
+    const project = projectStorage.getById(projectId);
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+    tenantId = project.tenant_id ?? 'default';
+
+    // Get file info
+    const filePath = path.join(getProjectFilesDir(projectId, tenantId), fileName);
+    
+    // Check if file exists
+    try {
+      await fs.access(filePath);
+    } catch {
+      return Response.json(
+        { success: false, error: "File not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get file stats
+    const stats = await fs.stat(filePath);
+
+    // Try to determine mime type from extension
+    const ext = path.extname(fileName).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.txt': 'text/plain',
+      '.md': 'text/markdown',
+      '.json': 'application/json',
+      '.csv': 'text/csv',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+    };
+    const fileType = mimeTypes[ext] || 'application/octet-stream';
+
+    // Load extensions
+    try {
+      const extensionLoader = new ExtensionLoader();
+      await extensionLoader.loadExtensions(projectId);
+      logger.info({ projectId }, 'Extensions loaded for regeneration');
+    } catch (error) {
+      logger.warn({ projectId, error }, 'Failed to load extensions');
+    }
+
+    // Execute extension hooks
+    const hookResult = await extensionHookRegistry.executeHook('afterFileUpload', {
+      convId: '', // No specific conversation for regeneration
+      projectId,
+      fileName,
+      filePath,
+      fileType,
+      fileSize: stats.size,
+    });
+
+    let fileDescription: string | undefined;
+    let fileTitle: string | undefined;
+
+    if (hookResult?.description && typeof hookResult.description === 'string') {
+      fileDescription = hookResult.description;
+      logger.info({ fileName, description: fileDescription.substring(0, 100) }, 'Regenerated description');
+
+      if (hookResult.title && typeof hookResult.title === 'string') {
+        fileTitle = hookResult.title;
+      }
+
+      // Update file metadata, clear any previous error
+      await fileStorage.updateFileMeta('', fileName, projectId, tenantId, {
+        description: fileDescription,
+        title: fileTitle,
+        processingError: undefined,
+      });
+    } else {
+      logger.info({ fileName }, 'No description generated by hooks');
+    }
+
+    return Response.json({
+      success: true,
+      message: fileDescription ? "Description regenerated successfully" : "No description generated",
+      data: {
+        description: fileDescription,
+        title: fileTitle,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ error }, "Error regenerating file description");
+    
+    // Save error to file metadata
+    try {
+      await fileStorage.updateFileMeta('', fileName, projectId, tenantId, {
+        processingError: errorMessage,
+      });
+    } catch (updateError) {
+      logger.error({ error: updateError }, "Failed to save processing error to metadata");
+    }
+    
+    return Response.json(
+      {
+        success: false,
+        error: errorMessage,
       },
       { status: 500 }
     );

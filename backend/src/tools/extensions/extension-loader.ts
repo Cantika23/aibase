@@ -156,6 +156,9 @@ export class ExtensionLoader {
       const defaultIds = new Set(defaultExts.map(d => d.metadata.id));
       const projectOnly = projectExts.filter(p => !defaultIds.has(p.metadata.id));
       extensions.push(...projectOnly);
+
+      // Filter to only enabled extensions for execution
+      extensions = extensions.filter(ext => ext.metadata.enabled);
     } else {
       // Production mode: Load from project's extensions folder
       // Each project can have different extension versions
@@ -248,6 +251,9 @@ export class ExtensionLoader {
 
   /**
    * Load extensions directly from defaults directory
+   *
+   * Note: This loads ALL extensions (enabled and disabled) for UI display.
+   * The enabled filter is applied in loadExtensions() for execution only.
    */
   async loadDefaults(): Promise<Extension[]> {
     try {
@@ -270,11 +276,7 @@ export class ExtensionLoader {
 
           const metadata = JSON.parse(metadataContent) as ExtensionMetadata;
 
-          // Only load enabled extensions
-          if (!metadata.enabled) {
-            continue;
-          }
-
+          // Load ALL extensions (enabled and disabled) for UI display
           extensions.push({
             metadata,
             code,
@@ -460,10 +462,12 @@ export class ExtensionLoader {
 
       // Import common utilities
       const { generateTitle } = await import('../../utils/title-generator');
+      const { createLogger } = await import('../../utils/logger');
 
       // Common utilities object to inject into extensions
       const commonUtils = {
         generateTitle,
+        createLogger,
       };
 
       // Evaluate the extension (pass hook registry, deps, require, and utils)

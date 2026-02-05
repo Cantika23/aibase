@@ -53,3 +53,7 @@ bins/duckdb/bin/
 .crush
 .agents
 .agent
+
+# AI & Prompts
+.ai-logs/
+.prompt-logs/
