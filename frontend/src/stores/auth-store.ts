@@ -63,18 +63,22 @@ export const useAuthStore = create<AuthStore>()(
 
       // Synchronous actions
       setUser: (user) => {
+        console.log("[AuthStore] setUser called with:", user?.username || user);
         set({ user, isAuthenticated: user !== null });
       },
 
       setToken: (token) => {
+        console.log("[AuthStore] setToken called, token length:", token?.length || 0);
         set({ token });
       },
 
       setError: (error) => {
+        console.error("[AuthStore] setError:", error);
         set({ error });
       },
 
       setIsLoading: (isLoading) => {
+        console.log("[AuthStore] setIsLoading:", isLoading);
         set({ isLoading });
       },
 
@@ -195,11 +199,13 @@ export const useAuthStore = create<AuthStore>()(
         const { token } = get();
 
         if (!token) {
-          set({ isAuthenticated: false, user: null });
+          console.log("[Auth] No token found, skipping fetchCurrentUser");
+          set({ isAuthenticated: false, user: null, isLoading: false });
           return;
         }
 
-        set({ isLoading: true });
+        console.log("[Auth] Fetching current user with token...");
+        set({ isLoading: true, error: null });
 
         try {
           const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
@@ -210,22 +216,27 @@ export const useAuthStore = create<AuthStore>()(
           });
 
           if (!response.ok) {
-            throw new Error("Session expired");
+            const errorData = await response.json().catch(() => ({ error: "Session expired" }));
+            throw new Error(errorData.error || "Session expired");
           }
 
           const data = await response.json();
+          console.log("[Auth] User fetched successfully:", data.user?.username);
           set({
             user: data.user,
             isAuthenticated: true,
             isLoading: false,
+            error: null,
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error("[Auth] Failed to fetch current user:", error);
+          // Clear token and set unauthenticated state
           set({
             user: null,
             token: null,
             isAuthenticated: false,
             isLoading: false,
+            error: error?.message || "Session expired. Please login again.",
           });
         }
       },
@@ -329,6 +340,19 @@ export const useAuthStore = create<AuthStore>()(
         adminUser: state.adminUser,
         adminToken: state.adminToken,
       }),
+      // Add storage event handlers for debugging
+      onRehydrateStorage: () => (state) => {
+        console.log("[AuthStore] Rehydrating state from localStorage:", {
+          hasUser: !!state?.user,
+          hasToken: !!state?.token,
+          isAuthenticated: state?.isAuthenticated,
+          username: state?.user?.username,
+        });
+        // Reset loading state on rehydration
+        if (state) {
+          state.isLoading = false;
+        }
+      },
     }
   )
 );
