@@ -154,7 +154,7 @@ const extract = async (options: ExtractOptions): Promise<ExtractResult> => {
     
     const projectId = globalThis.projectId || '';
     const tenantId = globalThis.tenantId || 'default';
-    const convFilesDir = getProjectFilesDir(projectId, tenantId);
+    const convFilesDir = await getProjectFilesDir(projectId, tenantId);
     filePath = path.join(convFilesDir, options.fileId);
 
     try {

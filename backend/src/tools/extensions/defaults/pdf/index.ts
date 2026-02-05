@@ -169,7 +169,7 @@ const extract = async (options: ExtractPDFOptions): Promise<ExtractPDFResult> =>
     
     const projectId = globalThis.projectId || '';
     const tenantId = globalThis.tenantId || 'default';
-    const convFilesDir = getProjectFilesDir(projectId, tenantId);
+    const convFilesDir = await getProjectFilesDir(projectId, tenantId);
     filePath = path.join(convFilesDir, options.fileId);
 
     // Try to find file by ID if not directly accessible
@@ -228,7 +228,7 @@ const read = async (options: ReadPDFOptions): Promise<ReadPDFResult> => {
         
         const projectId = globalThis.projectId || '';
         const tenantId = globalThis.tenantId || 'default';
-        const convFilesDir = getProjectFilesDir(projectId, tenantId);
+        const convFilesDir = await getProjectFilesDir(projectId, tenantId);
         filePath = path.join(convFilesDir, options.fileId);
 
         try {

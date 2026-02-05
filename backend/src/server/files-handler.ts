@@ -371,6 +371,8 @@ export async function handleRegenerateFileDescription(
   projectId: string,
   fileName: string
 ): Promise<Response> {
+  let tenantId: string | number = 'default';
+
   try {
     // Get project to retrieve tenant_id
     const project = projectStorage.getById(projectId);
@@ -380,7 +382,7 @@ export async function handleRegenerateFileDescription(
         { status: 404 }
       );
     }
-    const tenantId = project.tenant_id ?? 'default';
+    tenantId = project.tenant_id ?? 'default';
 
     // Get file info
     const filePath = path.join(getProjectFilesDir(projectId, tenantId), fileName);
