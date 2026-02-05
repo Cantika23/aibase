@@ -1331,6 +1331,11 @@ async function processWhatsAppMessageWithAI(
     let toolResultSent = false;
     let toolNotificationSent = false;
 
+    // Track response state for WhatsApp (skip pre-tool thinking, only send post-tool final response)
+    let responseAfterTool = "";
+    let preToolResponse = "";
+    let shouldReset = false;  // Flag to reset accumulator after tool execution
+
     // Load built-in tools for this conversation (includes script tool with extensions)
     const tools = getBuiltinTools(convId, projectId, tenantId, uid);
     logger.info({ tools: tools.map(t => t.name).join(", ") }, "[WhatsApp] Loaded tools");
@@ -1366,6 +1371,10 @@ async function processWhatsAppMessageWithAI(
 
             // Still track progress to prevent duplicates, but don't send
             toolNotificationSent = true;
+
+            // Mark that we should reset response accumulator after this tool executes
+            // This ensures we only capture the FINAL response (after tool), not the "thinking" before
+            shouldReset = true;
           },
           progress: async (toolCallId: string, toolName: string, data: any) => {
             // Send progress updates to WhatsApp user
@@ -1404,46 +1413,50 @@ async function processWhatsAppMessageWithAI(
     }
     logger.info("[WhatsApp] Sending user message to AI...");
 
-    // Initialize response accumulator
+    // Stream response and handle tool calls internally
+    // Conversation.sendMessage handles all chunks and tool call recursion
+    logger.info("[WhatsApp] AI processing started (handles tool calls automatically)...");
+    const startTime = Date.now();
+
     let fullResponse = "";
-
-    // Add user message to conversation and stream response
-    logger.info("[WhatsApp] Stream started. Waiting for first chunk...");
     let chunkCount = 0;
-    
-    // Create a timeout promise - increased to 60s for slow networks
-    let isComplete = false;
-    const TIMEOUT_MS = 60000; // 60 seconds
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        if (!isComplete && chunkCount === 0) {
-          reject(new Error(`AI Response Timeout (No chunks received in ${TIMEOUT_MS / 1000}s)`));
-        }
-      }, TIMEOUT_MS);
-    });
 
-    const streamPromise = (async () => {
-      try {
-        for await (const chunk of conversation.sendMessage(finalMessage, attachments)) {
-          chunkCount++;
-          if (chunkCount === 1) logger.info("[WhatsApp] First chunk received!");
-          fullResponse += chunk;
-          // Log progress every 50 chunks to avoid spam
-          if (chunkCount % 50 === 0) logger.info({ chunkCount }, `[WhatsApp] Received chunks...`);
-        }
-      } catch (err) {
-        logger.error({ err }, "[WhatsApp] Error during AI streaming");
-        throw err;
-      }
-    })();
-
-    // Race between stream and timeout
     try {
-      await Promise.race([streamPromise, timeoutPromise]);
-      isComplete = true;
-      logger.info({ chunkCount, fullResponseLength: fullResponse.length }, "[WhatsApp] AI response complete");
+      // Stream all chunks (tool calls handled internally by Conversation)
+      for await (const chunk of conversation.sendMessage(finalMessage, attachments)) {
+        chunkCount++;
+
+        // Check if we need to reset (tool was just executed)
+        if (shouldReset) {
+          responseAfterTool = chunk;  // Start fresh
+          fullResponse = responseAfterTool;
+          shouldReset = false;  // Clear flag
+          logger.info("[WhatsApp] Tool execution detected, capturing final response only");
+        } else if (responseAfterTool.length > 0) {
+          // Continue accumulating post-tool response
+          responseAfterTool += chunk;
+          fullResponse = responseAfterTool;
+        } else {
+          // Still in pre-tool phase
+          preToolResponse += chunk;
+          fullResponse = preToolResponse;
+        }
+
+        // Log first chunk and every 50 chunks
+        if (chunkCount === 1) logger.info("[WhatsApp] First chunk received");
+        if (chunkCount % 50 === 0) logger.info({ chunkCount }, "[WhatsApp] Streaming...");
+      }
+      const duration = Date.now() - startTime;
+      logger.info({
+        chunkCount,
+        duration,
+        responseLength: fullResponse.length,
+        preToolLength: preToolResponse.length,
+        postToolLength: responseAfterTool.length
+      }, "[WhatsApp] AI response complete");
     } catch (error) {
-      logger.error({ error }, "[WhatsApp] Error or Timeout during AI processing");
+      const duration = Date.now() - startTime;
+      logger.error({ error, duration }, "[WhatsApp] Error during AI processing");
       // Continue to save history so we don't lose the user's message
     }
 
@@ -1493,11 +1506,11 @@ async function processWhatsAppMessageWithAI(
     if (fullResponse.trim()) {
       // First, check if this is an inline script JSON that needs execution
       const inlineScript = detectInlineScriptJSON(fullResponse);
-      
+
       if (inlineScript) {
         logger.info("[WhatsApp] Detected inline script JSON, executing...");
         const scriptResult = await executeWhatsAppScript(inlineScript, projectId, String(tenantId), whatsappNumber);
-        
+
         if (scriptResult) {
           logger.info({ scriptResult: scriptResult.substring(0, 100) + "..." }, "[WhatsApp] Script executed, sending result");
           await sendWhatsAppMessage(projectId, whatsappNumber, {
@@ -1509,14 +1522,15 @@ async function processWhatsAppMessageWithAI(
         }
         return;
       }
-      
-      // Normal flow: clean and send response
+
+      // Clean the response
       const cleanedResponse = cleanWhatsAppResponse(fullResponse);
-      
+
+      // Skip empty responses
       if (!cleanedResponse.trim()) {
         logger.warn("[WhatsApp] WARNING: Response is empty after cleaning. Checking for tool results...");
         logger.warn({ fullResponse }, "[WhatsApp] Full raw response");
-        
+
         // If we have tool results but didn't send them yet, send now
         if (toolResults.length > 0) {
           for (const { toolName, result } of toolResults) {
@@ -1531,6 +1545,36 @@ async function processWhatsAppMessageWithAI(
           }
         }
         return;
+      }
+
+      // === SKIP INTERMEDIATE "THINKING" RESPONSE WHEN TOOLS WERE CALLED ===
+      // If tools were executed, skip generic "thinking" responses like "Berfikir keras..."
+      // Only send the final substantive response
+      if (toolResults.length > 0) {
+        const genericPatterns = [
+          /berfikir keras/i,
+          /tunggu ya/i,
+          /baik, saya/i,
+          /tentu, saya/i,
+          /mari saya/i,
+          /saya akan/i,
+          /sedang mem/i,
+          /akan saya/i,
+        ];
+
+        const isGenericResponse = genericPatterns.some(p => p.test(cleanedResponse));
+
+        // Check if response is short (likely just a thinking phrase)
+        const isShortResponse = cleanedResponse.length < 100;
+
+        if (isGenericResponse || isShortResponse) {
+          logger.info({
+            cleanedResponse: cleanedResponse.substring(0, 50),
+            isGenericResponse,
+            isShortResponse,
+          }, "[WhatsApp] Skipping intermediate 'thinking' response - waiting for final response after tool execution");
+          return; // Don't send this intermediate response
+        }
       }
 
       logger.info({ cleanedResponse: cleanedResponse.substring(0, 100) + "..." }, "[WhatsApp] Sending response back to WhatsApp");
