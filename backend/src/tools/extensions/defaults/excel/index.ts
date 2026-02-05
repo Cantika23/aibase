@@ -7,10 +7,24 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 
-// Get logger from require (provided by extension wrapper)
-declare const require: any;
-const { createLogger } = require("../../../../utils/logger");
-const logger = createLogger("ExcelExtension");
+// Type definition for injected utilities
+interface ExtensionUtils {
+  generateTitle: (options: {
+    systemPrompt?: string;
+    content: string;
+    label?: string;
+    timeoutMs?: number;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  }) => Promise<string | undefined>;
+  createLogger: (name: string) => any;
+}
+
+declare const utils: ExtensionUtils;
+
+// Get logger from injected utilities
+const logger = utils.createLogger("ExcelExtension");
 
 // Type definition for injected utilities
 interface ExtensionUtils {

@@ -462,10 +462,12 @@ export class ExtensionLoader {
 
       // Import common utilities
       const { generateTitle } = await import('../../utils/title-generator');
+      const { createLogger } = await import('../../utils/logger');
 
       // Common utilities object to inject into extensions
       const commonUtils = {
         generateTitle,
+        createLogger,
       };
 
       // Evaluate the extension (pass hook registry, deps, require, and utils)
