@@ -28,6 +28,7 @@ export interface Project {
   show_memory: boolean; // Show memory tab
   use_client_uid: boolean; // Allow client to provide uid for persistence
   sub_clients_enabled: boolean; // Whether sub-clients feature is enabled
+  whatsapp_max_history_messages: number | null; // Max messages to include in WhatsApp AI context (null = unlimited)
   created_at: number;
   updated_at: number;
 }
@@ -44,6 +45,7 @@ export interface CreateProjectData {
   show_memory?: boolean;
   use_client_uid?: boolean;
   sub_clients_enabled?: boolean;
+  whatsapp_max_history_messages?: number | null;
 }
 
 export interface UpdateProjectData {
@@ -56,6 +58,7 @@ export interface UpdateProjectData {
   show_memory?: boolean;
   use_client_uid?: boolean;
   sub_clients_enabled?: boolean;
+  whatsapp_max_history_messages?: number | null;
 }
 
 export class ProjectStorage {
@@ -245,6 +248,21 @@ export class ProjectStorage {
       }
     } catch (error) {
       logger.error({ error }, 'sub_clients_enabled migration failed');
+      throw error;
+    }
+
+    // Migration: Add whatsapp_max_history_messages column if it doesn't exist
+    try {
+      const tableInfo = this.db.prepare('PRAGMA table_info(projects)').all() as any[];
+      const hasWhatsAppMaxHistoryColumn = tableInfo.some((col: any) => col.name === 'whatsapp_max_history_messages');
+
+      if (!hasWhatsAppMaxHistoryColumn) {
+        logger.info('Migrating database: adding whatsapp_max_history_messages column');
+        this.db.run('ALTER TABLE projects ADD COLUMN whatsapp_max_history_messages INTEGER NULL');
+        logger.info('Migration completed: whatsapp_max_history_messages column added');
+      }
+    } catch (error) {
+      logger.error({ error }, 'whatsapp_max_history_messages migration failed');
       throw error;
     }
 
@@ -496,6 +514,7 @@ export class ProjectStorage {
       show_memory: row.show_memory === 1,
       use_client_uid: row.use_client_uid === 1,
       sub_clients_enabled: row.sub_clients_enabled === 1,
+      whatsapp_max_history_messages: row.whatsapp_max_history_messages,
     };
   }
 
@@ -535,6 +554,7 @@ export class ProjectStorage {
       show_memory: row.show_memory === 1,
       use_client_uid: row.use_client_uid === 1,
       sub_clients_enabled: row.sub_clients_enabled === 1,
+      whatsapp_max_history_messages: row.whatsapp_max_history_messages,
     }));
   }
 
@@ -555,6 +575,7 @@ export class ProjectStorage {
       show_memory: row.show_memory === 1,
       use_client_uid: row.use_client_uid === 1,
       sub_clients_enabled: row.sub_clients_enabled === 1,
+      whatsapp_max_history_messages: row.whatsapp_max_history_messages,
     }));
   }
 
@@ -626,6 +647,10 @@ export class ProjectStorage {
     if (updates.sub_clients_enabled !== undefined) {
       fields.push('sub_clients_enabled = ?');
       values.push(updates.sub_clients_enabled ? 1 : 0);
+    }
+    if (updates.whatsapp_max_history_messages !== undefined) {
+      fields.push('whatsapp_max_history_messages = ?');
+      values.push(updates.whatsapp_max_history_messages);
     }
 
     if (fields.length === 0) {
@@ -785,6 +810,7 @@ export class ProjectStorage {
       show_memory: row.show_memory === 1,
       use_client_uid: row.use_client_uid === 1,
       sub_clients_enabled: row.sub_clients_enabled === 1,
+      whatsapp_max_history_messages: row.whatsapp_max_history_messages,
     };
   }
 

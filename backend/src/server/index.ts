@@ -56,6 +56,8 @@ import {
   handleGetWhatsAppQRCode,
   handleWhatsAppWebhook,
   handleWhatsAppConnectionStatus,
+  handleUpdateWhatsAppSettings,
+  handleGetWhatsAppSettings,
   initWhatsAppNotifications,
 } from "./whatsapp-handler";
 import {
@@ -769,6 +771,14 @@ export class WebSocketServer {
 
           if (pathname === "/api/whatsapp/status" && req.method === "POST") {
             return handleWhatsAppConnectionStatus(req);
+          }
+
+          if (pathname === "/api/whatsapp/settings" && req.method === "GET") {
+            return handleGetWhatsAppSettings(req);
+          }
+
+          if (pathname === "/api/whatsapp/settings" && req.method === "PUT") {
+            return handleUpdateWhatsAppSettings(req);
           }
 
           // Sub-client WhatsApp endpoints

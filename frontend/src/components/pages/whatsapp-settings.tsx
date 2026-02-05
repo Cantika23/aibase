@@ -12,10 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 import { buildApiUrl } from "@/lib/base-path";
 import { useProjectStore } from "@/stores/project-store";
-import { MessageCircle, RefreshCw, Smartphone, Trash2 } from "lucide-react";
+import { MessageCircle, RefreshCw, Save, Smartphone, Trash2 } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
@@ -61,6 +64,11 @@ export function WhatsAppSettings() {
   const wsRef = useRef<WebSocket | null>(null);
   const wsConnectedRef = useRef<boolean>(false as boolean); // Track latest connection status from WebSocket
   const log = useLogger('general');
+
+  // WhatsApp settings state
+  const [maxHistoryMessages, setMaxHistoryMessages] = useState<number | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
   // Format phone number for display
   const formatPhoneNumber = (phone: string | null | undefined): string => {
@@ -258,6 +266,90 @@ export function WhatsAppSettings() {
       toast.error(errorMessage);
     }
   }, [currentProject, client, loadClient, log]);
+
+  // Load WhatsApp settings
+  const loadSettings = useCallback(async () => {
+    if (!currentProject) return;
+
+    setIsLoadingSettings(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/whatsapp/settings?projectId=${currentProject.id}`,
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load WhatsApp settings");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setMaxHistoryMessages(data.settings.maxHistoryMessages ?? null);
+      }
+    } catch (err) {
+      log.error("Failed to load WhatsApp settings", { error: String(err) });
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  }, [currentProject, log]);
+
+  // Save WhatsApp settings
+  const saveSettings = useCallback(async () => {
+    if (!currentProject) return;
+
+    setIsSavingSettings(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/whatsapp/settings`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId: currentProject.id,
+          maxHistoryMessages: maxHistoryMessages === 0 ? null : maxHistoryMessages,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save WhatsApp settings");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success("WhatsApp settings saved successfully");
+        setMaxHistoryMessages(data.settings.maxHistoryMessages ?? null);
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to save WhatsApp settings";
+      log.error("Failed to save WhatsApp settings", { error: errorMessage });
+      toast.error(errorMessage);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }, [currentProject, maxHistoryMessages, log]);
+
+  // Handle slider change
+  const handleSliderChange = (value: number[]) => {
+    setMaxHistoryMessages(value[0] ?? 0);
+  };
+
+  // Handle input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === "" || value === "0") {
+      setMaxHistoryMessages(null);
+    } else {
+      const num = parseInt(value, 10);
+      if (!isNaN(num) && num >= 0) {
+        setMaxHistoryMessages(num > 100 ? 100 : num);
+      }
+    }
+  };
+
+  // Load settings when project changes
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -563,6 +655,89 @@ export function WhatsAppSettings() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* AI Settings Card */}
+              {client.connected && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5" />
+                      AI Conversation Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Configure how the AI handles conversation history for WhatsApp messages
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Max History Messages Setting */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="max-history" className="text-sm font-medium">
+                          Max History Messages
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="max-history-input"
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={maxHistoryMessages ?? ""}
+                            onChange={handleInputChange}
+                            className="w-20 text-right"
+                            placeholder="∞"
+                          />
+                          <span className="text-sm text-muted-foreground w-16">
+                            {maxHistoryMessages === null || maxHistoryMessages === 0
+                              ? "(Unlimited)"
+                              : "messages"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Slider
+                        id="max-history"
+                        value={[maxHistoryMessages ?? 0]}
+                        onValueChange={handleSliderChange}
+                        min={0}
+                        max={50}
+                        step={1}
+                        className="w-full"
+                      />
+
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Unlimited (0)</span>
+                        <span>10</span>
+                        <span>25</span>
+                        <span>50</span>
+                      </div>
+
+                      <p className="text-sm text-muted-foreground">
+                        Limit the number of previous messages the AI remembers for each conversation.
+                        Lower values reduce token usage and cost, but the AI may lose context.
+                        Set to 0 or empty for unlimited history.
+                      </p>
+
+                      <Button
+                        onClick={saveSettings}
+                        disabled={isSavingSettings || isLoadingSettings}
+                        className="w-full"
+                      >
+                        {isSavingSettings ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Settings
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Information Card */}
               {client.connected && (

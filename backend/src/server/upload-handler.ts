@@ -300,7 +300,7 @@ async function processFileAsync(
       broadcastStatus(wsServer, convId, 'processing', `Generating thumbnail for ${fileName}...`);
       try {
         thumbnailUrl = await generateThumbnail(buffer, fileName, projectId, convId) || undefined;
-
+        
         // Update metadata with thumbnail URL
         if (thumbnailUrl) {
           await fileStorage.updateFileMeta('', storedFileName, projectId, tenantId, { thumbnailUrl });
