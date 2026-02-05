@@ -65,42 +65,6 @@ async function getDuckDBPath(): Promise<string> {
   return getDuckDBPathFn();
 }
 
-/**
- * Get file metadata (including title) for a file
- */
-async function getFileMetadata(fileName: string): Promise<{ title?: string } | null> {
-  try {
-    const projectId = globalThis.projectId || "";
-    const tenantId = globalThis.tenantId || "default";
-
-    // Import FileStorage to get file metadata
-    const fileStorageModule = await import(
-      `${process.cwd()}/backend/src/storage/file-storage.ts`
-    );
-    const FileStorage = fileStorageModule.FileStorage;
-    const fileStorage = FileStorage.getInstance();
-
-    // Load file metadata
-    const meta = await (fileStorage as any).loadFileMeta("", fileName, projectId, tenantId);
-
-    return { title: meta.title };
-  } catch (error) {
-    logger.warn({ error, fileName }, "Failed to load file metadata");
-    return null;
-  }
-}
-
-/**
- * Get display name for a file (uses title if available, otherwise filename)
- */
-async function getFileDisplayName(fileName: string): Promise<string> {
-  const metadata = await getFileMetadata(fileName);
-  if (metadata?.title) {
-    return metadata.title;
-  }
-  return fileName;
-}
-
 // Hook registry is passed as global during evaluation (like image-document extension)
 interface ExtensionHookRegistry {
   registerHook(
