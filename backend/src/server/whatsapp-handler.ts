@@ -1724,9 +1724,9 @@ async function sendWhatsAppMessage(
 
   // Handle typing indicator after message sent
   if (!keepTyping) {
-    // For completion messages: stop typing after 500ms
-    logger.info("[WhatsApp] Completion message sent, stopping typing in 500ms...");
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // For completion messages: stop typing after 50ms
+    logger.info("[WhatsApp] Completion message sent, stopping typing in 50ms...");
+    await new Promise(resolve => setTimeout(resolve, 50));
     await stopWhatsAppTyping(projectId, phone);
     logger.info("[WhatsApp] Typing indicator stopped");
   }
