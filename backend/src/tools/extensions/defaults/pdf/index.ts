@@ -6,11 +6,6 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { extractTextFromPdf, isPdfFile } from '../../../../utils/document-extractor';
-import { getProjectFilesDir } from '../../../../config/paths';
-import { createLogger } from '../../../../utils/logger';
-
-const logger = createLogger('PDFExtension');
 
 // Type definition for injected utilities
 interface ExtensionUtils {
@@ -23,9 +18,46 @@ interface ExtensionUtils {
     temperature?: number;
     maxTokens?: number;
   }) => Promise<string | undefined>;
+  createLogger: (name: string) => any;
 }
 
 declare const utils: ExtensionUtils;
+
+// Get logger from injected utilities
+const logger = utils.createLogger('PDFExtension');
+
+// Dynamically import dependencies to avoid esbuild transpilation issues
+let documentExtractorModule: any = null;
+async function isPdfFile(fileName: string): Promise<boolean> {
+  if (!documentExtractorModule) {
+    documentExtractorModule = await import(
+      `${process.cwd()}/backend/src/utils/document-extractor.ts`
+    );
+  }
+  return documentExtractorModule.isPdfFile(fileName);
+}
+
+async function extractTextFromPdf(filePath: string): Promise<string> {
+  if (!documentExtractorModule) {
+    documentExtractorModule = await import(
+      `${process.cwd()}/backend/src/utils/document-extractor.ts`
+    );
+  }
+  return documentExtractorModule.extractTextFromPdf(filePath);
+}
+
+let configPathsModule: any = null;
+async function getProjectFilesDir(
+  projectId: string,
+  tenantId: string | number,
+): Promise<string> {
+  if (!configPathsModule) {
+    configPathsModule = await import(
+      `${process.cwd()}/backend/src/config/paths.ts`
+    );
+  }
+  return configPathsModule.getProjectFilesDir(projectId, tenantId);
+}
 
 // Type definitions
 interface ExtractPDFOptions {
