@@ -3,7 +3,9 @@ import {
   Save,
   RefreshCw,
   Maximize2,
-  Minimize2
+  Minimize2,
+  BookOpen,
+  Info
 } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -18,6 +20,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
+import { ContextVariablesLegend } from "@/components/pages/context-variables-legend";
 
 const API_URL = buildApiUrl("");
 
@@ -28,6 +31,7 @@ export function ContextEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zenMode, setZenMode] = useState(false);
+  const [showVariables, setShowVariables] = useState(false);
 
   const { currentProject } = useProjectStore();
 
@@ -163,6 +167,22 @@ export function ContextEditor() {
               </Tooltip>
             </TooltipProvider>
 
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                   <Button 
+                     variant={showVariables ? "secondary" : "ghost"} 
+                     size="icon" 
+                     className="h-8 w-8" 
+                     onClick={() => setShowVariables(!showVariables)}
+                   >
+                     <Info className="h-4 w-4" />
+                   </Button>
+                </TooltipTrigger>
+                <TooltipContent>Variables Legend</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             <Button
               variant={hasChanges ? "default" : "secondary"}
               size="sm"
@@ -176,28 +196,38 @@ export function ContextEditor() {
           </div>
         </div>
 
-        {/* Editor Wrapper */}
-        <div className="flex-1 overflow-hidden relative flex flex-col p-4">
-          
-          {/* Zen Mode Exit */}
-          {zenMode && (
-             <Button 
-               variant="secondary" 
-               size="sm" 
-               className="fixed top-4 right-4 z-50 opacity-0 group-hover/app:opacity-100 transition-opacity shadow-lg"
-               onClick={() => setZenMode(false)}
-             >
-               <Minimize2 className="mr-2 h-3 w-3" /> Exit Zen
-             </Button>
-          )}
 
-          <MarkdownEditor
-            initialContent={originalContent}
-            onSave={handleSave}
-            saveLabel="Save"
-            className="h-full border-0 shadow-none"
-            minHeight="calc(100vh - 200px)"
-          />
+        
+        {/* Editor Wrapper */}
+        <div className="flex-1 overflow-hidden relative flex flex-row">
+          <div className="flex-1 flex flex-col p-4 relative">
+             {/* Zen Mode Exit */}
+             {zenMode && (
+                <Button 
+                variant="secondary" 
+                size="sm" 
+                className="fixed top-4 right-4 z-50 opacity-0 group-hover/app:opacity-100 transition-opacity shadow-lg"
+                onClick={() => setZenMode(false)}
+                >
+                <Minimize2 className="mr-2 h-3 w-3" /> Exit Zen
+                </Button>
+             )}
+
+            <MarkdownEditor
+                initialContent={originalContent}
+                onSave={handleSave}
+                saveLabel="Save"
+                className="h-full border-0 shadow-none"
+                minHeight="calc(100vh - 200px)"
+            />
+          </div>
+
+          {/* Variable Legend Sidebar */}
+          {showVariables && (
+            <ContextVariablesLegend 
+               className="animate-in slide-in-from-right-5 duration-300 shadow-xl z-20" 
+            />
+          )}
         </div>
       </div>
     </div>
