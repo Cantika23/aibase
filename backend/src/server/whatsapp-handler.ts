@@ -931,11 +931,13 @@ async function executeWhatsAppScript(
     logger.info({ extensions: Object.keys(extensions).join(", ") || "none" }, "[WhatsApp] Loaded extensions");
 
     // Create a broadcast function that sends progress to WhatsApp
-    // WHATSAPP: Suppress all progress messages - only send final result
+    // Send progress immediately when received
     const broadcast = (type: "tool_call" | "tool_result", data: any) => {
-      // Log progress but don't send to WhatsApp
       if (type === "tool_call" && data.status === "progress" && data.result?.message) {
-        logger.info({ message: data.result.message }, "[WhatsApp] Script progress (not sent - waiting for completion)");
+        logger.info({ message: data.result.message }, "[WhatsApp] Script progress - sending immediately");
+        // Send immediately without await - fire and forget
+        sendWhatsAppMessage(projectId, whatsappNumber, { text: `⏳ ${data.result.message}` }, true)
+          .catch((err) => logger.error({ err }, "[WhatsApp] Error sending progress"));
       }
     };
 
@@ -1438,7 +1440,7 @@ async function processWhatsAppMessageWithAI(
           logger.info({ cleanedResponse: cleanedResponse.substring(0, 50) + "..." }, "[WhatsApp] Sending additional AI context");
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: cleanedResponse,
-          });
+          }, false); // Final message - stop typing after 1s
         } else {
           logger.info("[WhatsApp] Skipping generic/short AI response since tool result already sent");
         }
@@ -1459,7 +1461,7 @@ async function processWhatsAppMessageWithAI(
           logger.info({ scriptResult: scriptResult.substring(0, 100) + "..." }, "[WhatsApp] Script executed, sending result");
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: scriptResult,
-          });
+          }, false); // Final message - stop typing after 1s
           logger.info("[WhatsApp] Script result sent successfully");
         } else {
           logger.warn("[WhatsApp] Script execution returned no result");
@@ -1482,7 +1484,7 @@ async function processWhatsAppMessageWithAI(
               logger.info("[WhatsApp] Sending stored tool result as fallback");
               await sendWhatsAppMessage(projectId, whatsappNumber, {
                 text: formatted,
-              });
+              }, false); // Final message - stop typing after 1s
               break; // Only send first result to avoid spam
             }
           }
@@ -1493,7 +1495,7 @@ async function processWhatsAppMessageWithAI(
       logger.info({ cleanedResponse: cleanedResponse.substring(0, 100) + "..." }, "[WhatsApp] Sending response back to WhatsApp");
       await sendWhatsAppMessage(projectId, whatsappNumber, {
         text: cleanedResponse,
-      });
+      }, false); // Final message - stop typing after 1s
       logger.info("[WhatsApp] Response sent successfully");
     } else if (toolResults.length > 0) {
       // No AI response but we have tool results
@@ -1503,7 +1505,7 @@ async function processWhatsAppMessageWithAI(
         if (formatted) {
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: formatted,
-          });
+          }, false); // Final message - stop typing after 1s
           break;
         }
       }
@@ -1605,22 +1607,25 @@ async function sendWhatsAppMessage(
       throw new Error("Failed to send WhatsApp message");
     }
 
-    logger.info({ phone }, "[WhatsApp] Message sent successfully");
+    logger.info({ phone, keepTyping }, "[WhatsApp] Message sent successfully");
 
-    // Stop typing indicator after message is sent, UNLESS keepTyping is true
-    // Typing should continue during AI processing and tool execution
+    // Handle typing indicator after message sent
     if (!keepTyping) {
+      // For completion messages: stop typing after 1 second
+      logger.info("[WhatsApp] Completion message sent, stopping typing in 1s...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
       await stopWhatsAppTyping(projectId, phone);
+      logger.info("[WhatsApp] Typing indicator stopped");
     } else {
-      // FORCE restart typing if keepTyping is true
-      // Sending a message usually stops the typing indicator on the client side
-      logger.info("[WhatsApp] keepTyping=true, restarting typing indicator...");
-      startWhatsAppTyping(projectId, phone).catch((e: any) => logger.warn({ e }, "[WhatsApp] Failed to restart typing"));
+      // For progress messages: restart typing indicator
+      logger.info("[WhatsApp] Progress message sent, restarting typing indicator...");
+      await startWhatsAppTyping(projectId, phone);
+      logger.info("[WhatsApp] Typing indicator restarted");
     }
   } catch (error) {
     logger.error({ url: `${WHATSAPP_API_URL}/clients/${projectId}/send-message` }, "[WhatsApp] Error sending message to URL");
     logger.error({ error }, "[WhatsApp] Error details");
-    
+
     const errorStr = String(error);
     if (errorStr.includes("fetch failed") || errorStr.includes("ECONNREFUSED")) {
       logger.error("[WhatsApp] CRITICAL: Could not connect to WhatsApp Service!");
