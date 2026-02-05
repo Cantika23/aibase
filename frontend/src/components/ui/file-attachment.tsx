@@ -53,7 +53,50 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
+function isImageFile(type: string): boolean {
+  return type.startsWith("image/");
+}
+
+interface ImageFileAttachmentProps {
+  file: UploadedFileAttachment;
+  className?: string;
+}
+
+function ImageFileAttachment({ file, className }: ImageFileAttachmentProps) {
+  const hasProcessingStatus =
+    file.processingStatus && file.processingStatus.length > 0;
+
+  return (
+    <div className={cn("max-w-md", className)}>
+      {/* Image Preview with Loading State */}
+      <div className="relative rounded-lg overflow-hidden">
+        {hasProcessingStatus && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{file.processingStatus}</span>
+            </div>
+          </div>
+        )}
+
+        <img
+          src={file.thumbnailUrl || file.url}
+          alt={(file as any).originalName || file.name}
+          className="w-full h-auto object-cover"
+          loading="lazy"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function FileAttachment({ file, className }: FileAttachmentProps) {
+  // Route to image-specific component for image files
+  if (isImageFile(file.type)) {
+    return <ImageFileAttachment file={file} className={className} />;
+  }
+
+  // Existing implementation for non-image files
   const Icon = getFileIcon(file.type);
   const hasProcessingStatus =
     file.processingStatus && file.processingStatus.length > 0;
@@ -74,7 +117,7 @@ export function FileAttachment({ file, className }: FileAttachmentProps) {
         <div className="flex flex-col min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-blue-900 dark:text-blue-100 truncate">
-              {file.name}
+              {(file as any).originalName || file.name}
             </span>
           </div>
           <div className="flex items-center gap-2">

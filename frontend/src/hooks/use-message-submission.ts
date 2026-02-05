@@ -50,7 +50,7 @@ export function useMessageSubmission({
   updateMessage,
 }: UseMessageSubmissionProps) {
   const log = useLogger('chat');
-  
+
   // Track if we're currently submitting to prevent double submissions
   const isSubmittingRef = useRef(false);
   // Track last submit time to prevent rapid duplicate submissions
@@ -73,10 +73,10 @@ export function useMessageSubmission({
 
       const isConnected = wsClient?.isConnected() === true;
 
-      log.debug("[Submit] Called", { 
-        input: input?.substring(0, 50), 
-        isConnected, 
-        attachments: options?.experimental_attachments?.length || 0 
+      log.debug("[Submit] Called", {
+        input: input?.substring(0, 50),
+        isConnected,
+        attachments: options?.experimental_attachments?.length || 0
       });
 
       const hasAttachments = options?.experimental_attachments && options.experimental_attachments.length > 0;
@@ -212,18 +212,13 @@ export function useMessageSubmission({
             // CRITICAL: Get current attachments before replacing to preserve processing status
             if (userMessageWithFiles) {
               const messageId = userMessageWithFiles.id;
-              const { messages } = useChatStore.getState();
-              const currentMessage = messages.find(m => m.id === messageId);
-              const currentAttachments = currentMessage?.attachments || [];
-
               updateMessage(messageId, {
-                attachments: uploadedFiles.map((f, index) => {
-                  // Preserve processing status from current attachment if it exists
-                  // This ensures the "complete" WebSocket message can properly clear it
-                  const currentStatus = currentAttachments[index]?.processingStatus;
+                attachments: uploadedFiles.map((f) => {
+                  // We explicitly do NOT preserve the processingStatus here
+                  // This ensures the "Uploading..." overlay is removed and the image preview is shown
                   return {
                     ...f,
-                    ...(currentStatus && { processingStatus: currentStatus }),
+                    processingStatus: undefined,
                   };
                 }),
               });

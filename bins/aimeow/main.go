@@ -311,7 +311,7 @@ func (cm *ClientManager) createClient(osName string, customID string) (*WhatsApp
 		clientID = clientUUID.String()
 	}
 
-	// Create a device store with proper initialization but don't save to database yet
+	// Create a device store with proper initialization
 	deviceStore := cm.container.NewDevice()
 	if deviceStore == nil {
 		return nil, "", fmt.Errorf("failed to create new device: container returned nil")
@@ -320,6 +320,8 @@ func (cm *ClientManager) createClient(osName string, customID string) (*WhatsApp
 	clientLog := waLog.Stdout("Client", "DEBUG", true)
 	client := whatsmeow.NewClient(deviceStore, clientLog)
 	LogClient.Info("Created new client: %s", clientID)
+
+
 
 	waClient := &WhatsAppClient{
 		client:       client,
@@ -451,6 +453,18 @@ func (cm *ClientManager) eventHandler(client *WhatsAppClient) func(interface{}) 
 			client.isConnected = true
 			now := time.Now()
 			client.connectedAt = &now
+
+			// Save device store to database after successful connection
+			// This is CRITICAL for WhatsApp pairing persistence
+			// Device JID is now available, so we can save to database
+			if client.deviceStore.ID != nil {
+				err := cm.container.PutDevice(context.Background(), client.deviceStore)
+				if err != nil {
+					LogClient.Warn("Failed to save device store after connection: %v", err)
+				} else {
+					LogClient.Info("Device store saved to database after successful connection")
+				}
+			}
 
 			// Set OS name if provided and device has JID
 			if client.osName != "" && client.deviceStore.ID != nil {

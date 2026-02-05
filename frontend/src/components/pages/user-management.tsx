@@ -33,7 +33,7 @@ export function UserManagementPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // New: Tabs state
 
 
@@ -154,7 +154,7 @@ export function UserManagementPage() {
               onImpersonateUser={handleImpersonateUser}
             />
           </TabsContent>
-          
+
           <TabsContent value="contacts" className="flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
             <ContactsList onViewDetails={handleViewContact} />
           </TabsContent>

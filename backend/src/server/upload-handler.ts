@@ -154,7 +154,8 @@ function broadcastFileUpdate(
 
 export interface UploadedFileInfo {
   id: string;
-  name: string;
+  name: string; // Timestamped filename for storage
+  originalName?: string; // Original filename for UI display
   size: number;
   type: string;
   url: string;
@@ -208,7 +209,8 @@ function isImageFile(fileName: string, mimeType: string): boolean {
 async function generateThumbnail(
   imageBuffer: Buffer,
   fileName: string,
-  projectId: string
+  projectId: string,
+  convId: string
 ): Promise<string | null> {
   try {
     // Create sharp instance from buffer
@@ -441,11 +443,20 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
     const convId = url.searchParams.get('convId') ?? '';
     const projectId = url.searchParams.get('projectId');
 
+    // Log request details for debugging
+    logger.info({ convId, projectId, hasConvId: !!convId }, '[UPLOAD-HANDLER] Upload request received');
+
     if (!projectId) {
       return Response.json(
         { success: false, error: 'Missing projectId parameter' },
         { status: 400 }
       );
+    }
+
+    // If convId is empty, generate a default one for file storage
+    if (!convId || convId.trim() === '') {
+      convId = `upload_${Date.now()}`;
+      logger.info({ generatedConvId: convId }, '[UPLOAD-HANDLER] Generated convId for upload');
     }
 
     // Get project to retrieve tenant_id
@@ -513,17 +524,35 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
         scope
       }, 'Processing file (sync phase)');
 
-      // Broadcast: Starting to save file
-      broadcastStatus(wsServer, convId, 'processing', `Saving ${file.name}...`);
+      // Add timestamp to filename to prevent duplicates
+      // Format: originalname_timestamp.ext (e.g., data.csv -> data_1738680123456.csv)
+      const timestamp = Date.now();
+      const fileExt = path.extname(file.name);
+      const fileBaseName = path.basename(file.name, fileExt);
+      const uniqueFileName = `${fileBaseName}_${timestamp}${fileExt}`;
+
+      logger.info({ originalName: file.name, uniqueName: uniqueFileName }, 'Generated unique filename');
+
+      // Broadcast: Starting to process file
+      broadcastStatus(wsServer, convId!, 'processing', `Uploading ${file.name}...`);
 
       // Convert File to Buffer
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // Save file synchronously (no thumbnail yet - that happens async)
+      // Generate thumbnail for images BEFORE saving file (so we have the URL)
+      let thumbnailUrl: string | undefined;
+      const isImage = isImageFile(uniqueFileName, file.type);
+      if (isImage) {
+        broadcastStatus(wsServer, convId!, 'processing', `Generating thumbnail for ${file.name}...`);
+        thumbnailUrl = await generateThumbnail(buffer, uniqueFileName, projectId, convId!) || undefined;
+      }
+
+      // Save file with scope and thumbnail URL
+      broadcastStatus(wsServer, convId!, 'processing', `Saving ${file.name}...`);
       const storedFile = await fileStorage.saveFile(
-        convId,
-        file.name,
+        convId!,
+        uniqueFileName,
         buffer,
         file.type,
         projectId,
@@ -538,7 +567,8 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
       // Add to response list
       uploadedFiles.push({
         id: fileId,
-        name: storedFile.name,
+        name: storedFile.name, // Timestamped name for backend
+        originalName: file.name, // Original name for UI display
         size: storedFile.size,
         type: storedFile.type,
         url: `/api/files/${projectId}/${storedFile.name}`,
@@ -615,7 +645,12 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
     });
 
   } catch (error: any) {
-    logger.error({ error }, 'Upload error');
+    logger.error({
+      error,
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    }, 'Upload error - detailed');
     return Response.json(
       { success: false, error: error.message || 'Upload failed' },
       { status: 500 }
@@ -631,13 +666,22 @@ export async function handleFileDownload(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/');
 
-    // Expected: /api/files/{projectId}/{fileName}
+    // Expected: /api/files/{projectId}/{fileName} or /api/files/{projectId}/{convId}/{fileName}
     if (pathParts.length < 5) {
       return new Response('Invalid file path', { status: 400 });
     }
 
     const projectId = pathParts[3];
-    const fileName = pathParts[4];
+    let convId = '';
+    let fileName = '';
+
+    // Check if URL includes convId
+    if (pathParts.length >= 6) {
+      convId = pathParts[4] || '';
+      fileName = pathParts[5] || '';
+    } else {
+      fileName = pathParts[4] || '';
+    }
 
     if (!projectId || !fileName) {
       return new Response('Invalid file path', { status: 400 });
@@ -652,7 +696,7 @@ export async function handleFileDownload(req: Request): Promise<Response> {
 
     const fileStorage = FileStorage.getInstance();
     const tenantId = project.tenant_id ?? 'default';
-    const fileBuffer = await fileStorage.getFile('', fileName, projectId!, tenantId);
+    const fileBuffer = await fileStorage.getFile(convId, fileName, projectId!, tenantId);
 
     // Try to determine content type from extension
     const ext = fileName.split('.').pop()?.toLowerCase();

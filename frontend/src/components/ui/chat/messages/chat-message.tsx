@@ -8,7 +8,7 @@ import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { chatBubbleVariants } from "../shared/variants";
 import { dataUrlToUint8Array } from "../shared/utils";
 import { ReasoningBlock } from "./reasoning-block";
-import { ToolCall, MemoryToolGroup } from "../tools";
+import { MemoryToolGroup } from "../tools";
 import type {
   ChatMessageProps,
   MessagePart,
@@ -116,11 +116,54 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           <FileAttachmentList files={attachments} className="mb-2" />
         )}
 
-        {/* Show message text if there's actual content */}
-        {content && content.trim() && (
+        {/* Show message text only if there's no attachments or if content doesn't contain file info */}
+        {/* Hide technical file information from display */}
+        {content && content.trim() && !attachments?.length && (
           <div className={cn(chatBubbleVariants({ isUser, animation }))}>
             <MarkdownRenderer>{content}</MarkdownRenderer>
           </div>
+        )}
+
+        {/* If there are attachments, check if user wrote a custom message */}
+        {attachments && attachments.length > 0 && content && (
+          (() => {
+            // Extract only the user's original message before file info
+            // File info starts with "File:" or contains file details
+            const lines = content.split('\n');
+            const userMessageLines = [];
+
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+
+              // Stop when we hit file information or technical prompts
+              if (trimmedLine.startsWith('File:') ||
+                trimmedLine.startsWith('Analyze the following file') ||
+                trimmedLine.startsWith('**Attached files:**') ||
+                trimmedLine.includes('.csv') ||
+                trimmedLine.includes('.xlsx') ||
+                trimmedLine.includes('.pdf') ||
+                trimmedLine.includes('.jpg') ||
+                trimmedLine.includes('.png')) {
+                break;
+              }
+
+              // Also skip empty lines at the start
+              if (userMessageLines.length === 0 && !trimmedLine) {
+                continue;
+              }
+
+              userMessageLines.push(line);
+            }
+
+            const userMessage = userMessageLines.join('\n').trim();
+
+            // Only show message if it's not empty and not a technical message
+            return userMessage ? (
+              <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+                <MarkdownRenderer>{userMessage}</MarkdownRenderer>
+              </div>
+            ) : null;
+          })()
         )}
 
         {showTimeStamp && createdAt ? (
@@ -231,12 +274,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           } else if (part.type === "reasoning") {
             return <ReasoningBlock key={`reasoning-${index}`} part={part} />;
           } else if (part.type === "tool-invocation") {
-            return (
+            // Hidden as per user request
+            return null;
+            /* return (
               <ToolCall
                 key={`tool-${index}`}
                 toolInvocations={[part.toolInvocation]}
               />
-            );
+            ); */
           }
           return null;
         })}
@@ -338,25 +383,47 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
       )}
 
-      {/* Render tool invocations */}
-      {toolInvocations && toolInvocations.length > 0 && (
+      {/* Render tool invocations - HIDDEN as per user request */}
+      {/* {toolInvocations && toolInvocations.length > 0 && (
         <ToolCall toolInvocations={toolInvocations} />
-      )}
+      )} */}
 
       {/* Render content after tools (or all content if not split) */}
       {((shouldSplitContent && afterToolContent && afterToolContent.trim()) ||
         (!shouldSplitContent && content && content.trim())) && (
-        <div className={cn("me", chatBubbleVariants({ isUser, animation }))}>
-          <MarkdownRenderer>
-            {shouldSplitContent ? afterToolContent : content}
-          </MarkdownRenderer>
-          {actions ? (
-            <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-              {actions}
-            </div>
-          ) : null}
-        </div>
-      )}
+          /* Filter technical text from assistant responses too */
+          (() => {
+            const textToShow = shouldSplitContent ? afterToolContent : content;
+
+            // Filter out technical text for assistant messages
+            if (!isUser) {
+              const lower = textToShow.toLowerCase();
+              if (lower.startsWith('analyze the following file') ||
+                lower.startsWith('calculating') ||
+                lower.startsWith('i will analyze') ||
+                lower.startsWith('read and analyze')) {
+                // If it's just technical text, don't render this bubble
+                // UNLESS it has substantial content after the technical prefix
+                if (textToShow.length < 100 && !textToShow.includes('\n\n')) {
+                  return null;
+                }
+              }
+            }
+
+            return (
+              <div className={cn("me", chatBubbleVariants({ isUser, animation }))}>
+                <MarkdownRenderer>
+                  {textToShow}
+                </MarkdownRenderer>
+                {actions ? (
+                  <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+                    {actions}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()
+        )}
 
       {showTimeStamp && createdAt ? (
         <time
