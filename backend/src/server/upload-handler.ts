@@ -129,8 +129,8 @@ async function ensureExtensionsLoaded(projectId: string): Promise<void> {
  * Used to notify frontend of async processing completion
  */
 function broadcastFileUpdate(
-  wsServer: WSServer | undefined, 
-  convId: string, 
+  wsServer: WSServer | undefined,
+  convId: string,
   fileInfo: UploadedFileInfo,
   updateType: 'thumbnail' | 'description' | 'complete' = 'complete'
 ) {
@@ -140,7 +140,7 @@ function broadcastFileUpdate(
     wsServer.broadcastToConv(convId, {
       type: 'file_update',
       id: `file_update_${Date.now()}`,
-      data: { 
+      data: {
         file: fileInfo,
         updateType,
       },
@@ -278,34 +278,34 @@ async function processFileAsync(
 ): Promise<void> {
   const { fileId, fileName, fileType, fileSize, convId, projectId, tenantId, scope, buffer, storedFileName } = fileInfo;
   const jobId = `process_${fileId}`;
-  
+
   // Mark file as pending processing
   markFilePending(convId, storedFileName);
-  
+
   // Create abort controller for this job
   const abortController = new AbortController();
   activeProcessingJobs.set(jobId, abortController);
-  
+
   const fileStorage = FileStorage.getInstance();
   const filePath = path.join(getProjectFilesDir(projectId, tenantId), storedFileName);
-  
+
   try {
     logger.info({ fileName, jobId }, '[UPLOAD-HANDLER] Starting async post-processing');
-    
+
     // Step 1: Generate thumbnail for images
     let thumbnailUrl: string | undefined;
     const isImage = isImageFile(fileName, fileType);
-    
+
     if (isImage) {
       broadcastStatus(wsServer, convId, 'processing', `Generating thumbnail for ${fileName}...`);
       try {
-        thumbnailUrl = await generateThumbnail(buffer, fileName, projectId) || undefined;
-        
+        thumbnailUrl = await generateThumbnail(buffer, fileName, projectId, convId) || undefined;
+
         // Update metadata with thumbnail URL
         if (thumbnailUrl) {
           await fileStorage.updateFileMeta('', storedFileName, projectId, tenantId, { thumbnailUrl });
           logger.info({ fileName, thumbnailUrl }, '[UPLOAD-HANDLER] Thumbnail generated and saved');
-          
+
           // Broadcast thumbnail update
           broadcastFileUpdate(wsServer, convId, {
             id: fileId,
@@ -322,15 +322,15 @@ async function processFileAsync(
         logger.warn({ error: thumbError, fileName }, '[UPLOAD-HANDLER] Thumbnail generation failed');
       }
     }
-    
+
     // Step 2: Execute extension hooks for analysis
     broadcastStatus(wsServer, convId, 'processing', `Analyzing ${fileName}...`);
     logger.info({ fileName }, '[UPLOAD-HANDLER] Starting extension analysis for file');
-    
+
     try {
       // Ensure extensions are loaded (hooks registered) before executing hooks
       await ensureExtensionsLoaded(projectId);
-      
+
       const hookResult = await extensionHookRegistry.executeHook('afterFileUpload', {
         convId,
         projectId,
@@ -339,21 +339,21 @@ async function processFileAsync(
         fileType,
         fileSize,
       });
-      
+
       logger.info({ fileName, hookResult }, '[UPLOAD-HANDLER] Extension hook execution result');
-      
+
       let fileDescription: string | undefined;
       let fileTitle: string | undefined;
-      
+
       if (hookResult?.description && typeof hookResult.description === 'string') {
         fileDescription = hookResult.description;
         logger.info({ fileName, description: fileDescription.substring(0, 100) }, '[UPLOAD-HANDLER] Extension hook generated description');
-        
+
         if (hookResult.title && typeof hookResult.title === 'string') {
           fileTitle = hookResult.title;
           logger.info({ fileTitle }, '[UPLOAD-HANDLER] Extension hook generated title');
         }
-        
+
         // Update file metadata with description and title, clear any previous error
         try {
           await fileStorage.updateFileMeta('', storedFileName, projectId, tenantId, {
@@ -362,7 +362,7 @@ async function processFileAsync(
             processingError: undefined // Clear any previous error on success
           });
           logger.info({ fileTitle }, '[UPLOAD-HANDLER] File metadata updated with description and title');
-          
+
           // Broadcast description update
           broadcastFileUpdate(wsServer, convId, {
             id: fileId,
@@ -385,14 +385,14 @@ async function processFileAsync(
     } catch (hookError) {
       const errorMessage = hookError instanceof Error ? hookError.message : String(hookError);
       logger.error({ error: hookError, fileName }, '[UPLOAD-HANDLER] Extension hook execution failed');
-      
+
       // Save processing error to file metadata
       try {
         await fileStorage.updateFileMeta('', storedFileName, projectId, tenantId, {
           processingError: errorMessage
         });
         logger.info({ fileName, error: errorMessage }, '[UPLOAD-HANDLER] Saved processing error to file metadata');
-        
+
         // Broadcast error update
         broadcastFileUpdate(wsServer, convId, {
           id: fileId,
@@ -409,11 +409,11 @@ async function processFileAsync(
         logger.error({ error: updateError }, '[UPLOAD-HANDLER] Failed to save processing error to metadata');
       }
     }
-    
+
     // Step 3: Broadcast completion
     broadcastStatus(wsServer, convId, 'complete', `Successfully processed ${fileName}`);
     logger.info({ fileName }, '[UPLOAD-HANDLER] Async post-processing completed');
-    
+
   } catch (error) {
     logger.error({ error, fileName }, '[UPLOAD-HANDLER] Async post-processing failed');
     broadcastStatus(wsServer, convId, 'error', `Failed to process ${fileName}`);
@@ -436,11 +436,11 @@ async function processFileAsync(
 export async function handleFileUpload(req: Request, wsServer?: WSServer): Promise<Response> {
   logger.info('========================================');
   logger.info('[UPLOAD-HANDLER] File upload request received');
-  
+
   try {
     // Get conversation ID and project ID from query params
     const url = new URL(req.url);
-    const convId = url.searchParams.get('convId') ?? '';
+    let convId = url.searchParams.get('convId') ?? '';
     const projectId = url.searchParams.get('projectId');
 
     // Log request details for debugging
@@ -487,7 +487,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
     const fileStorage = FileStorage.getInstance();
     const uploadedFiles: UploadedFileInfo[] = [];
     const tenantId = project.tenant_id ?? 'default';
-    
+
     // Collect file buffers for async processing
     const filesToProcess: Array<{
       fileId: string;
@@ -500,7 +500,7 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
 
     // Phase 1: Synchronous file save (blocking)
     logger.info('[UPLOAD-HANDLER] Starting synchronous file save phase');
-    
+
     for (const file of files) {
       if (!(file instanceof File)) {
         continue;
@@ -594,11 +594,11 @@ export async function handleFileUpload(req: Request, wsServer?: WSServer): Promi
 
     // Phase 2: Return response immediately (file is saved)
     logger.info({ fileCount: uploadedFiles.length }, '[UPLOAD-HANDLER] Synchronous save complete, returning response');
-    
+
     // Phase 3: Start async post-processing (don't await - run in background)
     if (filesToProcess.length > 0) {
       logger.info({ fileCount: filesToProcess.length }, '[UPLOAD-HANDLER] Starting async post-processing');
-      
+
       // Fire-and-forget async processing for each file
       for (const fileInfo of filesToProcess) {
         processFileAsync(

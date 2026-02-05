@@ -54,9 +54,9 @@ export function MarkdownEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      UnderlineExtension,
-      Markdown,
+      StarterKit as any,
+      UnderlineExtension as any,
+      Markdown as any,
     ],
     content: initialContent,
     onUpdate: ({ editor }) => {

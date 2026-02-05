@@ -4,13 +4,19 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
-  Info
+  Info,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  Code
 } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
+import { Markdown } from 'tiptap-markdown';
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
@@ -21,8 +27,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { MarkdownEditor } from "@/components/ui/markdown-editor";
-import { ContextVariablesLegend } from "@/components/pages/context-variables-legend";
+// import { MarkdownEditor } from "@/components/ui/markdown-editor";
+// import { ContextVariablesLegend } from "@/components/pages/context-variables-legend";
 
 const API_URL = buildApiUrl("");
 
@@ -55,7 +61,7 @@ export function ContextEditor() {
       }) as any, // Type assertion for Markdown
     ],
     content: '',
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor }: { editor: any }) => {
       // Use markdown storage to get markdown content
       const markdownContent = (editor.storage as any).markdown?.getMarkdown?.() || editor.getHTML();
       setContent(markdownContent);
@@ -228,14 +234,14 @@ export function ContextEditor() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                   <Button 
-                     variant={showVariables ? "secondary" : "ghost"} 
-                     size="icon" 
-                     className="h-8 w-8" 
-                     onClick={() => setShowVariables(!showVariables)}
-                   >
-                     <Info className="h-4 w-4" />
-                   </Button>
+                  <Button
+                    variant={showVariables ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setShowVariables(!showVariables)}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>Variables Legend</TooltipContent>
               </Tooltip>
@@ -255,7 +261,7 @@ export function ContextEditor() {
         </div>
 
 
-        
+
         {/* Editor Wrapper */}
         <div className="flex-1 overflow-hidden relative flex flex-col">
 
