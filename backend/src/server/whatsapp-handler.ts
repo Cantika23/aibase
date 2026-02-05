@@ -931,12 +931,11 @@ async function executeWhatsAppScript(
     logger.info({ extensions: Object.keys(extensions).join(", ") || "none" }, "[WhatsApp] Loaded extensions");
 
     // Create a broadcast function that sends progress to WhatsApp
+    // WHATSAPP: Suppress all progress messages - only send final result
     const broadcast = (type: "tool_call" | "tool_result", data: any) => {
+      // Log progress but don't send to WhatsApp
       if (type === "tool_call" && data.status === "progress" && data.result?.message) {
-        // Send progress update to WhatsApp
-        sendWhatsAppMessage(projectId, whatsappNumber, {
-          text: `⏳ ${data.result.message}`,
-        }).catch((err: any) => logger.error({ err }, "[WhatsApp] Error sending progress message"));
+        logger.info({ message: data.result.message }, "[WhatsApp] Script progress (not sent - waiting for completion)");
       }
     };
 
@@ -1213,16 +1212,10 @@ async function processWhatsAppMessageWithAI(
     let enhancedMessage = messageText;
     
     // Notify user if we are processing images
+    // WHATSAPP: Suppress image analysis notification - will show typing indicator only
     const hasImages = attachments.some(a => a.type === "image" && a.url);
     if (hasImages) {
-      try {
-        logger.info("[WhatsApp] Sending image analysis notification");
-        await sendWhatsAppMessage(projectId, whatsappNumber, {
-          text: `⏳ Analyzing image(s)...`,
-        }, true); // keep typing
-      } catch (err) {
-        logger.error({ err }, "[WhatsApp] Failed to send image analysis notification");
-      }
+      logger.info("[WhatsApp] Processing image(s) - notification suppressed, typing indicator active");
     }
     
     for (const attachment of attachments) {
@@ -1317,9 +1310,6 @@ async function processWhatsAppMessageWithAI(
     // Track tool execution results to send if AI response is empty
     const toolResults: Array<{ toolName: string; result: any }> = [];
     let toolResultSent = false;
-    
-    // Track sent notification messages to prevent duplicates
-    const sentNotifications = new Set<string>();
 
     // Load built-in tools for this conversation (includes script tool with extensions)
     const tools = getBuiltinTools(convId, projectId, tenantId, uid);
@@ -1337,9 +1327,6 @@ async function processWhatsAppMessageWithAI(
       systemPrompt = `You are a helpful AI assistant on WhatsApp.`;
     }
 
-    // Track if we have already sent a status notification to the user
-    let toolNotificationSent = false;
-
     const conversation = await Conversation.create({
       projectId,
       tenantId,
@@ -1350,58 +1337,20 @@ async function processWhatsAppMessageWithAI(
       hooks: {
         tools: {
           before: async (toolCallId: string, toolName: string, args: any) => {
-            // 1. Handle Script Tool Progress
-            // Only send if we haven't sent a notification yet
-            if (toolName === "script" && args.__status === "progress" && args.__result) {
-              const progressMessage = args.__result.message;
-              
-              if (!toolNotificationSent) {
-                 // Lock immediately to prevent race conditions
-                 toolNotificationSent = true;
-                 try {
-                    await sendWhatsAppMessage(projectId, whatsappNumber, {
-                      text: `⏳ ${progressMessage}`,
-                    }, true);
-                 } catch (err) {
-                    logger.error({ err }, "[WhatsApp] Failed to send progress message");
-                 }
-              }
-              return;
-            }
+            // WHATSAPP: Suppress all intermediate tool execution messages
+            // Only send final completed message after tools finish
+            logger.info({ toolName }, "[WhatsApp] Tool started (Notification suppressed - will send only when complete)");
 
-            // 2. Handle Initial Tool Call
-            // Only send if we haven't sent a notification yet
-            if (!toolNotificationSent) {
-                let notificationText = "";
-                if (toolName === "script") {
-                  const purpose = args.purpose || "Executing custom script...";
-                  notificationText = `⏳ ${purpose}`;
-                } else if (toolName === "search") {
-                  notificationText = `🔍 Searching for: ${args.query || "data"}...`;
-                } else {
-                  notificationText = `🔧 Using tool: ${toolName}...`;
-                }
-
-                // Lock immediately to prevent race conditions
-                toolNotificationSent = true;
-
-                logger.info({ toolName, notificationText }, "[WhatsApp] Tool started (Notification sent)");
-                try {
-                  await sendWhatsAppMessage(projectId, whatsappNumber, { text: notificationText }, true);
-                } catch (err) {
-                  logger.error({ err }, "[WhatsApp] Failed to send tool start notification");
-                }
-            } else {
-              logger.info({ toolName }, "[WhatsApp] Tool started (Notification suppressed)");
-            }
+            // Still track progress to prevent duplicates, but don't send
+            toolNotificationSent = true;
           },
           after: async (toolCallId: string, toolName: string, args: any, result: any) => {
             logger.info({ toolName, result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Tool executed");
-            
+
             // Store tool result for later use if needed (debugging or fallback)
             toolResults.push({ toolName, result });
-            
-            // Do NOT send tool results directly to user anymore.
+
+            // Do NOT send tool results directly to user.
             // The AI will incorporate the result into the final answer.
           },
         },
