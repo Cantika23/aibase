@@ -1384,7 +1384,11 @@ async function processWhatsAppMessageWithAI(
               const progressPromise = (async () => {
                 try {
                   await sendWhatsAppMessageRaw(projectId, whatsappNumber, { text: `⏳ ${data.message}` });
-                  logger.info("[WhatsApp] Progress message sent");
+                  logger.info("[WhatsApp] Progress message sent, restarting typing indicator");
+
+                  // Restart typing indicator after progress message to keep showing "typing..."
+                  // aimeow API stops typing when any message is sent, so we need to restart it
+                  await startWhatsAppTyping(projectId, whatsappNumber);
                 } catch (err) {
                   logger.error({ err }, "[WhatsApp] Error sending progress");
                 }
