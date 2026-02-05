@@ -119,9 +119,13 @@ export function ExtensionsSettings() {
 
   // Load data
   const loadData = useCallback(async () => {
-    if (!currentProject) return;
-
     setIsLoading(true);
+
+    if (!currentProject) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const [extData, catData] = await Promise.all([
         getExtensions(currentProject.id),
