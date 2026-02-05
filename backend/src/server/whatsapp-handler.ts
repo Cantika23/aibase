@@ -1323,8 +1323,19 @@ async function processWhatsAppMessageWithAI(
 
     // Load existing conversation history
     logger.info("[WhatsApp] Loading client history...");
-    const existingHistory = await chatHistoryStorage.loadChatHistory(convId, projectId, tenantId);
+    let existingHistory = await chatHistoryStorage.loadChatHistory(convId, projectId, tenantId, uid);
     logger.info({ messageCount: existingHistory?.length || 0 }, "[WhatsApp] Loaded history");
+
+    // Apply max history limit if configured
+    const maxHistoryMessages = project?.whatsapp_max_history_messages;
+    if (maxHistoryMessages && maxHistoryMessages > 0 && existingHistory.length > maxHistoryMessages) {
+      // Keep the last X messages, preserving order
+      existingHistory = existingHistory.slice(-maxHistoryMessages);
+      logger.info({ 
+        maxHistoryMessages, 
+        trimmedCount: existingHistory.length 
+      }, "[WhatsApp] Trimmed history to max limit");
+    }
 
     // Track tool execution results to send if AI response is empty
     const toolResults: Array<{ toolName: string; result: any }> = [];
@@ -1844,6 +1855,111 @@ export async function handleWhatsAppConnectionStatus(req: Request): Promise<Resp
   }
 }
 
+/**
+ * Update WhatsApp settings for a project
+ * PUT /api/whatsapp/settings
+ */
+export async function handleUpdateWhatsAppSettings(req: Request): Promise<Response> {
+  try {
+    const body = await req.json() as any;
+    const { projectId, maxHistoryMessages } = body;
 
+    if (!projectId) {
+      return Response.json(
+        { success: false, error: "Missing projectId" },
+        { status: 400 }
+      );
+    }
 
+    // Validate maxHistoryMessages
+    if (maxHistoryMessages !== undefined && maxHistoryMessages !== null) {
+      if (typeof maxHistoryMessages !== 'number' || maxHistoryMessages < 0) {
+        return Response.json(
+          { success: false, error: "maxHistoryMessages must be a positive number or null" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Get project
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(projectId);
+
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    // Update the setting
+    const updatedProject = await projectStorage.update(projectId, project.user_id, {
+      whatsapp_max_history_messages: maxHistoryMessages === 0 ? null : maxHistoryMessages,
+    });
+
+    if (!updatedProject) {
+      return Response.json(
+        { success: false, error: "Failed to update settings" },
+        { status: 500 }
+      );
+    }
+
+    logger.info({ projectId, maxHistoryMessages }, "[WhatsApp] Settings updated");
+
+    return Response.json({
+      success: true,
+      settings: {
+        maxHistoryMessages: updatedProject.whatsapp_max_history_messages,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "[WhatsApp] Error updating settings");
+    return Response.json(
+      { success: false, error: "Failed to update WhatsApp settings" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Get WhatsApp settings for a project
+ * GET /api/whatsapp/settings?projectId=xxx
+ */
+export async function handleGetWhatsAppSettings(req: Request): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const projectId = url.searchParams.get("projectId");
+
+    if (!projectId) {
+      return Response.json(
+        { success: false, error: "Missing projectId" },
+        { status: 400 }
+      );
+    }
+
+    // Get project
+    const projectStorage = ProjectStorage.getInstance();
+    const project = projectStorage.getById(projectId);
+
+    if (!project) {
+      return Response.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      settings: {
+        maxHistoryMessages: project.whatsapp_max_history_messages,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "[WhatsApp] Error getting settings");
+    return Response.json(
+      { success: false, error: "Failed to get WhatsApp settings" },
+      { status: 500 }
+    );
+  }
+}
 
