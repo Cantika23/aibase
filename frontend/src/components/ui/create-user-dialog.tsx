@@ -98,6 +98,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               placeholder="user@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
               required
               autoComplete="email"
             />
@@ -111,6 +112,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               placeholder="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
               required
               autoComplete="username"
               minLength={3}
@@ -128,6 +130,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               placeholder="Min 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
               required
               autoComplete="new-password"
               minLength={8}
@@ -142,6 +145,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               placeholder="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
               required
               autoComplete="new-password"
               minLength={8}

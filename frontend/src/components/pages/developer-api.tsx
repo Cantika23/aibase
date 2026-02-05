@@ -228,6 +228,7 @@ console.log(data.response);`;
                                         placeholder="e.g. You are a professional chef..."
                                         value={context}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setContext(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleTest()}
                                         className="bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
                                     />
                                 </div>
@@ -239,6 +240,12 @@ console.log(data.response);`;
                                         rows={4}
                                         value={prompt}
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleTest();
+                                            }
+                                        }}
                                         className="bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 resize-none"
                                     />
                                 </div>

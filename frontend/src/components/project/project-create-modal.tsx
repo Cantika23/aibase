@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 interface ProjectCreateModalProps {
@@ -16,9 +18,7 @@ export function ProjectCreateModal({ open, onOpenChange }: ProjectCreateModalPro
   const [description, setDescription] = useState("");
   const { createProject, setCurrentProject, isLoading } = useProjectStore();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleCreate = async () => {
     if (!name.trim()) {
       toast.error("Project name is required");
       return;
@@ -35,6 +35,11 @@ export function ProjectCreateModal({ open, onOpenChange }: ProjectCreateModalPro
     } else {
       toast.error("Failed to create project");
     }
+  };
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    handleCreate();
   };
 
   const handleCancel = () => {
@@ -57,13 +62,13 @@ export function ProjectCreateModal({ open, onOpenChange }: ProjectCreateModalPro
             <label htmlFor="project-name" className="text-sm font-medium">
               Project Name *
             </label>
-            <input
+            <Input
               id="project-name"
               type="text"
               placeholder="My Project"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               disabled={isLoading}
               autoFocus
               required
@@ -74,13 +79,19 @@ export function ProjectCreateModal({ open, onOpenChange }: ProjectCreateModalPro
             <label htmlFor="project-description" className="text-sm font-medium">
               Description <span className="text-muted-foreground">(optional)</span>
             </label>
-            <textarea
+            <Textarea
               id="project-description"
               placeholder="A brief description of your project..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleCreate();
+                }
+              }}
               rows={3}
-              className="w-full px-3 py-2 border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+              className="resize-none"
               disabled={isLoading}
             />
           </div>

@@ -150,6 +150,12 @@ export function ExtensionAICreator() {
             placeholder="e.g., I want an extension that can query GitHub API to get repository information, list commits, and show file details..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleGenerate();
+              }
+            }}
             rows={5}
             className="mt-1.5 w-full px-3 py-2 border rounded-md resize-none bg-background"
             disabled={isGenerating || !!generatedExtension}

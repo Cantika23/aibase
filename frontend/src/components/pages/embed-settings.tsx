@@ -297,6 +297,7 @@ export function EmbedSettings() {
                     id="user-mode"
                     value={userMode}
                     onChange={(e) => setUserMode(e.target.value as "current" | "uid")}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveConfig()}
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="current">Current User</option>
@@ -327,6 +328,12 @@ export function EmbedSettings() {
                   id="custom-css"
                   value={customCss}
                   onChange={(e) => setCustomCss(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleSaveCustomCss();
+                    }
+                  }}
                   placeholder={`/* Example CSS */
 .aibase-chat-container {
   background-color: #f5f5f5;

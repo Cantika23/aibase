@@ -3,6 +3,7 @@ import {
   Save,
   RefreshCw,
   Maximize2,
+  Minimize2,
   Info,
   Bold,
   Italic,
@@ -16,7 +17,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
 import { Markdown } from 'tiptap-markdown';
-} from "lucide-react";
+
 
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
@@ -28,8 +29,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-// import { MarkdownEditor } from "@/components/ui/markdown-editor";
-// import { ContextVariablesLegend } from "@/components/pages/context-variables-legend";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
+import { ContextVariablesLegend } from "@/components/pages/context-variables-legend";
 
 const API_URL = buildApiUrl("");
 
@@ -247,34 +248,34 @@ export function ContextEditor() {
         {/* Editor Wrapper */}
         <div className="flex-1 overflow-hidden relative flex flex-row">
           <div className="flex-1 flex flex-col p-4 relative">
-             {/* Zen Mode Exit */}
-             {zenMode && (
-                <Button 
-                variant="secondary" 
-                size="sm" 
+            {/* Zen Mode Exit */}
+            {zenMode && (
+              <Button
+                variant="secondary"
+                size="sm"
                 className="fixed top-4 right-4 z-50 opacity-0 group-hover/app:opacity-100 transition-opacity shadow-lg"
                 onClick={() => setZenMode(false)}
-                >
+              >
                 <Minimize2 className="mr-2 h-3 w-3" /> Exit Zen
-                </Button>
-             )}
+              </Button>
+            )}
 
             <MarkdownEditor
-                initialContent={originalContent}
-                onSave={handleSave}
-                saveLabel="Save"
-                className="h-full border-0 shadow-none"
-                minHeight="calc(100vh - 200px)"
+              initialContent={originalContent}
+              onSave={handleSave}
+              saveLabel="Save"
+              className="h-full border-0 shadow-none"
+              minHeight="calc(100vh - 200px)"
             />
           </div>
 
           {/* Variable Legend Sidebar */}
           {showVariables && (
-            <ContextVariablesLegend 
-               className="animate-in slide-in-from-right-5 duration-300 shadow-xl z-20" 
+            <ContextVariablesLegend
+              className="animate-in slide-in-from-right-5 duration-300 shadow-xl z-20"
             />
           )}
-        </div>
+        </div>e
       </div>
     </div>
   );

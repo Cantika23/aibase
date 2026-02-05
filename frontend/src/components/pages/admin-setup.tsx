@@ -778,10 +778,10 @@ export function AdminSetupPage() {
                   <div className="flex flex-col items-center">
                     <div
                       className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${isCompleted
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : isCurrent
-                            ? "border-primary text-primary"
-                            : "border-muted-foreground/30 text-muted-foreground"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : isCurrent
+                          ? "border-primary text-primary"
+                          : "border-muted-foreground/30 text-muted-foreground"
                         }`}
                     >
                       {step.id === "admin" ? (
@@ -797,7 +797,7 @@ export function AdminSetupPage() {
                   </div>
                   {index < steps.length - 1 && (
                     <div
-                      className={`${index===0 && "ml-5"} h-0.5 w-16 mx-2 mb-5 transition-colors ${index < currentStepIndex ? "bg-primary" : "bg-muted-foreground/30"
+                      className={`${index === 0 && "ml-5"} h-0.5 w-16 mx-2 mb-5 transition-colors ${index < currentStepIndex ? "bg-primary" : "bg-muted-foreground/30"
                         }`}
                     />
                   )}
@@ -829,6 +829,7 @@ export function AdminSetupPage() {
                       placeholder="My Organization"
                       value={tenantForm.name}
                       onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && handleWizardTenantCreate(e as any)}
                       required
                       autoFocus
                     />
@@ -842,6 +843,7 @@ export function AdminSetupPage() {
                       placeholder="https://example.com"
                       value={tenantForm.domain}
                       onChange={(e) => setTenantForm({ ...tenantForm, domain: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && handleWizardTenantCreate(e as any)}
                     />
                     <p className="text-xs text-muted-foreground">
                       Custom domain for this tenant (leave empty for default)
@@ -881,6 +883,7 @@ export function AdminSetupPage() {
                       placeholder="admin"
                       value={wizardAdminUser.username}
                       onChange={(e) => setWizardAdminUser({ ...wizardAdminUser, username: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && handleWizardAdminCreate(e as any)}
                       required
                       autoFocus
                     />
@@ -894,6 +897,7 @@ export function AdminSetupPage() {
                       placeholder="admin@example.com"
                       value={wizardAdminUser.email}
                       onChange={(e) => setWizardAdminUser({ ...wizardAdminUser, email: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && handleWizardAdminCreate(e as any)}
                       required
                     />
                   </div>
@@ -906,6 +910,7 @@ export function AdminSetupPage() {
                       placeholder="••••••••"
                       value={wizardAdminUser.password}
                       onChange={(e) => setWizardAdminUser({ ...wizardAdminUser, password: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && handleWizardAdminCreate(e as any)}
                       required
                     />
                   </div>
@@ -1168,6 +1173,7 @@ export function AdminSetupPage() {
                             placeholder="username"
                             value={userForm.username}
                             onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
+                            onKeyDown={(e) => e.key === "Enter" && (editingUser ? handleUpdateUser(e as any) : handleCreateUser(e as any))}
                             required
                           />
                         </div>
@@ -1179,6 +1185,7 @@ export function AdminSetupPage() {
                             placeholder="user@example.com"
                             value={userForm.email}
                             onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                            onKeyDown={(e) => e.key === "Enter" && (editingUser ? handleUpdateUser(e as any) : handleCreateUser(e as any))}
                             required
                           />
                         </div>
@@ -1195,6 +1202,7 @@ export function AdminSetupPage() {
                             placeholder="••••••••"
                             value={userForm.password}
                             onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                            onKeyDown={(e) => e.key === "Enter" && (editingUser ? handleUpdateUser(e as any) : handleCreateUser(e as any))}
                             required={!editingUser}
                           />
                         </div>
@@ -1258,8 +1266,8 @@ export function AdminSetupPage() {
                             <td className="px-4 py-3 text-sm">
                               <span
                                 className={`px-2 py-1 rounded text-xs font-medium ${user.role === "admin"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-gray-100 text-gray-800"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-gray-100 text-gray-800"
                                   }`}
                               >
                                 {user.role}
@@ -1320,6 +1328,7 @@ export function AdminSetupPage() {
                           placeholder="My Organization"
                           value={tenantForm.name}
                           onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
+                          onKeyDown={(e) => e.key === "Enter" && (editingTenant ? handleUpdateTenant(e as any) : handleCreateTenant(e as any))}
                           required
                         />
                       </div>
@@ -1332,6 +1341,7 @@ export function AdminSetupPage() {
                           placeholder="https://example.com"
                           value={tenantForm.domain}
                           onChange={(e) => setTenantForm({ ...tenantForm, domain: e.target.value })}
+                          onKeyDown={(e) => e.key === "Enter" && (editingTenant ? handleUpdateTenant(e as any) : handleCreateTenant(e as any))}
                         />
                         <p className="text-xs text-muted-foreground">
                           Custom domain for this tenant (leave empty for default domain)

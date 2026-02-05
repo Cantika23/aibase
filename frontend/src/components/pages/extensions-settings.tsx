@@ -836,11 +836,10 @@ export function ExtensionsSettings() {
                                 }
                               >
                                 <PowerIcon
-                                  className={`w-4 h-4 ${
-                                    extension.metadata.enabled
+                                  className={`w-4 h-4 ${extension.metadata.enabled
                                       ? "text-green-500"
                                       : "text-muted-foreground"
-                                  }`}
+                                    }`}
                                 />
                               </Button>
                               <Button
@@ -874,8 +873,8 @@ export function ExtensionsSettings() {
                                   extension.source === 'project'
                                     ? "Switch to default (removes customizations)"
                                     : extension.hasProjectVersion
-                                    ? "Switch to project version (customizable)"
-                                    : "Copy to project (allows customization)"
+                                      ? "Switch to project version (customizable)"
+                                      : "Copy to project (allows customization)"
                                 }
                               >
                                 {extension.source === 'project' ? (
@@ -917,21 +916,19 @@ export function ExtensionsSettings() {
                               <div className="flex items-center gap-2 px-4 py-2 border-b">
                                 <button
                                   onClick={() => setDebugLogsTab(prev => ({ ...prev, [extension.metadata.id]: 'frontend' }))}
-                                  className={`px-3 py-1 text-sm rounded ${
-                                    debugLogsTab[extension.metadata.id] === 'frontend'
+                                  className={`px-3 py-1 text-sm rounded ${debugLogsTab[extension.metadata.id] === 'frontend'
                                       ? 'bg-primary text-primary-foreground'
                                       : 'bg-muted hover:bg-muted/70'
-                                  }`}
+                                    }`}
                                 >
                                   Frontend
                                 </button>
                                 <button
                                   onClick={() => setDebugLogsTab(prev => ({ ...prev, [extension.metadata.id]: 'backend' }))}
-                                  className={`px-3 py-1 text-sm rounded ${
-                                    debugLogsTab[extension.metadata.id] === 'backend'
+                                  className={`px-3 py-1 text-sm rounded ${debugLogsTab[extension.metadata.id] === 'backend'
                                       ? 'bg-primary text-primary-foreground'
                                       : 'bg-muted hover:bg-muted/70'
-                                  }`}
+                                    }`}
                                 >
                                   Backend
                                 </button>
@@ -964,17 +961,15 @@ export function ExtensionsSettings() {
                                         {frontendLogs[extension.metadata.id].map((log, idx) => (
                                           <div key={idx} className="border rounded p-3">
                                             <div className="flex items-center gap-2 mb-1">
-                                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                                log.level === 'error' ? 'bg-destructive text-destructive' :
-                                                log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-500' :
-                                                log.level === 'info' ? 'bg-blue-500/10 text-blue-500' :
-                                                'bg-muted text-muted-foreground'
-                                              }`}>
+                                              <span className={`text-xs px-1.5 py-0.5 rounded ${log.level === 'error' ? 'bg-destructive text-destructive' :
+                                                  log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-500' :
+                                                    log.level === 'info' ? 'bg-blue-500/10 text-blue-500' :
+                                                      'bg-muted text-muted-foreground'
+                                                }`}>
                                                 {log.level.toUpperCase()}
                                               </span>
-                                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                                log.source === 'frontend' ? 'bg-purple-500/10 text-purple-500' : 'bg-green-500/10 text-green-500'
-                                              }`}>
+                                              <span className={`text-xs px-1.5 py-0.5 rounded ${log.source === 'frontend' ? 'bg-purple-500/10 text-purple-500' : 'bg-green-500/10 text-green-500'
+                                                }`}>
                                                 {log.source === 'frontend' ? 'UI' : 'Worker'}
                                               </span>
                                               <span className="text-xs text-muted-foreground">
@@ -989,7 +984,7 @@ export function ExtensionsSettings() {
                                                 <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
                                                   View details
                                                 </summary>
-                                                        <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto">
+                                                <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto">
                                                   {typeof log.data === 'object'
                                                     ? JSON.stringify(log.data, null, 2)
                                                     : String(log.data)}
@@ -1016,17 +1011,15 @@ export function ExtensionsSettings() {
                                         {backendLogs[extension.metadata.id].map((log, idx) => (
                                           <div key={idx} className="border rounded p-3">
                                             <div className="flex items-center gap-2 mb-1">
-                                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                                log.level === 'error' ? 'bg-destructive text-destructive' :
-                                                log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-500' :
-                                                log.level === 'info' ? 'bg-blue-500/10 text-blue-500' :
-                                                'bg-muted text-muted-foreground'
-                                              }`}>
+                                              <span className={`text-xs px-1.5 py-0.5 rounded ${log.level === 'error' ? 'bg-destructive text-destructive' :
+                                                  log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-500' :
+                                                    log.level === 'info' ? 'bg-blue-500/10 text-blue-500' :
+                                                      'bg-muted text-muted-foreground'
+                                                }`}>
                                                 {log.level.toUpperCase()}
                                               </span>
-                                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                                log.source === 'frontend' ? 'bg-purple-500/10 text-purple-500' : 'bg-green-500/10 text-green-500'
-                                              }`}>
+                                              <span className={`text-xs px-1.5 py-0.5 rounded ${log.source === 'frontend' ? 'bg-purple-500/10 text-purple-500' : 'bg-green-500/10 text-green-500'
+                                                }`}>
                                                 {log.source === 'frontend' ? 'UI' : 'Worker'}
                                               </span>
                                               <span className="text-xs text-muted-foreground">
@@ -1090,6 +1083,7 @@ export function ExtensionsSettings() {
                 onChange={(e) =>
                   setCategoryForm({ ...categoryForm, id: e.target.value })
                 }
+                onKeyDown={(e) => e.key === "Enter" && handleSaveCategory()}
                 disabled={categoryEditMode}
                 className="mt-1.5"
               />
@@ -1107,6 +1101,7 @@ export function ExtensionsSettings() {
                 onChange={(e) =>
                   setCategoryForm({ ...categoryForm, name: e.target.value })
                 }
+                onKeyDown={(e) => e.key === "Enter" && handleSaveCategory()}
                 className="mt-1.5"
               />
             </div>
@@ -1123,6 +1118,7 @@ export function ExtensionsSettings() {
                     description: e.target.value,
                   })
                 }
+                onKeyDown={(e) => e.key === "Enter" && handleSaveCategory()}
                 className="mt-1.5"
               />
             </div>
