@@ -67,6 +67,7 @@ export function ExtensionsSettings() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Category management state
@@ -173,7 +174,7 @@ export function ExtensionsSettings() {
     if (currentProject) {
       loadData();
     }
-  }, [currentProject, loadData]);
+  }, [currentProject]); // Remove loadData to prevent infinite loop
 
   // Handle toggle extension
   const handleToggle = async (extensionId: string) => {
@@ -443,6 +444,7 @@ export function ExtensionsSettings() {
   const confirmResetExtensions = async () => {
     if (!currentProject) return;
 
+    setIsResetting(true);
     try {
       const defaults = await resetExtensionsToDefaults(currentProject.id);
       setExtensions(defaults);
@@ -454,6 +456,7 @@ export function ExtensionsSettings() {
       );
     } finally {
       setResetExtensionsDialog(false);
+      setIsResetting(false);
     }
   };
 
@@ -641,7 +644,7 @@ export function ExtensionsSettings() {
             size="sm"
             onClick={handleResetToDefaults}
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${isResetting ? 'animate-spin' : ''}`} />
             Reset
           </Button>
           <Button variant="outline" size="sm" onClick={openAddCategoryDialog}>
