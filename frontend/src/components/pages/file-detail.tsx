@@ -448,9 +448,19 @@ export function FileDetailPage() {
                       className="max-w-full rounded-lg"
                     />
                   </div>
-                ) : fileCategory === 'code' || fileCategory === 'document' ? (
+                ) : ext === 'pdf' ? (
+                  <iframe
+                    src={currentFile.url}
+                    className="w-full h-[600px] rounded-lg border"
+                    title={currentFile.name}
+                  />
+                ) : fileCategory === 'code' ? (
                   <pre className="text-sm bg-muted rounded-lg p-4 overflow-auto max-h-[600px]">
                     <code>{fileContent || '(No content to display)'}</code>
+                  </pre>
+                ) : fileCategory === 'document' ? (
+                  <pre className="text-sm bg-muted rounded-lg p-4 overflow-auto max-h-[600px]">
+                    <code>{fileContent || '(Document content preview not available)'}</code>
                   </pre>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 space-y-4">
