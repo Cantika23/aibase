@@ -4,7 +4,6 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
-  BookOpen,
   Info
 } from "lucide-react";
 import { toast } from "sonner";
