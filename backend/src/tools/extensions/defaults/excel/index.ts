@@ -6,8 +6,10 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
-import { createLogger } from "../../../../utils/logger";
 
+// Get logger from require (provided by extension wrapper)
+declare const require: any;
+const { createLogger } = require("../../../../utils/logger");
 const logger = createLogger("ExcelExtension");
 
 // Type definition for injected utilities
