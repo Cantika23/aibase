@@ -27,6 +27,7 @@ const logger = createLogger('WebSocketServer');
 import { FileStorage } from "../storage/file-storage";
 import { FileContextStorage } from "../storage/file-context-storage";
 import { ExtensionLoader } from "../tools/extensions/extension-loader";
+import { waitForFileProcessing, getPendingFiles } from "../server/upload-handler";
 
 const authService = AuthService.getInstance();
 
@@ -535,9 +536,31 @@ export class WSServer extends WSEventEmitter {
 
     // Create conversation for this session with existing history
     // Load from disk if available
-    const existingHistory = await this.messagePersistence.getClientHistory(convId, projectId, effectiveUserId ?? 'anonymous');
-    const conversation = await this.createConversation(existingHistory, convId, projectId, effectiveUserId ?? 'anonymous', urlParams);
-    connectionInfo.conversation = conversation;
+    let conversation: Conversation;
+    try {
+      const existingHistory = await this.messagePersistence.getClientHistory(convId, projectId, effectiveUserId ?? 'anonymous');
+      conversation = await this.createConversation(existingHistory, convId, projectId, effectiveUserId ?? 'anonymous', urlParams);
+      connectionInfo.conversation = conversation;
+    } catch (error: any) {
+      logger.error({ error, convId, projectId }, '[WSServer] Failed to create conversation, closing connection');
+
+      // Send error message to client before closing
+      this.sendToWebSocket(ws, {
+        type: "error",
+        id: this.generateMessageId(),
+        data: {
+          message: "Failed to initialize conversation. Please try again.",
+          error: error?.message || "Unknown error",
+        },
+        metadata: {
+          timestamp: Date.now(),
+        },
+      });
+
+      // Close the connection gracefully
+      ws.close(1011, "Conversation initialization failed");
+      return;
+    }
 
     // Hook into conversation to persist changes to MessagePersistence
     const originalAddMessage = conversation.addMessage.bind(conversation);
@@ -623,11 +646,22 @@ export class WSServer extends WSEventEmitter {
         break;
 
       case "ping":
+        // Mark connection as alive when we receive a ping from client
+        if (connectionInfo) {
+          connectionInfo.isAlive = true;
+        }
         this.sendToWebSocket(ws, {
           type: "pong",
           id: message.id,
           metadata: { timestamp: Date.now() },
         });
+        break;
+
+      case "pong":
+        // Mark connection as alive when we receive a pong from client
+        if (connectionInfo) {
+          connectionInfo.isAlive = true;
+        }
         break;
 
       default:
@@ -737,6 +771,22 @@ export class WSServer extends WSEventEmitter {
       let attachments: any[] | undefined = undefined;
       if (userData.fileIds && userData.fileIds.length > 0) {
         logger.info({ fileIds: userData.fileIds }, "[UserMessage] Processing message with file IDs");
+
+        // Wait for any pending file processing to complete before proceeding
+        const pendingFiles = getPendingFiles(connectionInfo.convId);
+        if (pendingFiles.length > 0) {
+          logger.info({ pendingFiles, count: pendingFiles.length }, "[UserMessage] Waiting for file processing to complete");
+          this.broadcastToConv(connectionInfo.convId, {
+            type: "status",
+            id: `status_${Date.now()}`,
+            data: { status: "processing", message: `Waiting for ${pendingFiles.length} file(s) to finish processing...` },
+            metadata: { timestamp: Date.now() },
+          });
+
+          // Wait for all pending files to complete
+          await Promise.all(pendingFiles.map(fileName => waitForFileProcessing(connectionInfo.convId, fileName)));
+          logger.info("[UserMessage] All pending file processing completed");
+        }
 
         // Fetch file metadata for attachments
         try {
@@ -1449,7 +1499,20 @@ export class WSServer extends WSEventEmitter {
     userId?: string,
     urlParams?: Record<string, string>
   ): Promise<Conversation> {
-    const tools = await this.getDefaultTools(convId, projectId, userId);
+    let tools: Tool[];
+    try {
+      tools = await this.getDefaultTools(convId, projectId, userId);
+    } catch (error: any) {
+      logger.error({ error, convId, projectId }, '[WSServer] Failed to load tools/extensions, using built-in tools only');
+
+      // Get tenantId from project
+      const project = ProjectStorage.getInstance().getById(projectId);
+      const tenantId = project?.tenant_id ?? 'default';
+
+      // Fall back to built-in tools only (no extensions)
+      tools = getBuiltinTools(convId, projectId, tenantId, userId);
+    }
+
     const defaultSystemPrompt = `You are a helpful AI assistant connected via WebSocket.
 You have access to tools that can help you provide better responses.
 Always be helpful and conversational.`;

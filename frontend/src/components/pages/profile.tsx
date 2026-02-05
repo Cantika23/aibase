@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle2, User, Mail } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle2, User, Mail, Pencil, X, Save } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "sonner";
@@ -20,7 +20,16 @@ export function ProfilePage() {
     return null;
   }
 
-  // Form state
+  // Profile edit state
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    username: user?.username || "",
+    email: user?.email || "",
+  });
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Password change form state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -76,6 +85,78 @@ export function ProfilePage() {
     }
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(null);
+    setIsSavingProfile(true);
+
+    // Validate profile form
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (profileForm.email && !emailRegex.test(profileForm.email)) {
+      setProfileError("Invalid email format");
+      setIsSavingProfile(false);
+      return;
+    }
+
+    if (profileForm.username && profileForm.username.length < 3) {
+      setProfileError("Username must be at least 3 characters long");
+      setIsSavingProfile(false);
+      return;
+    }
+
+    if (profileForm.username && profileForm.username.length > 50) {
+      setProfileError("Username must be less than 50 characters");
+      setIsSavingProfile(false);
+      return;
+    }
+
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (profileForm.username && !usernameRegex.test(profileForm.username)) {
+      setProfileError("Username can only contain letters, numbers, underscores, and hyphens");
+      setIsSavingProfile(false);
+      return;
+    }
+
+    // Check if anything changed
+    if (profileForm.username === user?.username && profileForm.email === user?.email) {
+      setProfileError("No changes to save");
+      setIsSavingProfile(false);
+      return;
+    }
+
+    const success = await auth.updateProfile({
+      email: profileForm.email !== user?.email ? profileForm.email : undefined,
+      username: profileForm.username !== user?.username ? profileForm.username : undefined,
+    });
+
+    if (success) {
+      setIsEditingProfile(false);
+      toast.success("Profile updated successfully");
+    } else {
+      setProfileError(auth.error || "Failed to update profile");
+    }
+
+    setIsSavingProfile(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingProfile(false);
+    setProfileForm({
+      username: user?.username || "",
+      email: user?.email || "",
+    });
+    setProfileError(null);
+  };
+
+  const handleStartEdit = () => {
+    setIsEditingProfile(true);
+    setProfileForm({
+      username: user?.username || "",
+      email: user?.email || "",
+    });
+    setProfileError(null);
+  };
+
   if (auth.isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -108,36 +189,112 @@ export function ProfilePage() {
 
         {/* User Info Card */}
         <div className="border rounded-lg p-6 bg-muted/30">
-          <h2 className="text-lg font-semibold mb-4">Account Information</h2>
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Username</p>
-                <p className="text-sm text-muted-foreground">{user?.username}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Mail className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Email</p>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <AlertCircle className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Role</p>
-                <p className="text-sm text-muted-foreground capitalize">{user?.role}</p>
-              </div>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Account Information</h2>
+            {!isEditingProfile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleStartEdit}
+                className="gap-2"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+            )}
           </div>
+
+          {profileError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{profileError}</AlertDescription>
+            </Alert>
+          )}
+
+          {!isEditingProfile ? (
+            // Read-only view
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Username</p>
+                  <p className="text-sm text-muted-foreground">{user?.username}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <Mail className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Email</p>
+                  <p className="text-sm text-muted-foreground">{user?.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <AlertCircle className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Role</p>
+                  <p className="text-sm text-muted-foreground capitalize">{user?.role}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Edit mode
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  value={profileForm.username}
+                  onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
+                  placeholder="Enter username"
+                  className="max-w-md"
+                />
+                <p className="text-xs text-muted-foreground">
+                  3-50 characters, letters, numbers, underscores, and hyphens only
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  placeholder="Enter email"
+                  className="max-w-md"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  {isSavingProfile ? "Saving..." : "Save Changes"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelEdit}
+                  disabled={isSavingProfile}
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Change Password Form */}

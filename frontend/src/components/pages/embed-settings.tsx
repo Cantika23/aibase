@@ -42,16 +42,37 @@ export function EmbedSettings() {
     if (!currentProject) return;
 
     try {
+      // Add timeout controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(
-        `${API_BASE_URL}/api/projects/${currentProject.id}/embed/css`
+        `${API_BASE_URL}/api/projects/${currentProject.id}/embed/css`,
+        {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        }
       );
+
+      clearTimeout(timeoutId);
+
+      // Check for aborted request
+      if (response.status === 0) {
+        throw new Error('Request timeout');
+      }
+
       const data = await response.json();
 
       if (data.success && data.data.customCss) {
         setCustomCss(data.data.customCss);
       }
-    } catch (err) {
+    } catch (err: any) {
       log.error("Failed to load custom CSS", { error: String(err) });
+      // Set empty CSS on error to prevent infinite retries
+      setCustomCss("");
     }
   }, [currentProject, log]);
 
@@ -80,14 +101,14 @@ export function EmbedSettings() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentProject, loadCustomCss]);
+  }, [currentProject]); // Remove loadCustomCss from dependencies to prevent infinite loop
 
   // Load embed settings when project changes
   useEffect(() => {
     if (currentProject) {
       loadEmbedSettings();
     }
-  }, [currentProject, loadEmbedSettings]);
+  }, [currentProject, loadEmbedSettings]); // Keep loadEmbedSettings to ensure it runs when project changes
 
   const handleSaveConfig = async () => {
     if (!currentProject) return;
@@ -105,6 +126,7 @@ export function EmbedSettings() {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
+          credentials: 'include',
           body: JSON.stringify(configUpdates),
         }
       );
@@ -139,6 +161,7 @@ export function EmbedSettings() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: 'include',
           body: JSON.stringify({ customCss }),
         }
       );

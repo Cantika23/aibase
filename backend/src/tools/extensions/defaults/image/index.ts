@@ -7,15 +7,7 @@
  * The extensionHookRegistry is passed as a parameter during evaluation
  */
 
-import { createLogger } from '../../../../utils/logger';
-
-const logger = createLogger('ImageExtension');
-
-// Type definitions
-interface ExtensionHookRegistry {
-  registerHook(hookType: string, name: string, handler: (context: HookContext) => Promise<HookResult | undefined>): void;
-}
-
+// Type definition for injected utilities
 interface ExtensionUtils {
   generateTitle: (options: {
     systemPrompt?: string;
@@ -26,10 +18,20 @@ interface ExtensionUtils {
     temperature?: number;
     maxTokens?: number;
   }) => Promise<string | undefined>;
+  createLogger: (name: string) => any;
+}
+
+declare const utils: ExtensionUtils;
+
+// Get logger from injected utilities
+const logger = utils.createLogger('ImageExtension');
+
+// Type definitions
+interface ExtensionHookRegistry {
+  registerHook(hookType: string, name: string, handler: (context: HookContext) => Promise<HookResult | undefined>): void;
 }
 
 declare const extensionHookRegistry: ExtensionHookRegistry | undefined;
-declare const utils: ExtensionUtils;
 
 interface HookContext {
   fileName: string;

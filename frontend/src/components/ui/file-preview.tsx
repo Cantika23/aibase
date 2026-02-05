@@ -1,8 +1,6 @@
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { FileIcon, X } from "lucide-react"
-import { useShallow } from "zustand/react/shallow"
-import { useFileStore } from "@/stores/file-store"
 
 interface FilePreviewProps {
   file: File
@@ -69,12 +67,7 @@ ImageFilePreview.displayName = "ImageFilePreview"
 
 const TextFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
   ({ file, onRemove }, ref) => {
-    const { preview, setPreview } = useFileStore(
-      useShallow((state) => ({
-        preview: state.preview,
-        setPreview: state.setPreview,
-      }))
-    );
+    const [preview, setPreview] = useState("Loading...");
 
     useEffect(() => {
       const reader = new FileReader()
@@ -83,7 +76,7 @@ const TextFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
         setPreview(text.slice(0, 50) + (text.length > 50 ? "..." : ""))
       }
       reader.readAsText(file)
-    }, [file, setPreview])
+    }, [file])
 
     return (
       <motion.div
@@ -97,7 +90,7 @@ const TextFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
         <div className="flex w-full items-center space-x-2">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border bg-muted p-0.5">
             <div className="h-full w-full overflow-hidden text-[6px] leading-none text-muted-foreground">
-              {preview || "Loading..."}
+              {preview}
             </div>
           </div>
           <span className="w-full truncate text-muted-foreground">

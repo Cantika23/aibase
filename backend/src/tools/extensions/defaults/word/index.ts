@@ -6,11 +6,6 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { extractTextFromDocx, isDocxFile } from '../../../../utils/document-extractor';
-import { getProjectFilesDir } from '../../../../config/paths';
-import { createLogger } from '../../../../utils/logger';
-
-const logger = createLogger('WordExtension');
 
 // Type definition for injected utilities
 interface ExtensionUtils {
@@ -23,9 +18,46 @@ interface ExtensionUtils {
     temperature?: number;
     maxTokens?: number;
   }) => Promise<string | undefined>;
+  createLogger: (name: string) => any;
 }
 
 declare const utils: ExtensionUtils;
+
+// Get logger from injected utilities
+const logger = utils.createLogger('WordExtension');
+
+// Dynamically import dependencies to avoid esbuild transpilation issues
+let documentExtractorModule: any = null;
+async function isDocxFile(fileName: string): Promise<boolean> {
+  if (!documentExtractorModule) {
+    documentExtractorModule = await import(
+      `${process.cwd()}/backend/src/utils/document-extractor.ts`
+    );
+  }
+  return documentExtractorModule.isDocxFile(fileName);
+}
+
+async function extractTextFromDocx(filePath: string): Promise<string> {
+  if (!documentExtractorModule) {
+    documentExtractorModule = await import(
+      `${process.cwd()}/backend/src/utils/document-extractor.ts`
+    );
+  }
+  return documentExtractorModule.extractTextFromDocx(filePath);
+}
+
+let configPathsModule: any = null;
+async function getProjectFilesDir(
+  projectId: string,
+  tenantId: string | number,
+): Promise<string> {
+  if (!configPathsModule) {
+    configPathsModule = await import(
+      `${process.cwd()}/backend/src/config/paths.ts`
+    );
+  }
+  return configPathsModule.getProjectFilesDir(projectId, tenantId);
+}
 
 // Type definitions
 interface ExtractOptions {
@@ -123,7 +155,7 @@ const extract = async (options: ExtractOptions): Promise<ExtractResult> => {
     
     const projectId = globalThis.projectId || '';
     const tenantId = globalThis.tenantId || 'default';
-    const convFilesDir = getProjectFilesDir(projectId, tenantId);
+    const convFilesDir = await getProjectFilesDir(projectId, tenantId);
     filePath = path.join(convFilesDir, options.fileId);
 
     try {

@@ -19,6 +19,61 @@ const logger = createLogger('WhatsAppHandler');
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || "http://localhost:7031/api/v1";
 
+// Message deduplication cache: messageId -> timestamp
+// Prevents processing the same message multiple times when aimeow sends duplicate webhooks
+const processedMessages = new Map<string, number>();
+const MESSAGE_DEDUP_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
+const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // Cleanup every 10 minutes
+
+/**
+ * Generate a simple hash from string for deduplication fallback
+ * Uses a basic DJB2 hash algorithm
+ */
+function generateHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i); // hash * 33 + character
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/**
+ * Generate deduplication key from message data
+ * Priority: messageData.id > hash(from + text + timestamp)
+ */
+function generateDedupKey(messageData: any): { key: string; source: string } {
+  // Priority 1: Use message ID if available
+  if (messageData?.id) {
+    return { key: `id_${messageData.id}`, source: 'message_id' };
+  }
+
+  // Priority 2: Use hash of message content + sender + timestamp as fallback
+  const from = messageData?.from || messageData?.rawChat || messageData?.rawSender || 'unknown';
+  const text = messageData?.text || messageData?.caption || '';
+  const timestamp = messageData?.timestamp || Date.now();
+  const content = `${from}|${text}|${timestamp}`;
+
+  return {
+    key: `hash_${generateHash(content)}`,
+    source: 'content_hash'
+  };
+}
+
+// Periodic cleanup of old entries from deduplication cache
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [msgId, timestamp] of processedMessages.entries()) {
+    if (now - timestamp > MESSAGE_DEDUP_TTL_MS) {
+      processedMessages.delete(msgId);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    logger.info({ cleaned, totalRemaining: processedMessages.size }, '[WhatsApp] Cleaned up expired message IDs from deduplication cache');
+  }
+}, CLEANUP_INTERVAL_MS);
+
 // Import notification functions for WebSocket broadcasts
 let notifyWhatsAppStatus: (projectId: string, status: any) => void = () => { };
 let notifyWhatsAppQRCode: (projectId: string, qrCode: string) => void = () => { };
@@ -319,6 +374,45 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
       logger.info("[WhatsApp] Ignoring self-message fromMe=true");
       return Response.json({ success: true, ignored: true });
     }
+
+    // MESSAGE DEDUPLICATION: Check if this message has already been processed
+    // This prevents duplicate AI responses when aimeow sends duplicate webhooks
+    const { key: dedupKey, source: dedupSource } = generateDedupKey(messageData);
+    const existingTimestamp = processedMessages.get(dedupKey);
+
+    if (existingTimestamp) {
+      const age = Date.now() - existingTimestamp;
+      if (age < MESSAGE_DEDUP_TTL_MS) {
+        logger.info({
+          dedupKey,
+          dedupSource,
+          age: `${age}ms`,
+          messageId: messageData?.id,
+          from: messageData?.from
+        }, '[WhatsApp] ❌ Duplicate webhook blocked - message already processed');
+        return Response.json({
+          success: true,
+          ignored: true,
+          reason: 'duplicate-message',
+          dedupKey,
+          dedupSource
+        });
+      } else {
+        // Old entry expired, remove it
+        processedMessages.delete(dedupKey);
+        logger.info({ dedupKey, age }, '[WhatsApp] ⏰ Dedup key expired, allowing re-processing');
+      }
+    }
+
+    // Mark this message as processed IMMEDIATELY to prevent race conditions
+    processedMessages.set(dedupKey, Date.now());
+    logger.info({
+      dedupKey,
+      dedupSource,
+      messageId: messageData?.id,
+      from: messageData?.from,
+      cacheSize: processedMessages.size
+    }, '[WhatsApp] ✅ Tracking message for deduplication');
 
     // The clientId could be a projectId or a subClientId
     // Check if it's a sub-client first
@@ -683,6 +777,23 @@ export async function handleWhatsAppWebhook(req: Request): Promise<Response> {
         break;
     }
 
+    // === IGNORE PLACEHOLDER MESSAGES ===
+    // aimeow sometimes sends duplicate webhooks: one with actual content,
+    // and another with type="other" and placeholder text like "Sent a message"
+    // We ignore these placeholder messages to prevent duplicate AI responses
+    if (messageData.type === "other" && messageText === "Sent a message" && attachments.length === 0) {
+      logger.info({
+        type: messageData.type,
+        messageId: messageData.id,
+        from: messageData.from
+      }, '[WhatsApp] Ignoring placeholder message (duplicate webhook from aimeow)');
+      return Response.json({
+        success: true,
+        ignored: true,
+        reason: 'placeholder-message'
+      });
+    }
+
     // === HANDLER KHUSUS UNTUK LOCATION MESSAGE ===
     // Respons instan tanpa AI untuk menghindari timeout dan rate limit
     if (messageData.type === "location" || messageData.type === "live_location") {
@@ -819,13 +930,27 @@ async function executeWhatsAppScript(
     const extensions = await extensionLoader.loadExtensions(projectId);
     logger.info({ extensions: Object.keys(extensions).join(", ") || "none" }, "[WhatsApp] Loaded extensions");
 
+    // Track all progress message promises
+    const progressPromises: Promise<void>[] = [];
+
     // Create a broadcast function that sends progress to WhatsApp
+    // Send progress immediately when received
     const broadcast = (type: "tool_call" | "tool_result", data: any) => {
       if (type === "tool_call" && data.status === "progress" && data.result?.message) {
-        // Send progress update to WhatsApp
-        sendWhatsAppMessage(projectId, whatsappNumber, {
-          text: `⏳ ${data.result.message}`,
-        }).catch((err: any) => logger.error({ err }, "[WhatsApp] Error sending progress message"));
+        logger.info({ message: data.result.message }, "[WhatsApp] Script progress - sending immediately");
+
+        // Send progress message (fire and forget, but track promise)
+        const progressPromise = (async () => {
+          try {
+            // Send progress message WITHOUT affecting typing indicator
+            await sendWhatsAppMessageRaw(projectId, whatsappNumber, { text: `⏳ ${data.result.message}` });
+            logger.info("[WhatsApp] Progress message sent");
+          } catch (err) {
+            logger.error({ err }, "[WhatsApp] Error sending progress");
+          }
+        })();
+
+        progressPromises.push(progressPromise);
       }
     };
 
@@ -851,6 +976,10 @@ async function executeWhatsAppScript(
     ]);
 
     logger.info({ result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Script execution result");
+
+    // Wait for all progress messages to be sent
+    await Promise.all(progressPromises);
+    logger.info("[WhatsApp] All progress messages sent");
 
     // Format result for WhatsApp
     if (result === undefined || result === null) {
@@ -1102,16 +1231,10 @@ async function processWhatsAppMessageWithAI(
     let enhancedMessage = messageText;
     
     // Notify user if we are processing images
+    // WHATSAPP: Suppress image analysis notification - will show typing indicator only
     const hasImages = attachments.some(a => a.type === "image" && a.url);
     if (hasImages) {
-      try {
-        logger.info("[WhatsApp] Sending image analysis notification");
-        await sendWhatsAppMessage(projectId, whatsappNumber, {
-          text: `⏳ Analyzing image(s)...`,
-        }, true); // keep typing
-      } catch (err) {
-        logger.error({ err }, "[WhatsApp] Failed to send image analysis notification");
-      }
+      logger.info("[WhatsApp] Processing image(s) - notification suppressed, typing indicator active");
     }
     
     for (const attachment of attachments) {
@@ -1206,9 +1329,12 @@ async function processWhatsAppMessageWithAI(
     // Track tool execution results to send if AI response is empty
     const toolResults: Array<{ toolName: string; result: any }> = [];
     let toolResultSent = false;
-    
-    // Track sent notification messages to prevent duplicates
-    const sentNotifications = new Set<string>();
+    let toolNotificationSent = false;
+
+    // Track response state for WhatsApp (skip pre-tool thinking, only send post-tool final response)
+    let responseAfterTool = "";
+    let preToolResponse = "";
+    let shouldReset = false;  // Flag to reset accumulator after tool execution
 
     // Load built-in tools for this conversation (includes script tool with extensions)
     const tools = getBuiltinTools(convId, projectId, tenantId, uid);
@@ -1226,8 +1352,8 @@ async function processWhatsAppMessageWithAI(
       systemPrompt = `You are a helpful AI assistant on WhatsApp.`;
     }
 
-    // Track if we have already sent a status notification to the user
-    let toolNotificationSent = false;
+    // Track all progress message promises
+    const progressPromises: Promise<void>[] = [];
 
     const conversation = await Conversation.create({
       projectId,
@@ -1239,58 +1365,45 @@ async function processWhatsAppMessageWithAI(
       hooks: {
         tools: {
           before: async (toolCallId: string, toolName: string, args: any) => {
-            // 1. Handle Script Tool Progress
-            // Only send if we haven't sent a notification yet
-            if (toolName === "script" && args.__status === "progress" && args.__result) {
-              const progressMessage = args.__result.message;
-              
-              if (!toolNotificationSent) {
-                 // Lock immediately to prevent race conditions
-                 toolNotificationSent = true;
-                 try {
-                    await sendWhatsAppMessage(projectId, whatsappNumber, {
-                      text: `⏳ ${progressMessage}`,
-                    }, true);
-                 } catch (err) {
-                    logger.error({ err }, "[WhatsApp] Failed to send progress message");
-                 }
-              }
-              return;
-            }
+            // WHATSAPP: Suppress all intermediate tool execution messages
+            // Only send final completed message after tools finish
+            logger.info({ toolName }, "[WhatsApp] Tool started (Notification suppressed - will send only when complete)");
 
-            // 2. Handle Initial Tool Call
-            // Only send if we haven't sent a notification yet
-            if (!toolNotificationSent) {
-                let notificationText = "";
-                if (toolName === "script") {
-                  const purpose = args.purpose || "Executing custom script...";
-                  notificationText = `⏳ ${purpose}`;
-                } else if (toolName === "search") {
-                  notificationText = `🔍 Searching for: ${args.query || "data"}...`;
-                } else {
-                  notificationText = `🔧 Using tool: ${toolName}...`;
-                }
+            // Still track progress to prevent duplicates, but don't send
+            toolNotificationSent = true;
 
-                // Lock immediately to prevent race conditions
-                toolNotificationSent = true;
+            // Mark that we should reset response accumulator after this tool executes
+            // This ensures we only capture the FINAL response (after tool), not the "thinking" before
+            shouldReset = true;
+          },
+          progress: async (toolCallId: string, toolName: string, data: any) => {
+            // Send progress updates to WhatsApp user
+            if (toolName === "script" && data?.message) {
+              logger.info({ message: data.message }, "[WhatsApp] Script progress - sending immediately");
 
-                logger.info({ toolName, notificationText }, "[WhatsApp] Tool started (Notification sent)");
+              const progressPromise = (async () => {
                 try {
-                  await sendWhatsAppMessage(projectId, whatsappNumber, { text: notificationText }, true);
+                  await sendWhatsAppMessageRaw(projectId, whatsappNumber, { text: `⏳ ${data.message}` });
+                  logger.info("[WhatsApp] Progress message sent, restarting typing indicator");
+
+                  // Restart typing indicator after progress message to keep showing "typing..."
+                  // aimeow API stops typing when any message is sent, so we need to restart it
+                  await startWhatsAppTyping(projectId, whatsappNumber);
                 } catch (err) {
-                  logger.error({ err }, "[WhatsApp] Failed to send tool start notification");
+                  logger.error({ err }, "[WhatsApp] Error sending progress");
                 }
-            } else {
-              logger.info({ toolName }, "[WhatsApp] Tool started (Notification suppressed)");
+              })();
+
+              progressPromises.push(progressPromise);
             }
           },
           after: async (toolCallId: string, toolName: string, args: any, result: any) => {
             logger.info({ toolName, result: JSON.stringify(result).substring(0, 200) }, "[WhatsApp] Tool executed");
-            
+
             // Store tool result for later use if needed (debugging or fallback)
             toolResults.push({ toolName, result });
-            
-            // Do NOT send tool results directly to user anymore.
+
+            // Do NOT send tool results directly to user.
             // The AI will incorporate the result into the final answer.
           },
         },
@@ -1304,48 +1417,56 @@ async function processWhatsAppMessageWithAI(
     }
     logger.info("[WhatsApp] Sending user message to AI...");
 
-    // Initialize response accumulator
+    // Stream response and handle tool calls internally
+    // Conversation.sendMessage handles all chunks and tool call recursion
+    logger.info("[WhatsApp] AI processing started (handles tool calls automatically)...");
+    const startTime = Date.now();
+
     let fullResponse = "";
-
-    // Add user message to conversation and stream response
-    logger.info("[WhatsApp] Stream started. Waiting for first chunk...");
     let chunkCount = 0;
-    
-    // Create a timeout promise - increased to 60s for slow networks
-    let isComplete = false;
-    const TIMEOUT_MS = 60000; // 60 seconds
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        if (!isComplete && chunkCount === 0) {
-          reject(new Error(`AI Response Timeout (No chunks received in ${TIMEOUT_MS / 1000}s)`));
-        }
-      }, TIMEOUT_MS);
-    });
 
-    const streamPromise = (async () => {
-      try {
-        for await (const chunk of conversation.sendMessage(finalMessage, attachments)) {
-          chunkCount++;
-          if (chunkCount === 1) logger.info("[WhatsApp] First chunk received!");
-          fullResponse += chunk;
-          // Log progress every 50 chunks to avoid spam
-          if (chunkCount % 50 === 0) logger.info({ chunkCount }, `[WhatsApp] Received chunks...`);
-        }
-      } catch (err) {
-        logger.error({ err }, "[WhatsApp] Error during AI streaming");
-        throw err;
-      }
-    })();
-
-    // Race between stream and timeout
     try {
-      await Promise.race([streamPromise, timeoutPromise]);
-      isComplete = true;
-      logger.info({ chunkCount, fullResponseLength: fullResponse.length }, "[WhatsApp] AI response complete");
+      // Stream all chunks (tool calls handled internally by Conversation)
+      for await (const chunk of conversation.sendMessage(finalMessage, attachments)) {
+        chunkCount++;
+
+        // Check if we need to reset (tool was just executed)
+        if (shouldReset) {
+          responseAfterTool = chunk;  // Start fresh
+          fullResponse = responseAfterTool;
+          shouldReset = false;  // Clear flag
+          logger.info("[WhatsApp] Tool execution detected, capturing final response only");
+        } else if (responseAfterTool.length > 0) {
+          // Continue accumulating post-tool response
+          responseAfterTool += chunk;
+          fullResponse = responseAfterTool;
+        } else {
+          // Still in pre-tool phase
+          preToolResponse += chunk;
+          fullResponse = preToolResponse;
+        }
+
+        // Log first chunk and every 50 chunks
+        if (chunkCount === 1) logger.info("[WhatsApp] First chunk received");
+        if (chunkCount % 50 === 0) logger.info({ chunkCount }, "[WhatsApp] Streaming...");
+      }
+      const duration = Date.now() - startTime;
+      logger.info({
+        chunkCount,
+        duration,
+        responseLength: fullResponse.length,
+        preToolLength: preToolResponse.length,
+        postToolLength: responseAfterTool.length
+      }, "[WhatsApp] AI response complete");
     } catch (error) {
-      logger.error({ error }, "[WhatsApp] Error or Timeout during AI processing");
+      const duration = Date.now() - startTime;
+      logger.error({ error, duration }, "[WhatsApp] Error during AI processing");
       // Continue to save history so we don't lose the user's message
     }
+
+    // Wait for all progress messages to be sent
+    await Promise.all(progressPromises);
+    logger.info("[WhatsApp] All progress messages sent");
 
     // Save conversation history (Filter out system prompt)
     const history = (conversation as any)._history || [];
@@ -1377,7 +1498,7 @@ async function processWhatsAppMessageWithAI(
           logger.info({ cleanedResponse: cleanedResponse.substring(0, 50) + "..." }, "[WhatsApp] Sending additional AI context");
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: cleanedResponse,
-          });
+          }, false); // Final message - stop typing after 1s
         } else {
           logger.info("[WhatsApp] Skipping generic/short AI response since tool result already sent");
         }
@@ -1389,30 +1510,31 @@ async function processWhatsAppMessageWithAI(
     if (fullResponse.trim()) {
       // First, check if this is an inline script JSON that needs execution
       const inlineScript = detectInlineScriptJSON(fullResponse);
-      
+
       if (inlineScript) {
         logger.info("[WhatsApp] Detected inline script JSON, executing...");
         const scriptResult = await executeWhatsAppScript(inlineScript, projectId, String(tenantId), whatsappNumber);
-        
+
         if (scriptResult) {
           logger.info({ scriptResult: scriptResult.substring(0, 100) + "..." }, "[WhatsApp] Script executed, sending result");
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: scriptResult,
-          });
+          }, false); // Final message - stop typing after 1s
           logger.info("[WhatsApp] Script result sent successfully");
         } else {
           logger.warn("[WhatsApp] Script execution returned no result");
         }
         return;
       }
-      
-      // Normal flow: clean and send response
+
+      // Clean the response
       const cleanedResponse = cleanWhatsAppResponse(fullResponse);
-      
+
+      // Skip empty responses
       if (!cleanedResponse.trim()) {
         logger.warn("[WhatsApp] WARNING: Response is empty after cleaning. Checking for tool results...");
         logger.warn({ fullResponse }, "[WhatsApp] Full raw response");
-        
+
         // If we have tool results but didn't send them yet, send now
         if (toolResults.length > 0) {
           for (const { toolName, result } of toolResults) {
@@ -1421,7 +1543,7 @@ async function processWhatsAppMessageWithAI(
               logger.info("[WhatsApp] Sending stored tool result as fallback");
               await sendWhatsAppMessage(projectId, whatsappNumber, {
                 text: formatted,
-              });
+              }, false); // Final message - stop typing after 1s
               break; // Only send first result to avoid spam
             }
           }
@@ -1429,10 +1551,40 @@ async function processWhatsAppMessageWithAI(
         return;
       }
 
+      // === SKIP INTERMEDIATE "THINKING" RESPONSE WHEN TOOLS WERE CALLED ===
+      // If tools were executed, skip generic "thinking" responses like "Berfikir keras..."
+      // Only send the final substantive response
+      if (toolResults.length > 0) {
+        const genericPatterns = [
+          /berfikir keras/i,
+          /tunggu ya/i,
+          /baik, saya/i,
+          /tentu, saya/i,
+          /mari saya/i,
+          /saya akan/i,
+          /sedang mem/i,
+          /akan saya/i,
+        ];
+
+        const isGenericResponse = genericPatterns.some(p => p.test(cleanedResponse));
+
+        // Check if response is short (likely just a thinking phrase)
+        const isShortResponse = cleanedResponse.length < 100;
+
+        if (isGenericResponse || isShortResponse) {
+          logger.info({
+            cleanedResponse: cleanedResponse.substring(0, 50),
+            isGenericResponse,
+            isShortResponse,
+          }, "[WhatsApp] Skipping intermediate 'thinking' response - waiting for final response after tool execution");
+          return; // Don't send this intermediate response
+        }
+      }
+
       logger.info({ cleanedResponse: cleanedResponse.substring(0, 100) + "..." }, "[WhatsApp] Sending response back to WhatsApp");
       await sendWhatsAppMessage(projectId, whatsappNumber, {
         text: cleanedResponse,
-      });
+      }, false); // Final message - stop typing after 1s
       logger.info("[WhatsApp] Response sent successfully");
     } else if (toolResults.length > 0) {
       // No AI response but we have tool results
@@ -1442,7 +1594,7 @@ async function processWhatsAppMessageWithAI(
         if (formatted) {
           await sendWhatsAppMessage(projectId, whatsappNumber, {
             text: formatted,
-          });
+          }, false); // Final message - stop typing after 1s
           break;
         }
       }
@@ -1516,16 +1668,16 @@ async function stopWhatsAppTyping(projectId: string, phone: string): Promise<voi
 }
 
 /**
- * Send WhatsApp message
+ * Send WhatsApp message without handling typing indicator
+ * Used for progress messages where typing is managed separately
  */
-async function sendWhatsAppMessage(
+async function sendWhatsAppMessageRaw(
   projectId: string,
   phone: string,
-  message: { text?: string; imageUrl?: string; location?: { lat: number; lng: number } },
-  keepTyping: boolean = false
+  message: { text?: string; imageUrl?: string; location?: { lat: number; lng: number } }
 ): Promise<void> {
   try {
-    logger.info({ phone, message: message.text?.substring(0, 50) + "..." }, "[WhatsApp] Sending to WhatsApp");
+    logger.info({ phone, message: message.text?.substring(0, 50) + "..." }, "[WhatsApp] Sending to WhatsApp (raw)");
     const response = await fetch(`${WHATSAPP_API_URL}/clients/${projectId}/send-message`, {
       method: "POST",
       headers: {
@@ -1534,7 +1686,6 @@ async function sendWhatsAppMessage(
       body: JSON.stringify({
         phone,
         message: message.text,
-        // Add support for other message types as needed
       }),
     });
 
@@ -1544,22 +1695,11 @@ async function sendWhatsAppMessage(
       throw new Error("Failed to send WhatsApp message");
     }
 
-    logger.info({ phone }, "[WhatsApp] Message sent successfully");
-
-    // Stop typing indicator after message is sent, UNLESS keepTyping is true
-    // Typing should continue during AI processing and tool execution
-    if (!keepTyping) {
-      await stopWhatsAppTyping(projectId, phone);
-    } else {
-      // FORCE restart typing if keepTyping is true
-      // Sending a message usually stops the typing indicator on the client side
-      logger.info("[WhatsApp] keepTyping=true, restarting typing indicator...");
-      startWhatsAppTyping(projectId, phone).catch((e: any) => logger.warn({ e }, "[WhatsApp] Failed to restart typing"));
-    }
+    logger.info({ phone }, "[WhatsApp] Message sent successfully (raw)");
   } catch (error) {
     logger.error({ url: `${WHATSAPP_API_URL}/clients/${projectId}/send-message` }, "[WhatsApp] Error sending message to URL");
     logger.error({ error }, "[WhatsApp] Error details");
-    
+
     const errorStr = String(error);
     if (errorStr.includes("fetch failed") || errorStr.includes("ECONNREFUSED")) {
       logger.error("[WhatsApp] CRITICAL: Could not connect to WhatsApp Service!");
@@ -1567,6 +1707,30 @@ async function sendWhatsAppMessage(
     }
     throw error;
   }
+}
+
+/**
+ * Send WhatsApp message with typing indicator management
+ * For final completion messages: stops typing after 3 seconds (to ensure message is delivered)
+ */
+async function sendWhatsAppMessage(
+  projectId: string,
+  phone: string,
+  message: { text?: string; imageUrl?: string; location?: { lat: number; lng: number } },
+  keepTyping: boolean = false
+): Promise<void> {
+  // Send the message
+  await sendWhatsAppMessageRaw(projectId, phone, message);
+
+  // Handle typing indicator after message sent
+  if (!keepTyping) {
+    // For completion messages: stop typing after 50ms
+    logger.info("[WhatsApp] Completion message sent, stopping typing in 50ms...");
+    await new Promise(resolve => setTimeout(resolve, 50));
+    await stopWhatsAppTyping(projectId, phone);
+    logger.info("[WhatsApp] Typing indicator stopped");
+  }
+  // For keepTyping=true (progress), typing is restarted by the caller
 }
 
 /**

@@ -1211,7 +1211,6 @@ export function AdminSetupPage() {
                             }
                             className="w-full px-3 py-2 border rounded-md"
                           >
-                            <option value="user">User</option>
                             <option value="admin">Admin</option>
                           </select>
                         </div>

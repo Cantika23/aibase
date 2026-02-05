@@ -29,8 +29,6 @@ go.work
 *.swp
 *.swo
 *~
-<<<<<<< HEAD
-=======
 
 # OS generated files
 .DS_Store
@@ -51,4 +49,3 @@ examples/typescript-client/dist/
 # TypeScript client .env files
 examples/typescript-client/.env
 examples/typescript-client/.env.*
->>>>>>> 751d3a77536fa6308e20b784336112612b80e689

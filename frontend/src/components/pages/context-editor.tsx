@@ -2,20 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Save,
   RefreshCw,
-  Bold,
-  Italic,
-  Underline,
-  List,
-  Code,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Info
 } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
-import { Markdown } from 'tiptap-markdown';
 import { useProjectStore } from "@/stores/project-store";
 import { buildApiUrl } from "@/lib/base-path";
 import { Button } from "@/components/ui/button";
@@ -26,6 +21,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
+import { ContextVariablesLegend } from "@/components/pages/context-variables-legend";
 
 const API_URL = buildApiUrl("");
 
@@ -36,6 +33,7 @@ export function ContextEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zenMode, setZenMode] = useState(false);
+  const [showVariables, setShowVariables] = useState(false);
 
   const { currentProject } = useProjectStore();
 
@@ -67,7 +65,7 @@ export function ContextEditor() {
         class: 'prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-8 sm:p-12',
       },
     },
-  });
+  } as any);
 
   // Load Context
   const loadContext = async () => {
@@ -125,7 +123,7 @@ export function ContextEditor() {
   }, [editor, originalContent]);
 
   // Save Context
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (newContent: string) => {
     if (!currentProject) return;
 
     setIsSaving(true);
@@ -133,38 +131,32 @@ export function ContextEditor() {
       const response = await fetch(`${API_URL}/api/context`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, projectId: currentProject.id }),
+        body: JSON.stringify({ content: newContent, projectId: currentProject.id }),
       });
 
       const data = await response.json();
       if (!data.success) throw new Error(data.error || "Failed to save context");
 
-      setOriginalContent(content);
-      toast.success("Saved successfully");
+      setOriginalContent(newContent);
     } catch (err) {
-      toast.error("Failed to save");
+      throw err;
     } finally {
       setIsSaving(false);
     }
-  }, [currentProject, content]);
+  }, [currentProject]);
 
   const hasChanges = content !== originalContent;
 
-  // Keyboard Shortcuts (Standard Tiptap handles most, just Save)
+  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        if (hasChanges) handleSave();
-      }
       if (e.key === "Escape" && zenMode) {
         setZenMode(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [zenMode, hasChanges, handleSave]);
-
+  }, [zenMode]);
 
   if (error) {
     return (
@@ -233,10 +225,26 @@ export function ContextEditor() {
               </Tooltip>
             </TooltipProvider>
 
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                   <Button 
+                     variant={showVariables ? "secondary" : "ghost"} 
+                     size="icon" 
+                     className="h-8 w-8" 
+                     onClick={() => setShowVariables(!showVariables)}
+                   >
+                     <Info className="h-4 w-4" />
+                   </Button>
+                </TooltipTrigger>
+                <TooltipContent>Variables Legend</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             <Button
               variant={hasChanges ? "default" : "secondary"}
               size="sm"
-              onClick={handleSave}
+              onClick={() => handleSave(content)}
               disabled={!hasChanges || isLoading}
               className="gap-2 min-w-[80px]"
             >
@@ -246,6 +254,8 @@ export function ContextEditor() {
           </div>
         </div>
 
+
+        
         {/* Editor Wrapper */}
         <div className="flex-1 overflow-hidden relative flex flex-col">
 
